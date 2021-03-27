@@ -23,7 +23,7 @@ export class AppActionsPage extends Cleanup {
   appId: string
   app: PropertySubject<AppInstalledFull>
 
-  constructor(
+  constructor (
     private readonly route: ActivatedRoute,
     private readonly apiService: ApiService,
     private readonly alertCtrl: AlertController,
@@ -31,7 +31,7 @@ export class AppActionsPage extends Cleanup {
     private readonly loaderService: LoaderService,
   ) { super() }
 
-  ngOnInit() {
+  ngOnInit () {
     this.appId = this.route.snapshot.paramMap.get('appId')
 
     markAsLoadingDuring$(this.$loading$, this.preload.appFull(this.appId)).pipe(
@@ -39,11 +39,11 @@ export class AppActionsPage extends Cleanup {
     ).subscribe({ error: e => this.error = e.message })
   }
 
-  async handleAction(action: ServiceAction) {
+  async handleAction (action: ServiceAction) {
     if (action.allowedStatuses.includes(this.app.status.getValue())) {
       const alert = await this.alertCtrl.create({
         header: 'Confirm',
-        message: `Are you sure you want to execute action "${action.name}"? ${action.warning ? action.warning : ""}`,
+        message: `Are you sure you want to execute action "${action.name}"? ${action.warning ? action.warning : ''}`,
         buttons: [
           {
             text: 'Cancel',
@@ -80,7 +80,7 @@ export class AppActionsPage extends Cleanup {
     }
   }
 
-  private async executeAction(action: ServiceAction) {
+  private async executeAction (action: ServiceAction) {
     try {
       const res = await this.loaderService.displayDuringP(
         this.apiService.serviceAction(this.appId, action),
@@ -108,7 +108,7 @@ export class AppActionsPage extends Cleanup {
     }
   }
 
-  private async presentAlertActionFail(code: number, message: string): Promise<void> {
+  private async presentAlertActionFail (code: number, message: string): Promise<void> {
     const failureAlert = await this.alertCtrl.create({
       header: 'Execution Failed',
       message: `Error code ${code}. ${message}`,

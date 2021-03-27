@@ -237,7 +237,7 @@ export class ConfigCursor<T extends ValueType> {
                   displayUniqueBy(
                     (cursor.spec() as ValueSpecObject | ValueSpecUnion).uniqueBy,
                     (cursor.spec() as ValueSpecObject | ValueSpecUnion),
-                    cursor.config()
+                    cursor.config(),
                   )
                 } must be unique.` : ''
               }
@@ -454,7 +454,7 @@ function isEqual (uniqueBy: UniqueBy, lhs: ConfigCursor<'object'>, rhs: ConfigCu
   }
 }
 
-export function displayUniqueBy(uniqueBy: UniqueBy, spec: ValueSpecObject | ValueSpecUnion, value: object): string {
+export function displayUniqueBy (uniqueBy: UniqueBy, spec: ValueSpecObject | ValueSpecUnion, value: object): string {
   if (typeof uniqueBy === 'string') {
     if (spec.type === 'object') {
       return spec.spec[uniqueBy].name

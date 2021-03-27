@@ -43,7 +43,7 @@ export class DevSSHKeysPage {
     await this.serverConfigService.presentModalValueEdit('ssh', true)
   }
 
-  async presentAlertDelete (fingerprint: SSHFingerprint) {    
+  async presentAlertDelete (fingerprint: SSHFingerprint) {
     const alert = await this.alertCtrl.create({
       backdropDismiss: false,
       header: 'Caution',

@@ -46,7 +46,7 @@ export class MockApiService extends ApiService {
           launchable: this.config.isLaunchable(app),
         }
       })
-    
+
     const obj: { [appId: string]: AppInstalledFull } = { }
     apps.forEach(app => {
       obj[app.id] = app
@@ -186,7 +186,7 @@ export class MockApiService extends ApiService {
       hasFetchedFull: true,
       hasUI: this.config.hasUI(app),
       launchable: this.config.isLaunchable(app),
-      ...mockAppDependentBreakages
+      ...mockAppDependentBreakages,
     }
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),

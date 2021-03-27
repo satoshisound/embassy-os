@@ -4,7 +4,7 @@ import { AppBackupConfirmationComponent } from './app-backup-confirmation.compon
 import { IonicModule } from '@ionic/angular'
 import { RouterModule } from '@angular/router'
 import { SharingModule } from 'src/app/modules/sharing.module'
-import { FormsModule } from '@angular/forms';
+import { FormsModule } from '@angular/forms'
 
 @NgModule({
   declarations: [

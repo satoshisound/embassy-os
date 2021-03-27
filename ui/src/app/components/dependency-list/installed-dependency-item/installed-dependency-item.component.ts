@@ -101,7 +101,7 @@ export class InstalledDependencyItemComponent implements OnInit {
     return this.navCtrl.navigateForward(`/services/installed/${this.dep.id}/config`, navigationExtras)
   }
 
-  async presentAlertDescription() {
+  async presentAlertDescription () {
     const description = `<p>${this.dep.description}<\p>`
 
     const alert = await this.alertCtrl.create({

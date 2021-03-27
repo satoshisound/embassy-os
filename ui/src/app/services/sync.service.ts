@@ -52,12 +52,6 @@ export class SyncDaemon {
 
     switch (serverRes.result) {
       case 'resolve': {
-        this.patchDbModel.patch([{
-          op: PatchOp.ADD,
-          path: '/server',
-          value: 'test',
-        }])
-        console.log('huh', this.patchDbModel.peek)
         this.serverModel.update(serverRes.value, now)
         break
       }
