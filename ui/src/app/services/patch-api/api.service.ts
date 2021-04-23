@@ -5,11 +5,10 @@ import { Subject, Observable } from 'rxjs'
 import { Unit, ApiServer, ReqRes } from './api-types'
 import { AppMetrics } from 'src/app/util/metrics.util'
 import { ConfigSpec } from 'src/app/app-config/config-types'
-import { Http, PatchOp, SeqReplace, SeqUpdate, SeqUpdateReal, Source, TempSeqUpdate } from 'patch-db-client'
+import { Http, PatchOp, SeqReplace, SeqUpdate, SeqUpdateReal, Source, SeqUpdateTemp } from 'patch-db-client'
 import { DataModel } from 'src/app/models/patch-db/data-model'
 import { filter } from 'rxjs/operators'
 import * as uuid from 'uuid'
-
 
 export type PatchPromise<T> = Promise<{ response: T, patch?: SeqUpdate<DataModel> }>
 
@@ -18,8 +17,8 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   private syncing = true
 
   /** PatchDb Source interface. Post/Patch requests provide a source of patches to the db. */
-  // sequenceStream '_' is not used by the live api, but is overriden by the mock
-  watch (_?: Observable<number>): Observable<SeqUpdate<DataModel>> {
+  // sequenceStream '_' is not used by the live api, but is overridden by the mock
+  watch$ (_?: Observable<number>): Observable<SeqUpdate<DataModel>> {
     return this.sync.asObservable().pipe(filter(() => this.syncing))
   }
   start (): void { this.syncing = true }
@@ -80,7 +79,7 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
     //Unfortunately, this 'path' is not type safe.
     //We could consider a helper function with type safe path parameters like 'watch'?
-    return { expiredBy: uuid.v4(), patch: [{ op: PatchOp.REPLACE, path: `apps/${appId}/status`, value: AppStatus.INSTALLING }] } as TempSeqUpdate
+    return { expiredBy: uuid.v4(), operations: [{ op: PatchOp.REPLACE, path: `apps/${appId}/status`, value: AppStatus.INSTALLING }] } as SeqUpdateTemp
   })
 
   protected abstract uninstallAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
@@ -144,9 +143,9 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   serviceAction = this.syncResponse(this.serviceActionRaw)
 
   // Helper allowing quick decoration to sync the response patch and return the response contents.
-  // Pass in a tempUpdate function which returns a TempSeqUpdate correspodning to a temporary state change you'd like to enact prior
+  // Pass in a tempUpdate function which returns a TempSeqUpdate corresponding to a temporary state change you'd like to enact prior
   // to request and expired when request terminates.
-  private syncResponse<T extends (...args: any[]) => PatchPromise<any>> (f: T, tempUpdate?: (...args: Parameters<T>) => TempSeqUpdate | undefined): (...args: Parameters<T>) => ExtractResultPromise<ReturnType<T>> {
+  private syncResponse<T extends (...args: any[]) => PatchPromise<any>> (f: T, tempUpdate?: (...args: Parameters<T>) => SeqUpdateTemp | undefined): (...args: Parameters<T>) => ExtractResultPromise<ReturnType<T>> {
     return (...a) => {
       let responseExpires = undefined
       if (tempUpdate) {

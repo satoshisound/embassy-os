@@ -160,7 +160,9 @@ export function capitalizeFirstLetter (string: string): string {
   return string.charAt(0).toUpperCase() + string.slice(1)
 }
 
-export const exists = t => !!t
+export const exists = (t: any) => {
+  return t !== undefined
+}
 
 export type DeepPartial<T> = {
   [k in keyof T]?: DeepPartial<T[k]>

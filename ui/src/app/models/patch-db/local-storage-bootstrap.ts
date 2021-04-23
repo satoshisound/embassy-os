@@ -1,24 +1,30 @@
-import { BootstrapCache } from 'patch-db-client';
-import { DataModel } from './data-model';
+import { Bootstrapper, DBCache } from 'patch-db-client'
+import { DataModel } from './data-model'
 import { Injectable } from '@angular/core'
 import { Storage } from '@ionic/storage'
+
 @Injectable({
   providedIn: 'root',
 })
-export class LocalStorageBootstrap implements BootstrapCache<DataModel> {
+export class LocalStorageBootstrap implements Bootstrapper<DataModel> {
   static CONTENT_KEY = 'patch-db-cache'
 
-  constructor (private readonly storage: Storage) { }
-  async commitCache (sequence: number, cache: DataModel): Promise<void> {
-    return this.storage.set(LocalStorageBootstrap.CONTENT_KEY, { sequence, cache })
+  constructor (
+    private readonly storage: Storage,
+  ) { }
+
+  async updateCache (cache: DBCache<DataModel>): Promise<void> {
+    return this.storage.set(LocalStorageBootstrap.CONTENT_KEY, cache)
   }
 
   async nukeCache (): Promise<void> {
     return this.storage.remove(LocalStorageBootstrap.CONTENT_KEY)
   }
 
-  async restoreCache (): Promise<{ sequence: number; cache: DataModel }> {
-    return this.storage.get(LocalStorageBootstrap.CONTENT_KEY).then(drudged => drudged || { sequence: 0, cache: { } })
+  async restoreCache (): Promise<DBCache<DataModel>> {
+    const cache = await this.storage.get(LocalStorageBootstrap.CONTENT_KEY)
+    if (!cache) return { sequence: 0, data: { } as DataModel }
+    return cache
   }
 
   async init (): Promise<void> {

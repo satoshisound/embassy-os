@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core'
-import { initPatchDb, PatchDB, PatchDbConfig, Store } from 'patch-db-client'
-import { BehaviorSubject, combineLatest, Subscription } from 'rxjs'
+import { PatchDB, PatchDbConfig, Store } from 'patch-db-client'
+import { BehaviorSubject, combineLatest, Observable, Subscription } from 'rxjs'
 import { filter, map } from 'rxjs/operators'
 import { exists } from '../../util/misc.util'
 import { DataModel } from './data-model'
@@ -10,23 +10,42 @@ import { DataModel } from './data-model'
 })
 export class PatchDbModel {
   private patchDb: PatchDB<DataModel>
-  private store: Store<DataModel>
   private syncSub: Subscription
-  constructor (private readonly conf: PatchDbConfig<DataModel>) { }
 
-  get peek (): DataModel { return this.store.peek }
+  constructor (
+    private readonly conf: PatchDbConfig<DataModel>,
+  ) { }
 
-  watch: Store<DataModel>['watch'] = (...args: (string | number)[]) => {
-    const overlay = this.getOverlay(...args).pipe(filter(exists))
-    const base = (this.store.watch as any)(...args)
-    return combineLatest([overlay, base]).pipe(
+  async init (): Promise<void> {
+    if (this.patchDb) return console.warn('Cannot re-init patchDbModel')
+    this.patchDb = await PatchDB.init<DataModel>(this.conf)
+    this.start()
+  }
+
+  start (): void {
+    if (this.syncSub) this.stop()
+    this.syncSub = this.patchDb.sync$().subscribe({
+      error: e => console.error('Critical, patch-db-sync sub error', e),
+      complete: () => console.error('Critical, patch-db-sync sub complete'),
+    })
+  }
+
+  stop (): void {
+    this.syncSub.unsubscribe()
+    this.syncSub = undefined
+  }
+
+  watch$: Store<DataModel>['watch$'] = (...args: (string | number)[]): Observable<DataModel> => {
+    const overlay$ = this.getOverlay(...args).pipe(filter(a => exists(a)))
+    const base$ = this.patchDb.store.watch$(...(args as []))
+    return combineLatest([overlay$, base$]).pipe(
       map(([o, b]) => {
         if (!o) return b
         if (o.expired(b)) {
           this.clearOverlay(...args)
           return b
         } else {
-          return o
+          return o.value
         }
       }),
     )
@@ -36,44 +55,19 @@ export class PatchDbModel {
     `patchDbModel.overlay({ expired: () => true, value: 'UNREACHABLE' }, 'server', 'status')`
     And will expire as soon as a genuine server status emits from the BE.
   */
-  private readonly overlays: { [path: string]: BehaviorSubject<{ value: any, expired: (newValue: any) => boolean }>} = { }
+  private readonly overlays: { [path: string]: BehaviorSubject<{ value: any, expired: (newValue: any) => boolean } | null>} = { }
 
-  setOverlay (args: { expired: (newValue: any) => boolean, value: any }, ...path: (string | number)[]) {
-    this.watch('apps', 'bitcoind', 'actions') // @TODO why is this here?
+  setOverlay (args: { value: any, expired: (newValue: any) => boolean }, ...path: (string | number)[]): void {
     this.getOverlay(...path).next(args)
   }
 
   private getOverlay (...path: (string | number)[]): BehaviorSubject<{ value: any, expired: (newValue: any) => boolean } | undefined> {
     const singlePath = '/' + path.join('/')
-    this.overlays[singlePath] = this.overlays[singlePath] || new BehaviorSubject(undefined)
+    this.overlays[singlePath] = this.overlays[singlePath] || new BehaviorSubject(null)
     return this.overlays[singlePath]
   }
 
   private clearOverlay (...path: (string | number)[]): void {
-    this.getOverlay(...path).next(undefined)
-  }
-
-  async init () {
-    if (this.patchDb || this.store) return console.warn('Cannot re-init patchDbModel')
-    await this.conf.bootstrap.init()
-    const { patchDb, store } = await initPatchDb<DataModel>(this.conf)
-    this.patchDb = patchDb
-    this.store = store
-
-    this.start()
-  }
-
-  stop () {
-    this.syncSub.unsubscribe()
-    this.syncSub = undefined
-  }
-
-  start () {
-    if (this.syncSub) this.stop()
-
-    this.syncSub = this.patchDb.startSync().subscribe({
-      error: e => console.error('Critical, patch-db-sync sub error', e),
-      complete: () => console.error('Critical, patch-db-sync sub complete'),
-    })
+    this.getOverlay(...path).next(null)
   }
 }

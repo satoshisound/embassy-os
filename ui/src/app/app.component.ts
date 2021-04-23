@@ -50,11 +50,6 @@ export class AppComponent {
       url: '/notifications',
       icon: 'notifications-outline',
     },
-    // {
-    //   title: 'Backup drives',
-    //   url: '/drives',
-    //   icon: 'albums-outline',
-    // },
   ]
 
   constructor (
@@ -68,7 +63,7 @@ export class AppComponent {
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly emver: Emver,
-    private readonly pm: PatchDbModel,
+    private readonly patchDBModel: PatchDbModel,
     readonly splitPane: SplitPaneTracker,
   ) {
     // set dark theme
@@ -87,7 +82,7 @@ export class AppComponent {
   async init () {
     let fromFresh = true
     await this.storage.ready()
-    await this.pm.init()
+    await this.patchDBModel.init()
     await this.authService.restoreCache()
     await this.emver.init()
 

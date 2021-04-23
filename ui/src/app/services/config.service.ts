@@ -7,9 +7,15 @@ const { patchDb, maskAs, api, skipStartupAlerts } = require('../../../ui-config.
 type UiConfig = {
   patchDb: {
     // If this is false (the default), poll will be used if in consulate only. If true it will be on regardless of env. This is useful in concert with api mocks.
-    usePollOverride: boolean,
-    poll: { cooldown: number /* in ms */ },
-    websocket: { type: 'ws', url: string, version: number }
+    usePollOverride: boolean
+    poll: {
+      cooldown: number /* in ms */
+    }
+    websocket: {
+      type: 'ws'
+      url: string
+      version: number
+    }
     // Wait this long (ms) before asking BE for a dump when out of order messages are received
     timeoutForMissingPatch: number
   }

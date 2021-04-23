@@ -6,7 +6,6 @@ import { S9Server } from 'src/app/models/server-model'
 import { ApiService } from 'src/app/services/api/api.service'
 import { SyncDaemon } from 'src/app/services/sync.service'
 import { Subscription, Observable } from 'rxjs'
-import { PropertySubject, toObservable } from 'src/app/util/property-subject.util'
 import { doForAtLeast } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
@@ -17,17 +16,10 @@ import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
   styleUrls: ['server-show.page.scss'],
 })
 export class ServerShowPage {
-  error = ''
-  s9Host$: Observable<string>
-
-  server: PropertySubject<S9Server>
-  serverName: Observable<string>
-  currentServer: S9Server
-
+  server: Observable<S9Server>
   subsToTearDown: Subscription[] = []
-
-  updatingFreeze = false
   updating = false
+  error = ''
 
   constructor (
     private readonly serverModel: ServerModel,
@@ -35,26 +27,17 @@ export class ServerShowPage {
     private readonly loader: LoaderService,
     private readonly apiService: ApiService,
     private readonly syncDaemon: SyncDaemon,
-    // call watch directly in the html?
     public readonly patchDbModel: PatchDbModel,
   ) { }
 
   async ngOnInit () {
-    this.server = this.serverModel.watch()
-    this.serverName = this.patchDbModel.watch('server', 'name')
+    // this.server = this.serverModel.watch()
+    this.server = this.patchDbModel.watch$('server')
 
     this.subsToTearDown.push(
       // serverUpdateSubscription
-      this.server.status.subscribe(status => {
-        if (status === ServerStatus.UPDATING) {
-          this.updating = true
-        } else {
-          if (!this.updatingFreeze) { this.updating = false }
-        }
-      }),
-      // currentServerSubscription
-      toObservable(this.server).subscribe(currentServerProperties => {
-        this.currentServer = currentServerProperties
+      this.server.subscribe(s => {
+        this.updating = s.status === ServerStatus.UPDATING
       }),
     )
   }
@@ -128,7 +111,7 @@ export class ServerShowPage {
 
   private async restart () {
     this.loader
-      .of(LoadingSpinner(`Restarting ${this.currentServer.name}...`))
+      .of(LoadingSpinner(`Restarting...`))
       .displayDuringAsync( async () => {
           this.serverModel.markUnreachable()
           await this.apiService.restartServer()
@@ -138,7 +121,7 @@ export class ServerShowPage {
 
   private async shutdown () {
     this.loader
-      .of(LoadingSpinner(`Shutting down ${this.currentServer.name}...`))
+      .of(LoadingSpinner(`Shutting down...`))
       .displayDuringAsync( async () => {
         this.serverModel.markUnreachable()
         await this.apiService.shutdownServer()

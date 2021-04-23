@@ -28,11 +28,13 @@ export class MockApiService extends ApiService {
   watch (sequenceStream: Observable<number>): Observable<SeqUpdate<DataModel>> {
     if (!this.sequenceStreamSub || this.sequenceStreamSub.closed) this.sequenceStreamSub = sequenceStream.subscribe(i => this.sequence < i ? (this.sequence = i) : { })
 
-    return super.watch()
+    return super.watch$()
   }
 
   async getUpdates (): Promise<SeqUpdateReal<DataModel>[]> {
-    return this.getDump().then(a => [a])
+    console.log('getting updates')
+    const data = await this.getDump()
+    return [data]
   }
 
   async getDump (): Promise<SeqReplace<DataModel>> {
@@ -190,7 +192,7 @@ export class MockApiService extends ApiService {
     }
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.ADD, path: `/apps/${appId}`, value: response }],
+      operations: [{ op: PatchOp.ADD, path: `/apps/${appId}`, value: response }],
     }
     return { response, patch }
   }
@@ -199,7 +201,7 @@ export class MockApiService extends ApiService {
     await pauseFor(1000)
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REMOVE, path: `/apps/${appId}` }],
+      operations: [{ op: PatchOp.REMOVE, path: `/apps/${appId}` }],
     }
 
     return { patch, response: mockAppDependentBreakages}
@@ -215,7 +217,7 @@ export class MockApiService extends ApiService {
     await pauseFor(1000)
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RUNNING }],
+      operations: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RUNNING }],
     }
 
     return { patch, response: { } }
@@ -226,7 +228,7 @@ export class MockApiService extends ApiService {
 
     const patch: SeqUpdate<DataModel> = !dryRun ? {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
+      operations: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
     } : undefined
 
     return { patch, response: mockAppDependentBreakages }
@@ -246,7 +248,7 @@ export class MockApiService extends ApiService {
     await pauseFor(1000)
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.CREATING_BACKUP }],
+      operations: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.CREATING_BACKUP }],
     }
 
     return { patch, response: { } }
@@ -257,7 +259,7 @@ export class MockApiService extends ApiService {
 
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
+      operations: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
     }
 
     return { patch, response: { } }
@@ -268,7 +270,7 @@ export class MockApiService extends ApiService {
 
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RESTORING_BACKUP }],
+      operations: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RESTORING_BACKUP }],
     }
 
     return { patch, response: { } }
@@ -284,7 +286,7 @@ export class MockApiService extends ApiService {
     await pauseFor(1000)
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: `/server/${attr}`, value }],
+      operations: [{ op: PatchOp.REPLACE, path: `/server/${attr}`, value }],
     }
     return { patch, response: { } }
   }
@@ -299,7 +301,7 @@ export class MockApiService extends ApiService {
     const fingerprint =  mockApiServer().ssh[0]
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.ADD, path: `/server/ssh/-`, value: fingerprint }],
+      operations: [{ op: PatchOp.ADD, path: `/server/ssh/-`, value: fingerprint }],
     }
     return { patch, response: { } }
   }
@@ -309,7 +311,7 @@ export class MockApiService extends ApiService {
 
     const patch: SeqUpdate<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.REMOVE, path: `/server/ssh/0` }],
+      operations: [{ op: PatchOp.REMOVE, path: `/server/ssh/0` }],
     }
 
     return { patch, response: { }}
