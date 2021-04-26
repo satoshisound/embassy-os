@@ -2,7 +2,8 @@ import { NgModule, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core'
 import { BrowserModule } from '@angular/platform-browser'
 import { RouteReuseStrategy } from '@angular/router'
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular'
-import { IonicStorageModule } from '@ionic/storage'
+import { Drivers } from '@ionic/storage'
+import { IonicStorageModule } from '@ionic/storage-angular'
 import { HttpClientModule } from '@angular/common/http'
 import { AppComponent } from './app.component'
 import { AppRoutingModule } from './app-routing.module'
@@ -30,7 +31,10 @@ import { LocalStorageBootstrap } from './models/patch-db/local-storage-bootstrap
     BrowserModule,
     IonicModule.forRoot(),
     AppRoutingModule,
-    IonicStorageModule.forRoot(),
+    IonicStorageModule.forRoot({
+      name: 'embassy_db',
+      driverOrder: [Drivers.IndexedDB, Drivers.LocalStorage],
+    }),
     QRCodeModule,
     OSWelcomePageModule,
   ],

@@ -58,9 +58,9 @@ export class ModelPreload {
   }
 
   server (): Observable<PropertySubject<S9Server>> {
-    return fromSync$(() => this.serverModel.watch()).pipe(concatMap(sw => {
-      if (sw.versionInstalled.getValue()) {
-        return of(sw)
+    return fromSync$(() => this.serverModel.watch()).pipe(concatMap(server => {
+      if (server.versionInstalled.getValue()) {
+        return of(server)
       } else {
         console.warn(`server not present, preloading`)
         return from(this.api.getServer()).pipe(

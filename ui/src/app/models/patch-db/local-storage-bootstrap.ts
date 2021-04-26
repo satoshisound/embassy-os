@@ -23,11 +23,12 @@ export class LocalStorageBootstrap implements Bootstrapper<DataModel> {
 
   async restoreCache (): Promise<DBCache<DataModel>> {
     const cache = await this.storage.get(LocalStorageBootstrap.CONTENT_KEY)
+    console.log(this.storage.driver, cache)
     if (!cache) return { sequence: 0, data: { } as DataModel }
     return cache
   }
 
   async init (): Promise<void> {
-    return this.storage.ready().then(() => { })
+    this.storage.create()
   }
 }

@@ -1,13 +1,11 @@
 import { Component } from '@angular/core'
-import { ServerModel, ServerStatus } from './models/server-model'
+import { ServerStatus } from './models/server-model'
 import { Storage } from '@ionic/storage'
-import { SyncDaemon } from './services/sync.service'
 import { AuthService, AuthState } from './services/auth.service'
 import { ApiService } from './services/api/api.service'
 import { Router } from '@angular/router'
-import { BehaviorSubject, Observable } from 'rxjs'
-import { AppModel } from './models/app-model'
-import { filter, take } from 'rxjs/operators'
+import { BehaviorSubject } from 'rxjs'
+import { filter, takeWhile, tap } from 'rxjs/operators'
 import { AlertController } from '@ionic/angular'
 import { LoaderService } from './services/loader.service'
 import { Emver } from './services/emver.service'
@@ -22,11 +20,8 @@ import { PatchDbModel } from './models/patch-db/patch-db-model'
   styleUrls: ['app.component.scss'],
 })
 export class AppComponent {
-  isUpdating = false
   fullPageMenu = true
-  $showMenuContent$ = new BehaviorSubject(false)
-  serverName$ : Observable<string>
-  serverBadge$: Observable<number>
+  showMenuContent$ = new BehaviorSubject(false)
   selectedIndex = 0
   untilLoaded = true
   appPages = [
@@ -53,23 +48,18 @@ export class AppComponent {
   ]
 
   constructor (
-    private readonly serverModel: ServerModel,
-    private readonly syncDaemon: SyncDaemon,
     private readonly storage: Storage,
-    private readonly appModel: AppModel,
     private readonly authService: AuthService,
     private readonly router: Router,
     private readonly api: ApiService,
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly emver: Emver,
-    private readonly patchDBModel: PatchDbModel,
+    private readonly patch: PatchDbModel,
     readonly splitPane: SplitPaneTracker,
   ) {
     // set dark theme
     document.body.classList.toggle('dark', true)
-    this.serverName$ = this.serverModel.watch().name
-    this.serverBadge$ = this.serverModel.watch().badge
     this.init()
   }
 
@@ -80,56 +70,64 @@ export class AppComponent {
   }
 
   async init () {
-    let fromFresh = true
-    await this.storage.ready()
-    await this.patchDBModel.init()
-    await this.authService.restoreCache()
+    await this.storage.create()
+    await this.patch.init()
+    await this.authService.init()
     await this.emver.init()
 
-    this.authService.listen({
-      [AuthState.VERIFIED]: async () => {
-        console.log('verified')
-        this.api.authenticatedRequestsEnabled = true
-        await this.serverModel.restoreCache()
-        await this.appModel.restoreCache()
-        this.syncDaemon.start()
-        this.$showMenuContent$.next(true)
-        if (fromFresh) {
-          this.router.initialNavigation()
-          fromFresh = false
+    let fromFresh = true
+    let isUpdating = false
+    let authed = false
+
+    const serverStatus$ = this.patch.watch$('server', 'status')
+    .pipe(
+      tap(_ => console.log('testing')),
+      tap(status => isUpdating = status === ServerStatus.UPDATING),
+      takeWhile(_ => !!authed),
+    )
+
+    const routerEvents$ = this.router.events
+    .pipe(
+      filter(e => !!(e as any).urlAfterRedirects),
+      tap((e: any) => {
+        const appPageIndex = this.appPages.findIndex(
+          appPage => (e.urlAfterRedirects || e.url || '').startsWith(appPage.url),
+        )
+        if (appPageIndex > -1) this.selectedIndex = appPageIndex
+
+        // TODO: while this works, it is dangerous and impractical.
+        if (e.urlAfterRedirects !== '/embassy' && e.urlAfterRedirects !== '/authenticate' && isUpdating) {
+          this.router.navigateByUrl('/embassy')
         }
-      },
-      [AuthState.UNVERIFIED]: () => {
-        console.log('unverified')
+      }),
+      takeWhile(_ => !!authed),
+    )
+
+    this.authService.watch$()
+    .subscribe(auth => {
+      // VERIFIED
+      if (auth === AuthState.VERIFIED) {
+        this.api.authenticatedRequestsEnabled = true
+        this.showMenuContent$.next(true)
+        this.patch.start()
+        serverStatus$.subscribe()
+        routerEvents$.subscribe()
+      // UNVERIFIED
+      } else if (auth === AuthState.UNVERIFIED) {
+        authed = false
         this.api.authenticatedRequestsEnabled = false
-        this.serverModel.clear()
-        this.appModel.clear()
-        this.syncDaemon.stop()
+        this.patch.stop()
         this.storage.clear()
         this.router.navigate(['/authenticate'], { replaceUrl: true })
-        this.$showMenuContent$.next(false)
-        if (fromFresh) {
-          this.router.initialNavigation()
-          fromFresh = false
-        }
-      },
-    })
+        this.showMenuContent$.next(false)
+      }
 
-    this.serverModel.watch().status.subscribe(s => {
-      this.isUpdating = (s === ServerStatus.UPDATING)
-    })
-
-    this.router.events.pipe(filter(e => !!(e as any).urlAfterRedirects)).subscribe((e: any) => {
-      const appPageIndex = this.appPages.findIndex(
-        appPage => (e.urlAfterRedirects || e.url || '').startsWith(appPage.url),
-      )
-      if (appPageIndex > -1) this.selectedIndex = appPageIndex
-
-      // TODO: while this works, it is dangerous and impractical.
-      if (e.urlAfterRedirects !== '/embassy' && e.urlAfterRedirects !== '/authenticate' && this.isUpdating) {
-        this.router.navigateByUrl('/embassy')
+      if (fromFresh) {
+        this.router.initialNavigation()
+        fromFresh = false
       }
     })
+
     this.api.watch401$().subscribe(() => {
       this.authService.setAuthStateUnverified()
       return this.api.postLogout()
@@ -159,12 +157,10 @@ export class AppComponent {
   }
 
   private async logout () {
-    this.serverName$.pipe(take(1)).subscribe(name => {
-      this.loader.of(LoadingSpinner(`Logging out ${name || ''}...`))
-      .displayDuringP(this.api.postLogout())
-      .then(() => this.authService.setAuthStateUnverified())
-      .catch(e => this.setError(e))
-    })
+    this.loader.of(LoadingSpinner('Logging out...'))
+    .displayDuringP(this.api.postLogout())
+    .then(() => this.authService.setAuthStateUnverified())
+    .catch(e => this.setError(e))
   }
 
   async setError (e: Error) {

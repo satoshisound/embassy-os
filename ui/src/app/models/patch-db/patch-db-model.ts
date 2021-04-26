@@ -19,7 +19,6 @@ export class PatchDbModel {
   async init (): Promise<void> {
     if (this.patchDb) return console.warn('Cannot re-init patchDbModel')
     this.patchDb = await PatchDB.init<DataModel>(this.conf)
-    this.start()
   }
 
   start (): void {

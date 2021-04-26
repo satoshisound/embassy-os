@@ -37,14 +37,13 @@
     <ion-item-group *ngIf="($hasMetrics$ | async) === true">
       <div *ngFor="let keyval of $metrics$ | async | keyvalue: asIsOrder">
         <!-- object -->
-        <ion-item button detail="false" *ngIf="keyval.value.type === 'object'" (click)="goToNested(keyval.key)">
+        <ion-item button detail="true" *ngIf="keyval.value.type === 'object'" (click)="goToNested(keyval.key)">
           <ion-button *ngIf="keyval.value.description" class="help-button" fill="clear" slot="start" (click)="presentDescription(keyval, $event)">
             <ion-icon size="small" slot="icon-only" name="help-circle-outline"></ion-icon>
           </ion-button>
           <ion-label class="ion-text-wrap">
             <h2>{{ keyval.key }}</h2>
           </ion-label>
-          <ion-icon slot="end" name="arrow-forward"></ion-icon>
         </ion-item>
         <!-- not object -->
         <ion-item *ngIf="keyval.value.type === 'string'">

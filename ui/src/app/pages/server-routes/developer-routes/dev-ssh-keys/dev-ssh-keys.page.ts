@@ -31,14 +31,6 @@ export class DevSSHKeysPage {
     ).subscribe(s => this.server = s)
   }
 
-  async doRefresh (event: any) {
-    await Promise.all([
-      this.apiService.getServer(),
-      pauseFor(600),
-    ])
-    event.target.complete()
-  }
-
   async presentModalAdd () {
     await this.serverConfigService.presentModalValueEdit('ssh', true)
   }

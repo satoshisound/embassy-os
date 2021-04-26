@@ -22,7 +22,8 @@
     "@angular/platform-browser-dynamic": "^11.0.0",
     "@angular/router": "^11.0.0",
     "@ionic/angular": "^5.4.0",
-    "@ionic/storage": "2.2.0",
+    "@ionic/storage": "3.0.4",
+    "@ionic/storage-angular": "^3.0.6",
     "@start9labs/emver": "^0.1.1",
     "ajv": "^6.12.6",
     "angularx-qrcode": "^10.0.11",
@@ -37,10 +38,10 @@
     "jsonpointerx": "^1.0.30",
     "jsontokens": "^3.0.0",
     "marked": "^2.0.0",
+    "patch-db-client": "file: ../../../../patch-db-client",
     "rxjs": "^6.6.3",
     "uuid": "^8.3.1",
-    "zone.js": "^0.11.2",
-    "patch-db-client": "file: ../../../../patch-db-client"
+    "zone.js": "^0.11.2"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.1100.0",

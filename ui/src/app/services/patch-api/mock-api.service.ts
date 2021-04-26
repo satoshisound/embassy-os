@@ -7,16 +7,15 @@ import { ApiService, PatchPromise } from './api.service'
 import { ApiAppInstalledFull, ApiAppInstalledPreview, ApiServer, ReqRes, Unit } from './api-types'
 import { AppMetrics, AppMetricsVersioned, parseMetricsPermissive } from 'src/app/util/metrics.util'
 import { mockApiAppAvailableFull, mockApiAppAvailableVersionInfo, mockApiAppsInstalledFull, mockAppDependentBreakages, mockServer, toInstalledPreview } from './mock-app-fixures'
-import { Observable, Subscription } from 'rxjs'
+import { Observable } from 'rxjs'
 import { PatchOp, SeqReplace, SeqUpdate, SeqUpdateReal } from 'patch-db-client'
 import { DataModel } from 'src/app/models/patch-db/data-model'
 import { ConfigService } from '../config.service'
 
 @Injectable()
 export class MockApiService extends ApiService {
-  private sequenceStreamSub: Subscription
-  welcomeAck = false
   sequence = 0
+  welcomeAck = false
 
   constructor (
     private readonly config: ConfigService,
@@ -25,14 +24,14 @@ export class MockApiService extends ApiService {
   }
 
   // every time a patch is returned from the mock, we override its sequence to be 1 more than the last sequence in the patch-db as provided by `o`.
-  watch (sequenceStream: Observable<number>): Observable<SeqUpdate<DataModel>> {
-    if (!this.sequenceStreamSub || this.sequenceStreamSub.closed) this.sequenceStreamSub = sequenceStream.subscribe(i => this.sequence < i ? (this.sequence = i) : { })
+  watch$ (sequenceStream: Observable<number>): Observable<SeqUpdate<DataModel>> {
+    sequenceStream.subscribe(i => this.sequence < i ? (this.sequence = i) : { })
 
     return super.watch$()
   }
 
-  async getUpdates (): Promise<SeqUpdateReal<DataModel>[]> {
-    console.log('getting updates')
+  async getUpdates (startSequence: number, finishSequence?: number): Promise<SeqUpdateReal<DataModel>[]> {
+    console.log('getting updates: ', startSequence, finishSequence)
     const data = await this.getDump()
     return [data]
   }
@@ -64,7 +63,8 @@ export class MockApiService extends ApiService {
   }
 
   private nextSequence () {
-    this.sequence ++
+    console.log('next')
+    this.sequence++
     return this.sequence
   }
 

@@ -21,8 +21,6 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   watch$ (_?: Observable<number>): Observable<SeqUpdate<DataModel>> {
     return this.sync.asObservable().pipe(filter(() => this.syncing))
   }
-  start (): void { this.syncing = true }
-  stop (): void { this.syncing = false }
 
   /** PatchDb Http interface. We can use the apiService to poll for patches or fetch db dumps */
   abstract getUpdates (startSequence: number, finishSequence?: number): Promise<SeqUpdateReal<DataModel>[]>
