@@ -1,10 +1,12 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
 use std::path::Path;
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::Error;
+
+pub const SYSTEM_ID: Id<&'static str> = Id("SYSTEM");
 
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid ID")]
@@ -15,7 +17,59 @@ impl From<InvalidId> for Error {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct IdUnchecked<S: AsRef<str>>(pub S);
+impl<'de> Deserialize<'de> for IdUnchecked<Cow<'de, str>> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = IdUnchecked<Cow<'de, str>>;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a valid ID")
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(IdUnchecked(Cow::Owned(v.to_owned())))
+            }
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(IdUnchecked(Cow::Owned(v)))
+            }
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(IdUnchecked(Cow::Borrowed(v)))
+            }
+        }
+        deserializer.deserialize_any(Visitor)
+    }
+}
+impl<'de> Deserialize<'de> for IdUnchecked<String> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(IdUnchecked(String::deserialize(deserializer)?))
+    }
+}
+impl<'de> Deserialize<'de> for IdUnchecked<&'de str> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(IdUnchecked(<&'de str>::deserialize(deserializer)?))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Id<S: AsRef<str> = String>(S);
 impl<S: AsRef<str>> Id<S> {
     pub fn try_from(value: S) -> Result<Self, InvalidId> {
@@ -30,6 +84,11 @@ impl<S: AsRef<str>> Id<S> {
         }
     }
 }
+impl<'a> Id<&'a str> {
+    pub fn owned(&self) -> Id {
+        Id(self.0.to_owned())
+    }
+}
 impl<S: AsRef<str>> std::fmt::Display for Id<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.as_ref())
@@ -40,56 +99,30 @@ impl<S: AsRef<str>> AsRef<str> for Id<S> {
         self.0.as_ref()
     }
 }
-impl<'de> Deserialize<'de> for Id<Cow<'de, str>> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = Id<Cow<'de, str>>;
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(
-                    formatter,
-                    "a string with only lowercase letters and hyphens"
-                )
-            }
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Id::try_from(Cow::Owned(v.to_owned())).map_err(serde::de::Error::custom)
-            }
-            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Id::try_from(Cow::Owned(v)).map_err(serde::de::Error::custom)
-            }
-            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Id::try_from(Cow::Borrowed(v)).map_err(serde::de::Error::custom)
-            }
-        }
-        deserializer.deserialize_any(Visitor)
+impl<S: AsRef<str>> Borrow<str> for Id<S> {
+    fn borrow(&self) -> &str {
+        self.0.as_ref()
     }
 }
-impl<'de> Deserialize<'de> for Id {
+impl<'de, S> Deserialize<'de> for Id<S>
+where
+    S: AsRef<str>,
+    IdUnchecked<S>: Deserialize<'de>,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        Id::try_from(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+        let unchecked: IdUnchecked<S> = Deserialize::deserialize(deserializer)?;
+        Id::try_from(unchecked.0).map_err(serde::de::Error::custom)
     }
 }
-impl<'de> Deserialize<'de> for Id<&'de str> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+impl<S: AsRef<str>> Serialize for Id<S> {
+    fn serialize<Ser>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error>
     where
-        D: Deserializer<'de>,
+        Ser: Serializer,
     {
-        Id::try_from(<&'de str>::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+        serializer.serialize_str(self.as_ref())
     }
 }
 
@@ -101,12 +134,19 @@ impl<S: AsRef<str>> std::fmt::Display for ImageId<S> {
     }
 }
 impl<S: AsRef<str>> ImageId<S> {
-    pub fn for_package(
+    pub fn for_package<PkgId: AsRef<crate::s9pk::manifest::PackageId<S0>>, S0: AsRef<str>>(
         &self,
-        pkg_id: &crate::s9pk::manifest::PackageId,
-        pkg_version: &emver::Version,
+        pkg_id: PkgId,
+        pkg_version: Option<&emver::Version>,
     ) -> String {
-        format!("start9/{}/{}:{}", pkg_id, self.0, pkg_version)
+        format!(
+            "start9/{}/{}:{}",
+            pkg_id.as_ref(),
+            self.0,
+            pkg_version
+                .map(|v| -> Box<dyn std::fmt::Display> { Box::new(v) })
+                .unwrap_or_else(|| Box::new("latest"))
+        )
     }
 }
 impl<'de, S> Deserialize<'de> for ImageId<S>

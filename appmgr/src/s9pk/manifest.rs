@@ -1,15 +1,28 @@
-use std::path::Path;
+use std::borrow::Borrow;
+use std::path::{Path, PathBuf};
 
 use emver::Version;
-use serde::{Deserialize, Serialize};
+use patch_db::HasModel;
+use serde::{Deserialize, Serialize, Serializer};
 use url::Url;
 
-use crate::action::{Action, ActionImplementation};
+use crate::action::ActionImplementation;
+use crate::backup_new::BackupActions;
+use crate::config::action::ConfigActions;
 use crate::dependencies::Dependencies;
-use crate::id::Id;
+use crate::id::{Id, SYSTEM_ID};
+use crate::migration::Migrations;
 use crate::volume::Volumes;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+
+pub const SYSTEM_PACKAGE_ID: PackageId<&'static str> = PackageId(SYSTEM_ID);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PackageId<S: AsRef<str> = String>(Id<S>);
+impl<S: AsRef<str>> AsRef<PackageId<S>> for PackageId<S> {
+    fn as_ref(&self) -> &PackageId<S> {
+        self
+    }
+}
 impl<S: AsRef<str>> std::fmt::Display for PackageId<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.0)
@@ -17,6 +30,11 @@ impl<S: AsRef<str>> std::fmt::Display for PackageId<S> {
 }
 impl<S: AsRef<str>> AsRef<str> for PackageId<S> {
     fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+impl<S: AsRef<str>> Borrow<str> for PackageId<S> {
+    fn borrow(&self) -> &str {
         self.0.as_ref()
     }
 }
@@ -37,20 +55,40 @@ where
         Ok(PackageId(Deserialize::deserialize(deserializer)?))
     }
 }
+impl<S> Serialize for PackageId<S>
+where
+    S: AsRef<str>,
+{
+    fn serialize<Ser>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error>
+    where
+        Ser: Serializer,
+    {
+        Serialize::serialize(&self.0, serializer)
+    }
+}
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename_all = "kebab-case")]
 pub struct Manifest {
     pub id: PackageId,
     pub title: String,
     pub version: Version,
+    pub description: Description,
+    #[serde(default)]
+    pub assets: Assets,
+    #[serde(default)]
+    pub build: Option<Vec<String>>,
     pub release_notes: String,
     pub license: String, // type of license
     pub wrapper_repo: Url,
     pub upstream_repo: Url,
     pub support_page: Option<Url>,
     pub marketing_page: Option<Url>,
+    #[model]
     pub main: ActionImplementation,
+    #[model]
+    pub config: ConfigActions,
+    #[model]
     pub volumes: Volumes,
     #[serde(default)]
     pub alerts: Alerts,
@@ -59,7 +97,11 @@ pub struct Manifest {
     // #[serde(default)]
     pub interfaces: Interfaces,
     // #[serde(default)]
-    pub backup: BackupStrategy,
+    #[model]
+    pub backup: BackupActions,
+    #[serde(default)]
+    #[model]
+    pub migrations: Migrations,
     // #[serde(default)]
     pub actions: Actions,
     // #[serde(default)]
@@ -71,13 +113,60 @@ pub struct Manifest {
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Interfaces {} // TODO
 #[derive(Debug, Deserialize, Serialize)]
-pub enum BackupStrategy {} // TODO
-#[derive(Debug, Deserialize, Serialize)]
-pub enum VolumeConfig {} // TODO
-#[derive(Debug, Deserialize, Serialize)]
 pub enum Actions {} // TODO
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Permissions {} // TODO
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct Assets {
+    #[serde(default)]
+    license: Option<PathBuf>,
+    #[serde(default)]
+    icon: Option<PathBuf>,
+    #[serde(default)]
+    docker_images: Option<PathBuf>,
+    #[serde(default)]
+    instructions: Option<PathBuf>,
+}
+impl Assets {
+    pub fn license_path(&self) -> &Path {
+        self.license
+            .as_ref()
+            .map(|a| a.as_path())
+            .unwrap_or(Path::new("LICENSE.md"))
+    }
+    pub fn icon_path(&self) -> &Path {
+        self.icon
+            .as_ref()
+            .map(|a| a.as_path())
+            .unwrap_or(Path::new("icon.png"))
+    }
+    pub fn icon_type(&self) -> &str {
+        self.icon
+            .as_ref()
+            .and_then(|icon| icon.extension())
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("png")
+    }
+    pub fn docker_images_path(&self) -> &Path {
+        self.docker_images
+            .as_ref()
+            .map(|a| a.as_path())
+            .unwrap_or(Path::new("images.tar"))
+    }
+    pub fn instructions_path(&self) -> &Path {
+        self.instructions
+            .as_ref()
+            .map(|a| a.as_path())
+            .unwrap_or(Path::new("INSTRUCTIONS.md"))
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Description {
+    pub short: String,
+    pub long: String,
+}
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]

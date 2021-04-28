@@ -1,37 +1,47 @@
 use emver::Version;
+use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
 
 use crate::action::ActionImplementation;
 use crate::s9pk::manifest::PackageId;
-use crate::volume::Volumes;
+use crate::volume::{Volume, VolumeId, Volumes};
 use crate::{Error, ResultExt};
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum BackupAction {
-    Custom(ActionImplementation),
-    Preset(ActionImplementation),
+#[derive(Debug, Deserialize, Serialize, HasModel)]
+pub struct BackupActions {
+    pub create: ActionImplementation,
+    pub restore: ActionImplementation,
 }
-impl BackupAction {
-    pub async fn execute(
+impl BackupActions {
+    pub async fn backup(
         &self,
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
     ) -> Result<(), Error> {
-        match self {
-            BackupAction::Custom(action) => action,
-            BackupAction::Preset(action) => action,
-        }
-        .execute(pkg_id, pkg_version, volumes, None)
-        .await?
-        .map_err(|e| anyhow::anyhow!("{}", e))
-        .with_kind(crate::ErrorKind::Backup)?;
+        let mut volumes = volumes.to_read_only();
+        volumes.insert(VolumeId::Backup, Volume::Backup { read_only: false });
+        self.create
+            .execute(pkg_id, pkg_version, &volumes, None::<()>)
+            .await?
+            .map_err(|e| anyhow::anyhow!("{}", e.1))
+            .with_kind(crate::ErrorKind::Backup)?;
         Ok(())
     }
 
-    pub async fn install(&self, pkg_id: &PackageId, pkg_version: &Version) -> Result<(), Error> {
-        // docker tag start9/presets/${self.image} start9/${pkg_id}/${self.image}:${pkg_version}
-        todo!()
+    pub async fn restore(
+        &self,
+        pkg_id: &PackageId,
+        pkg_version: &Version,
+        volumes: &Volumes,
+    ) -> Result<(), Error> {
+        let mut volumes = volumes.clone();
+        volumes.insert(VolumeId::Backup, Volume::Backup { read_only: true });
+        self.restore
+            .execute(pkg_id, pkg_version, &volumes, None::<()>)
+            .await?
+            .map_err(|e| anyhow::anyhow!("{}", e.1))
+            .with_kind(crate::ErrorKind::Restore)?;
+        Ok(())
     }
 }

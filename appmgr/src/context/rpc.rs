@@ -1,4 +1,5 @@
 use std::net::{IpAddr, SocketAddr};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -55,5 +56,11 @@ impl Context for RpcContext {
     }
     fn port(&self) -> u16 {
         self.0.bind.port()
+    }
+}
+impl Deref for RpcContext {
+    type Target = RpcContextSeed;
+    fn deref(&self) -> &Self::Target {
+        &*self.0
     }
 }

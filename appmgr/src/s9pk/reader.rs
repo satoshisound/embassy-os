@@ -3,14 +3,15 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use sha2::Digest;
+use digest::Output;
+use sha2::{Digest, Sha512};
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, ReadBuf, Take};
 
 use super::header::{FileSection, Header, TableOfContents};
 use super::manifest::Manifest;
 use super::SIG_CONTEXT;
-use crate::config::ConfigSpec;
+use crate::install_new::progress::InstallProgressTracker;
 use crate::{Error, ResultExt};
 
 #[pin_project::pin_project]
@@ -43,6 +44,8 @@ impl<'a, R: AsyncRead + AsyncSeek + Unpin> AsyncRead for ReadHandle<'a, R> {
 }
 
 pub struct S9pkReader<R: AsyncRead + AsyncSeek + Unpin = File> {
+    hash: Output<Sha512>,
+    hash_string: String,
     toc: TableOfContents,
     pos: u64,
     rdr: R,
@@ -57,12 +60,20 @@ impl S9pkReader {
         Self::from_reader(rdr).await
     }
 }
+impl<R: AsyncRead + AsyncSeek + Unpin> S9pkReader<InstallProgressTracker<R>> {
+    pub fn validated(&mut self) {
+        self.rdr.validated()
+    }
+}
 impl<R: AsyncRead + AsyncSeek + Unpin> S9pkReader<R> {
+    pub async fn validate(&mut self) -> Result<(), Error> {
+        todo!()
+    }
     pub async fn from_reader(mut rdr: R) -> Result<Self, Error> {
         let header = Header::deserialize(&mut rdr).await?;
         let pos = rdr.stream_position().await?;
 
-        let mut hasher = sha2::Sha512::new();
+        let mut hasher = Sha512::new();
         let mut buf = [0; 1024];
         let mut read;
         while {
@@ -71,15 +82,29 @@ impl<R: AsyncRead + AsyncSeek + Unpin> S9pkReader<R> {
         } {
             hasher.update(&buf[0..read]);
         }
+        let hash = hasher.clone().finalize();
         header
             .pubkey
             .verify_prehashed(hasher, Some(SIG_CONTEXT), &header.signature)?;
 
         Ok(S9pkReader {
+            hash_string: base32::encode(
+                base32::Alphabet::RFC4648 { padding: false },
+                hash.as_slice(),
+            ),
+            hash,
             toc: header.table_of_contents,
             pos,
             rdr,
         })
+    }
+
+    pub fn hash(&self) -> &Output<Sha512> {
+        &self.hash
+    }
+
+    pub fn hash_str(&self) -> &str {
+        self.hash_string.as_str()
     }
 
     async fn read_handle<'a>(
@@ -101,41 +126,21 @@ impl<R: AsyncRead + AsyncSeek + Unpin> S9pkReader<R> {
             .with_ctx(|_| (crate::ErrorKind::ParseS9pk, "Deserializing Manifest (CBOR)"))
     }
 
-    pub async fn config_spec(&mut self) -> Result<ConfigSpec, Error> {
-        serde_cbor::from_slice(
-            &self
-                .read_handle(self.toc.config_spec)
-                .await?
-                .to_vec()
-                .await?,
-        )
-        .with_ctx(|_| {
-            (
-                crate::ErrorKind::ParseS9pk,
-                "Deserializing Config Spec (CBOR)",
-            )
-        })
-    }
-
-    pub async fn license(&mut self) -> Result<String, Error> {
-        String::from_utf8(self.read_handle(self.toc.license).await?.to_vec().await?)
-            .with_ctx(|_| (crate::ErrorKind::ParseS9pk, "Parsing License (UTF-8)"))
+    pub async fn license<'a>(&'a mut self) -> Result<ReadHandle<'a, R>, Error> {
+        Ok(self.read_handle(self.toc.license).await?)
     }
 
     pub async fn icon<'a>(&'a mut self) -> Result<ReadHandle<'a, R>, Error> {
         Ok(self.read_handle(self.toc.icon).await?)
     }
 
-    pub async fn app_image<'a>(&'a mut self) -> Result<ReadHandle<'a, R>, Error> {
-        Ok(self.read_handle(self.toc.icon).await?)
+    pub async fn docker_images<'a>(&'a mut self) -> Result<ReadHandle<'a, R>, Error> {
+        Ok(self.read_handle(self.toc.docker_images).await?)
     }
 
-    pub async fn instructions(&mut self) -> Result<Option<String>, Error> {
+    pub async fn instructions<'a>(&'a mut self) -> Result<Option<ReadHandle<'a, R>>, Error> {
         if let Some(instructions) = self.toc.instructions {
-            Ok(Some(
-                String::from_utf8(self.read_handle(instructions).await?.to_vec().await?)
-                    .with_ctx(|_| (crate::ErrorKind::ParseS9pk, "Parsing Instructions (UTF-8)"))?,
-            ))
+            Ok(Some(self.read_handle(instructions).await?))
         } else {
             Ok(None)
         }

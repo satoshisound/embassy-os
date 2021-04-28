@@ -8,7 +8,7 @@ use crate::manifest::{Manifest, ManifestLatest};
 use crate::util::{from_yaml_async_reader, Apply, PersistencePath, YamlUpdateHandle};
 use crate::{Error, ResultExt as _};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum DockerStatus {
     Running,

@@ -68,10 +68,9 @@ impl Header {
 #[derive(Debug, Default)]
 pub struct TableOfContents {
     pub manifest: FileSection,
-    pub config_spec: FileSection,
     pub license: FileSection,
     pub icon: FileSection,
-    pub app_image: FileSection,
+    pub docker_images: FileSection,
     pub instructions: Option<FileSection>,
 }
 impl TableOfContents {
@@ -79,19 +78,17 @@ impl TableOfContents {
         let len: u32 = 16 // size of FileSection
             * (
                 1 + // manifest
-                1 + // config_spec
                 1 + // license
                 1 + // icon
-                1 + // app_image
+                1 + // docker_images
                 1 // instructions
             );
         writer.write_all(&u32::to_be_bytes(len))?;
         self.manifest.serialize_entry("manifest", &mut writer)?;
-        self.config_spec
-            .serialize_entry("config_spec", &mut writer)?;
         self.license.serialize_entry("license", &mut writer)?;
         self.icon.serialize_entry("icon", &mut writer)?;
-        self.app_image.serialize_entry("app_image", &mut writer)?;
+        self.docker_images
+            .serialize_entry("docker_images", &mut writer)?;
         self.instructions
             .unwrap_or_default() // 0/0 is not a valid file section
             .serialize_entry("instructions", &mut writer)?;
@@ -127,10 +124,9 @@ impl TableOfContents {
         }
         Ok(TableOfContents {
             manifest: from_table(&table, "manifest")?,
-            config_spec: from_table(&table, "config_spec")?,
             license: from_table(&table, "license")?,
             icon: from_table(&table, "icon")?,
-            app_image: from_table(&table, "app_image")?,
+            docker_images: from_table(&table, "docker_images")?,
             instructions: table.get(&b"instructions"[..]).copied().and_then(as_opt),
         })
     }

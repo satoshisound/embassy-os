@@ -1,39 +1,135 @@
 use std::borrow::Cow;
 use std::ffi::{OsStr, OsString};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use emver::Version;
-use hashlink::LinkedHashMap;
+use hashlink::{LinkedHashMap, LinkedHashSet};
+use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::apps::DockerStatus;
 use crate::config::{Config, ConfigSpec};
-use crate::id::ImageId;
-use crate::s9pk::manifest::PackageId;
-use crate::util::{Invoke, IpPool};
+use crate::id::{Id, ImageId};
+use crate::s9pk::manifest::{PackageId, SYSTEM_PACKAGE_ID};
+use crate::util::{Invoke, IpPool, ValuePrimative};
 use crate::volume::{VolumeId, Volumes};
 use crate::{Error, ResultExt};
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Action {
-    pub implementation: ActionImplementation,
-    pub input_spec: Option<ConfigSpec>,
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+pub struct ActionId<S: AsRef<str> = String>(Id<S>);
+impl<S: AsRef<str>> AsRef<ActionId<S>> for ActionId<S> {
+    fn as_ref(&self) -> &ActionId<S> {
+        self
+    }
+}
+impl<S: AsRef<str>> std::fmt::Display for ActionId<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
+impl<S: AsRef<str>> AsRef<str> for ActionId<S> {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+impl<S: AsRef<str>> AsRef<Path> for ActionId<S> {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref().as_ref()
+    }
+}
+impl<'de, S> Deserialize<'de> for ActionId<S>
+where
+    S: AsRef<str>,
+    Id<S>: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        Ok(ActionId(Deserialize::deserialize(deserializer)?))
+    }
+}
+
+pub struct Actions(pub LinkedHashMap<ActionId, Action>);
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "version")]
+pub enum ActionResult {
+    #[serde(rename = "0")]
+    V0(ActionResultV0),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ActionResultV0 {
+    pub message: String,
+    pub value: ValuePrimative,
+    pub copyable: bool,
+    pub qr: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Action {
+    pub name: String,
+    pub description: String,
+    #[serde(default)]
+    pub warning: Option<String>,
+    pub implementation: ActionImplementation,
+    pub allowed_statuses: LinkedHashSet<DockerStatus>,
+    #[serde(default)]
+    pub input_spec: ConfigSpec,
+}
+impl Action {
+    pub async fn execute(
+        &self,
+        pkg_id: &PackageId,
+        pkg_version: &Version,
+        volumes: &Volumes,
+        input: Config,
+    ) -> Result<Result<ActionResult, String>, Error> {
+        self.input_spec
+            .matches(&input)
+            .with_kind(crate::ErrorKind::ConfigSpecViolation)?;
+        self.implementation
+            .execute(pkg_id, pkg_version, volumes, Some(input))
+            .await
+            .map(|e| e.map_err(|e| e.1))
+    }
+}
+
+pub trait PresetActionImpl: Sized {
+    fn implementation(&self) -> &'static ActionImplementation;
+}
+
+pub enum ActionImplOrPreset<P: PresetActionImpl> {
+    Custom(ActionImplementation),
+    Preset(P),
+}
+impl<P: PresetActionImpl> std::ops::Deref for ActionImplOrPreset<P> {
+    type Target = ActionImplementation;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ActionImplOrPreset::Custom(a) => a,
+            ActionImplOrPreset::Preset(p) => p.implementation(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename = "kebab-case")]
 #[serde(tag = "type")]
 pub enum ActionImplementation {
     Docker(DockerAction),
 }
 impl ActionImplementation {
-    pub async fn execute(
+    pub async fn execute<I: Serialize, O: for<'de> Deserialize<'de>>(
         &self,
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
-        input: Option<Config>,
-    ) -> Result<Result<Value, String>, Error> {
+        input: Option<I>,
+    ) -> Result<Result<O, (i32, String)>, Error> {
         match self {
             ActionImplementation::Docker(action) => {
                 action.execute(pkg_id, pkg_version, volumes, input).await
@@ -99,10 +195,18 @@ impl DockerIOFormat {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DockerAction {
     pub image: ImageId,
+    #[serde(default)]
+    pub system: bool,
     pub entrypoint: String,
+    #[serde(default)]
     pub args: Vec<String>,
+    #[serde(default)]
     pub mounts: LinkedHashMap<VolumeId, PathBuf>,
+    #[serde(default)]
     pub io_format: Option<DockerIOFormat>,
+    #[serde(default)]
+    pub inject: bool,
+    #[serde(default)]
     pub shm_size_mb: Option<usize>, // TODO: use postfix sizing? like 1k vs 1m vs 1g
 }
 impl DockerAction {
@@ -117,7 +221,6 @@ impl DockerAction {
             .arg("create")
             .arg("--net")
             .arg("start9")
-            .arg("--name")
             .arg("--ip")
             .arg(format!(
                 "{}",
@@ -126,6 +229,7 @@ impl DockerAction {
                     .ok_or_else(|| anyhow::anyhow!("No available IP addresses"))
                     .with_kind(crate::ErrorKind::Network)?,
             ))
+            .arg("--name")
             .arg(self.container_name(pkg_id))
             .args(self.docker_args(pkg_id, pkg_version, volumes))
             .invoke(crate::ErrorKind::Docker)
@@ -133,17 +237,20 @@ impl DockerAction {
         Ok(())
     }
 
-    pub async fn execute(
+    pub async fn execute<I: Serialize, O: for<'de> Deserialize<'de>>(
         &self,
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
-        input: Option<Config>,
-    ) -> Result<Result<Value, String>, Error> {
+        input: Option<I>,
+    ) -> Result<Result<O, (i32, String)>, Error> {
         let mut cmd = tokio::process::Command::new("docker");
-        cmd.arg("run")
-            .arg("--rm")
-            .args(self.docker_args(pkg_id, pkg_version, volumes));
+        if self.inject {
+            cmd.arg("exec");
+        } else {
+            cmd.arg("run").arg("--rm");
+        }
+        cmd.args(self.docker_args(pkg_id, pkg_version, volumes));
         let input_buf = if let (Some(input), Some(format)) = (&input, &self.io_format) {
             cmd.stdin(std::process::Stdio::piped());
             Some(format.to_vec(input)?)
@@ -172,14 +279,21 @@ impl DockerAction {
                             format,
                             e
                         );
-                        String::from_utf8(res.stdout)?.into()
+                        serde_json::from_value(String::from_utf8(res.stdout)?.into())
+                            .with_kind(crate::ErrorKind::Deserialization)?
                     }
                 }
+            } else if res.stdout.is_empty() {
+                serde_json::from_value(Value::Null).with_kind(crate::ErrorKind::Deserialization)?
             } else {
-                String::from_utf8(res.stdout)?.into()
+                serde_json::from_value(String::from_utf8(res.stdout)?.into())
+                    .with_kind(crate::ErrorKind::Deserialization)?
             })
         } else {
-            Err(String::from_utf8(res.stderr)?)
+            Err((
+                res.status.code().unwrap_or_default(),
+                String::from_utf8(res.stderr)?,
+            ))
         })
     }
 
@@ -219,9 +333,18 @@ impl DockerAction {
             res.push(OsStr::new("--shm-size").into());
             res.push(OsString::from(format!("{}m", shm_size_mb)).into());
         }
-        res.push(OsStr::new("--entrypoint").into());
-        res.push(OsStr::new(&self.entrypoint).into());
-        res.push(OsString::from(self.image.for_package(pkg_id, pkg_version)).into());
+        if self.inject {
+            res.push(OsString::from(self.container_name(pkg_id)).into());
+            res.push(OsStr::new(&self.entrypoint).into());
+        } else {
+            res.push(OsStr::new("--entrypoint").into());
+            res.push(OsStr::new(&self.entrypoint).into());
+            if self.system {
+                res.push(OsString::from(self.image.for_package(SYSTEM_PACKAGE_ID, None)).into());
+            } else {
+                res.push(OsString::from(self.image.for_package(pkg_id, Some(pkg_version))).into());
+            }
+        }
         res.extend(self.args.iter().map(|s| OsStr::new(s).into()));
 
         res

@@ -33,8 +33,9 @@ avahi-sys = { git = "https://github.com/Start9Labs/avahi-sys", branch = "feature
 base32 = "0.4.0"
 clap = "2.33"
 ctrlc = "3.1.7"
+digest = "0.9.0"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
-emver = { version = "0.1.0", features = ["serde"] }
+emver = { version = "0.1.2", features = ["serde"] }
 file-lock = "1.1"
 futures = "0.3.8"
 git-version = "0.3.4"
@@ -48,7 +49,7 @@ linear-map = { version = "1.2", features = ["serde_impl"] }
 log = "0.4.11"
 nix = "0.20.0"
 openssl = "0.10.30"
-patch-db = { git = "https://github.com/Start9Labs/patch-db" }
+patch-db = { path = "../../patch-db/patch-db" }
 pest = "2.1"
 pest_derive = "2.1"
 pin-project = "1.0.6"
@@ -72,5 +73,6 @@ tokio = { version = "1.5.0", features = ["full"] }
 tokio-compat-02 = "0.2.0"
 tokio-stream = { version = "0.1.5", features = ["io-util"] }
 tokio-tar = { git = "https://github.com/dr-bonez/tokio-tar.git", branch = "tokio-1" }
+tokio-util = { version = "0.6.6", features = ["io"] }
 typed-builder = "0.9.0"
 url = { version = "2.2.1", features = ["serde"] }

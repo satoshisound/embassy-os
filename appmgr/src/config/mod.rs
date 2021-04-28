@@ -13,6 +13,7 @@ use crate::dependencies::{DependencyError, TaggedDependencyError};
 use crate::util::{from_yaml_async_reader, to_yaml_async_writer, PersistencePath};
 use crate::ResultExt as _;
 
+pub mod action;
 pub mod rules;
 pub mod spec;
 pub mod util;

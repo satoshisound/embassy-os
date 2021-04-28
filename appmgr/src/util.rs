@@ -1,11 +1,17 @@
 use std::future::Future;
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::net::Ipv4Addr;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::str::FromStr;
 
+use async_trait::async_trait;
+use emver::Version;
 use file_lock::FileLock;
 use id_pool::IdPool;
+use serde::Serialize;
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
@@ -537,6 +543,8 @@ pub trait Invoke {
 #[async_trait::async_trait]
 impl Invoke for tokio::process::Command {
     async fn invoke(&mut self, error_kind: crate::ErrorKind) -> Result<Vec<u8>, Error> {
+        self.stdout(Stdio::piped());
+        self.stderr(Stdio::piped());
         let res = self.output().await?;
         crate::ensure_code!(
             res.status.success(),
@@ -678,7 +686,7 @@ impl<T> SOption<T> for SNone<T> {}
 pub struct IpPool(IdPool);
 impl IpPool {
     pub fn new() -> Self {
-        let mut pool = IdPool::new();
+        let pool = IdPool::new();
         IpPool(pool)
     }
 
@@ -691,6 +699,204 @@ impl IpPool {
     pub fn put(&mut self, ip: Ipv4Addr) {
         let ip = u32::from_be_bytes(ip.octets());
         let id = ip - u32::from_be_bytes(crate::HOST_IP);
-        self.0.return_id(id as u16);
+        let _ = self.0.return_id(id as u16);
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub enum ValuePrimative {
+    Null,
+    String(String),
+    Number(serde_json::Number),
+}
+impl<'de> serde::de::Deserialize<'de> for ValuePrimative {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = ValuePrimative;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a JSON primative value")
+            }
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Null)
+            }
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Null)
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::String(v.to_owned()))
+            }
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::String(v))
+            }
+            fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(
+                    serde_json::Number::from_f64(v as f64).ok_or_else(|| {
+                        serde::de::Error::invalid_value(
+                            serde::de::Unexpected::Float(v as f64),
+                            &"a finite number",
+                        )
+                    })?,
+                ))
+            }
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(
+                    serde_json::Number::from_f64(v).ok_or_else(|| {
+                        serde::de::Error::invalid_value(
+                            serde::de::Unexpected::Float(v),
+                            &"a finite number",
+                        )
+                    })?,
+                ))
+            }
+            fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+            fn visit_u16<E>(self, v: u16) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+            fn visit_u32<E>(self, v: u32) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+            fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+            fn visit_i16<E>(self, v: i16) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+            fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Number(v.into()))
+            }
+        }
+        deserializer.deserialize_any(Visitor)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VersionString {
+    version: Version,
+    string: String,
+}
+impl VersionString {
+    pub fn as_str(&self) -> &str {
+        self.string.as_str()
+    }
+}
+impl From<Version> for VersionString {
+    fn from(v: Version) -> Self {
+        VersionString {
+            string: v.to_string(),
+            version: v,
+        }
+    }
+}
+impl From<VersionString> for Version {
+    fn from(v: VersionString) -> Self {
+        v.version
+    }
+}
+impl Deref for VersionString {
+    type Target = Version;
+    fn deref(&self) -> &Self::Target {
+        &self.version
+    }
+}
+impl AsRef<Version> for VersionString {
+    fn as_ref(&self) -> &Version {
+        &self.version
+    }
+}
+impl AsRef<str> for VersionString {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+impl PartialEq for VersionString {
+    fn eq(&self, other: &VersionString) -> bool {
+        self.version.eq(&other.version)
+    }
+}
+impl Eq for VersionString {}
+impl Hash for VersionString {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.version.hash(state)
+    }
+}
+
+#[async_trait]
+pub trait AsyncFileExt: Sized {
+    async fn maybe_open<P: AsRef<Path> + Send + Sync>(path: P) -> std::io::Result<Option<Self>>;
+    async fn delete<P: AsRef<Path> + Send + Sync>(path: P) -> std::io::Result<()>;
+}
+#[async_trait]
+impl AsyncFileExt for File {
+    async fn maybe_open<P: AsRef<Path> + Send + Sync>(path: P) -> std::io::Result<Option<Self>> {
+        match File::open(path).await {
+            Ok(f) => Ok(Some(f)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+    async fn delete<P: AsRef<Path> + Send + Sync>(path: P) -> std::io::Result<()> {
+        if let Ok(m) = tokio::fs::metadata(path.as_ref()).await {
+            if m.is_dir() {
+                tokio::fs::remove_dir_all(path).await
+            } else {
+                tokio::fs::remove_file(path).await
+            }
+        } else {
+            Ok(())
+        }
     }
 }
