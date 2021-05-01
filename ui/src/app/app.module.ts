@@ -9,8 +9,8 @@ import { AppComponent } from './app.component'
 import { AppRoutingModule } from './app-routing.module'
 import { ApiService } from './services/api/api.service'
 import { ApiServiceFactory } from './services/api/api.service.factory'
-import { ApiService as PatchApiService } from './services/patch-api/api.service'
-import { ApiServiceFactory as PatchApiServiceFactory } from './services/patch-api/api.service.factory'
+import { ApiService as PatchApiService } from './services/api/api.service'
+import { ApiServiceFactory as PatchApiServiceFactory } from './services/api/api.service.factory'
 import { PatchDbModelFactory } from './models/patch-db/patch-db-model.factory'
 import { AppModel } from './models/app-model'
 import { HttpService } from './services/http.service'
@@ -32,8 +32,10 @@ import { LocalStorageBootstrap } from './models/patch-db/local-storage-bootstrap
     IonicModule.forRoot(),
     AppRoutingModule,
     IonicStorageModule.forRoot({
-      name: 'embassy_db',
-      driverOrder: [Drivers.IndexedDB, Drivers.LocalStorage],
+      storeName: '_embassykv',
+      dbKey: '_embassykey',
+      name: '_embassystorage',
+      driverOrder: [Drivers.LocalStorage, Drivers.IndexedDB],
     }),
     QRCodeModule,
     OSWelcomePageModule,

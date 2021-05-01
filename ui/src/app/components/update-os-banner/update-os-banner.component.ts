@@ -4,7 +4,7 @@ import { Observable } from 'rxjs'
 import { ModalController } from '@ionic/angular'
 import { WizardBaker } from '../install-wizard/prebaked-wizards'
 import { wizardModal } from '../install-wizard/install-wizard.component'
-import { ReqRes } from 'src/app/services/api/api.service'
+import { ReqRes } from 'src/app/services/api/api-types'
 
 @Component({
   selector: 'update-os-banner',

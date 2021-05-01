@@ -1,7 +1,7 @@
 import { Component } from '@angular/core'
 import { ServerConfigService } from 'src/app/services/server-config.service'
-// import { ModelPreload } from 'src/app/models/model-preload'
-// import { BehaviorSubject } from 'rxjs'
+import { ModelPreload } from 'src/app/models/model-preload'
+import { Observable, of } from 'rxjs'
 
 @Component({
   selector: 'dev-options',
@@ -9,15 +9,15 @@ import { ServerConfigService } from 'src/app/services/server-config.service'
   styleUrls: ['./dev-options.page.scss'],
 })
 export class DevOptionsPage {
-  // altRegistryUrl: BehaviorSubject<string>
+  altRegistryUrl: Observable<string>
 
   constructor (
     private readonly serverConfigService: ServerConfigService,
-    // private readonly preload: ModelPreload,
+    private readonly preload: ModelPreload,
   ) { }
 
   ngOnInit () {
-    // this.preload.server().subscribe(s => this.altRegistryUrl = s.alternativeRegistryUrl)
+    this.preload.server().subscribe(s => this.altRegistryUrl = of(s.alternativeRegistryUrl))
   }
 
   async presentModalValueEdit (key: string): Promise<void> {

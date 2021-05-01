@@ -1,36 +1,85 @@
 import { Injectable } from '@angular/core'
-import { AppStatus, AppModel } from '../../models/app-model'
+import { AppStatus } from '../../models/app-model'
 import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, ServiceAction } from '../../models/app-types'
-import { S9Notification, SSHFingerprint, ServerStatus, ServerModel, DiskInfo } from '../../models/server-model'
+import { S9Notification, SSHFingerprint, ServerStatus, DiskInfo } from '../../models/server-model'
 import { pauseFor } from '../../util/misc.util'
-import { ApiService, ReqRes } from './api.service'
-import { ApiAppInstalledFull, ApiAppInstalledPreview, ApiServer, Unit as EmptyResponse, Unit } from './api-types'
+import { ApiService, PatchPromise } from './api.service'
+import { ApiAppInstalledFull, ApiAppInstalledPreview, ApiServer, ReqRes, Unit } from './api-types'
 import { AppMetrics, AppMetricsVersioned, parseMetricsPermissive } from 'src/app/util/metrics.util'
-import { mockApiAppAvailableFull, mockApiAppAvailableVersionInfo, mockApiAppInstalledFull, mockAppDependentBreakages, toInstalledPreview } from './mock-app-fixures'
+import { mockApiAppAvailableFull, mockApiAppAvailableVersionInfo, mockApiAppsInstalledFull, mockAppDependentBreakages, mockServer, toInstalledPreview } from './mock-app-fixures'
+import { Observable } from 'rxjs'
+import { PatchOp, SeqReplace, SeqUpdate, SeqUpdateReal } from 'patch-db-client'
+import { DataModel } from 'src/app/models/patch-db/data-model'
 import { ConfigService } from '../config.service'
 
-//@TODO consider moving to test folders.
 @Injectable()
 export class MockApiService extends ApiService {
+  sequence = 0
   welcomeAck = false
 
   constructor (
-    private readonly appModel: AppModel,
-    private readonly serverModel: ServerModel,
     private readonly config: ConfigService,
   ) {
     super()
   }
 
+  // every time a patch is returned from the mock, we override its sequence to be 1 more than the last sequence in the patch-db as provided by `o`.
+  watch$ (sequenceStream: Observable<number>): Observable<SeqUpdate<DataModel>> {
+    sequenceStream.subscribe(i => this.sequence < i ? (this.sequence = i) : { })
+
+    return super.watch$()
+  }
+
+  async getUpdates (startSequence: number, finishSequence?: number): Promise<SeqUpdateReal<DataModel>[]> {
+    console.log('getting updates: ', startSequence, finishSequence)
+    const data = await this.getDump()
+    return [data]
+  }
+
+  async getDump (): Promise<SeqReplace<DataModel>> {
+    console.log('PAUSING')
+    await pauseFor(10000)
+    console.log('PAUSE COMPLETE')
+    const apps: AppInstalledFull[] = Object.values(mockApiAppsInstalledFull)
+      .filter(({ versionInstalled }) => !!versionInstalled)
+      .map(app => {
+        return {
+          ...app,
+          hasFetchedFull: false,
+          hasUI: this.config.hasUI(app),
+          launchable: this.config.isLaunchable(app),
+        }
+      })
+
+    const obj: { [appId: string]: AppInstalledFull } = { }
+    apps.forEach(app => {
+      obj[app.id] = app
+    })
+
+    return {
+      id: this.nextSequence(),
+      value: {
+        server: mockServer,
+        apps: obj,
+      },
+    }
+  }
+
+  private nextSequence () {
+    console.log('next')
+    this.sequence++
+    return this.sequence
+  }
+
   async postLogin () : Promise<Unit> {
-    return {  }
+    return { }
   }
 
   async postLogout () : Promise<Unit> {
-    return {  }
+    return { }
   }
 
-  async postConfigureDependency (dependencyId: string, dependentId: string, dryRun?: boolean): Promise<{ config: object, breakages: DependentBreakage[] }> {
+  async postConfigureDependencyRaw (dependencyId: string, dependentId: string, dryRun?: boolean): PatchPromise<{ config: object, breakages: DependentBreakage[] }> {
     await pauseFor(2000)
     throw new Error ('some misc backend error ohh we forgot to make this endpoint or something')
   }
@@ -43,25 +92,9 @@ export class MockApiService extends ApiService {
     }
   }
 
-  testCounter = 0
-  async testConnection (): Promise<true> {
-    console.log('testing connection')
-    this.testCounter ++
-    await pauseFor(500)
-    if (this.testCounter > 2) {
-      return true
-    } else {
-      throw new Error('Not Connected')
-    }
-  }
-
-  async ejectExternalDisk (): Promise<Unit> {
+  async ejectExternalDiskRaw (): PatchPromise<Unit> {
     await pauseFor(2000)
-    return { }
-  }
-
-  async getCheckAuth (): Promise<ReqRes.GetCheckAuthRes> {
-    return { }
+    return { response: { } }
   }
 
   async getVersionLatest (): Promise<ReqRes.GetVersionLatestRes> {
@@ -76,16 +109,18 @@ export class MockApiService extends ApiService {
     return mockGetNotifications()
   }
 
-  async deleteNotification (id: string): Promise<EmptyResponse> {
-    return mockDeleteNotification()
+  async deleteNotificationRaw (id: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
   }
 
   async getExternalDisks (): Promise<DiskInfo[]> {
     return mockGetExternalDisks()
   }
 
-  async updateAgent (thing: any): Promise<EmptyResponse> {
-    return mockPostUpdateAgent()
+  async updateAgentRaw (thing: any): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
   }
 
   async getAvailableApps (): Promise<AppAvailablePreview[]> {
@@ -109,14 +144,14 @@ export class MockApiService extends ApiService {
 
   async getInstalledApp (appId: string): Promise<AppInstalledFull> {
     return mockGetInstalledApp(appId)
-      .then(app => {
-        return {
-          ...app,
-          hasFetchedFull: false,
-          hasUI: this.config.hasUI(app),
-          launchable: this.config.isLaunchable(app),
-        }
-      })
+    .then(app => {
+      return {
+        ...app,
+        hasFetchedFull: true,
+        hasUI: this.config.hasUI(app),
+        launchable: this.config.isLaunchable(app),
+      }
+    })
   }
 
   async getAppMetrics (appId: string): Promise<AppMetrics> {
@@ -148,129 +183,185 @@ export class MockApiService extends ApiService {
     return mockGetServerLogs()
   }
 
-  async installApp (appId: string, version: string, dryRun: boolean): Promise<AppInstalledFull & { breakages: DependentBreakage[] }> {
-    return mockInstallApp(appId)
-      .then(app => {
-        return {
-          ...app,
-          hasFetchedFull: true,
-          hasUI: this.config.hasUI(app),
-          launchable: this.config.isLaunchable(app),
-        }
-      })
+  async installAppRaw (appId: string, version: string, dryRun: boolean): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }> {
+    await pauseFor(1000)
+    const app = mockApiAppsInstalledFull[appId]
+    const response = {
+      ...app,
+      hasFetchedFull: true,
+      hasUI: this.config.hasUI(app),
+      launchable: this.config.isLaunchable(app),
+      ...mockAppDependentBreakages,
+    }
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.ADD, path: `/apps/${appId}`, value: response }],
+    }
+    return { response, patch }
   }
 
-  async uninstallApp (appId: string, dryRun: boolean): Promise<{ breakages: DependentBreakage[] }> {
-    return mockUninstallApp()
+  async uninstallAppRaw (appId: string, dryRun: boolean): PatchPromise<{ breakages: DependentBreakage[] }> {
+    await pauseFor(1000)
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REMOVE, path: `/apps/${appId}` }],
+    }
+
+    return { patch, response: mockAppDependentBreakages}
   }
 
-  async acknowledgeOSWelcome (version: string) {
+  async acknowledgeOSWelcomeRaw (version: string): PatchPromise<Unit> {
     await pauseFor(2000)
     this.welcomeAck = true
-    return {  }
+    return { response: { } }
   }
 
-  async startApp (appId: string): Promise<EmptyResponse> {
-    console.log('start app mock')
-    await mockStartApp()
-    this.appModel.update({ id: appId, status: AppStatus.RUNNING })
-    return { }
-  }
-
-  async stopApp (appId: string, dryRun = false): Promise<{ breakages: DependentBreakage[] }> {
-    await mockStopApp()
-    if (!dryRun) this.appModel.update({ id: appId, status: AppStatus.STOPPED })
-    return mockAppDependentBreakages
-  }
-
-  async toggleAppLAN (appId: string, toggle: 'enable' | 'disable'): Promise<Unit> {
-    return {  }
-  }
-
-  async restartApp (appId: string): Promise<Unit> {
-    return { }
-  }
-
-  async createAppBackup (appId: string, logicalname: string, password = ''): Promise<EmptyResponse> {
-    await mockCreateAppBackup()
-    this.appModel.update({ id: appId, status: AppStatus.CREATING_BACKUP })
-    return { }
-  }
-
-  async stopAppBackup (appId: string): Promise<EmptyResponse> {
-    await mockStopAppBackup()
-    this.appModel.update({ id: appId, status: AppStatus.STOPPED })
-    return { }
-  }
-
-  async restoreAppBackup (appId: string, logicalname: string, password?: string): Promise<EmptyResponse> {
-    await mockCreateAppBackup()
-    this.appModel.update({ id: appId, status: AppStatus.RESTORING_BACKUP })
-    return { }
-  }
-
-  async patchAppConfig (app: AppInstalledPreview, config: object, dryRun?: boolean): Promise<{ breakages: DependentBreakage[] }> {
-    return mockPatchAppConfig()
-  }
-
-  async patchServerConfig (attr: string, value: any): Promise<EmptyResponse> {
-    await mockPatchServerConfig()
-    this.serverModel.update({ [attr]: value })
-    return { }
-  }
-
-  async wipeAppData (app: AppInstalledPreview): Promise<EmptyResponse> {
-    return mockWipeAppData()
-  }
-
-  async addSSHKey (sshKey: string): Promise<EmptyResponse> {
-    const fingerprint = await mockAddSSHKey()
-    this.serverModel.update({ ssh: [...this.serverModel.peek().ssh, fingerprint] })
-    return { }
-  }
-
-  async deleteSSHKey (fingerprint: SSHFingerprint): Promise<EmptyResponse> {
-    await mockDeleteSSHKey()
-    const ssh = this.serverModel.peek().ssh
-    this.serverModel.update({ ssh: ssh.filter(s => s !== fingerprint) })
-    return { }
-  }
-
-  async addWifi (ssid: string, password: string, country: string, connect: boolean): Promise<EmptyResponse> {
-    return mockAddWifi()
-  }
-
-  async connectWifi (ssid: string): Promise<EmptyResponse> {
-    return mockConnectWifi()
-  }
-
-  async deleteWifi (ssid: string): Promise<EmptyResponse> {
-    return mockDeleteWifi()
-  }
-
-  async restartServer (): Promise<EmptyResponse> {
-    return mockRestartServer()
-  }
-
-  async shutdownServer (): Promise<EmptyResponse> {
-    return mockShutdownServer()
-  }
-
-  async serviceAction (appId: string, action: ServiceAction): Promise<ReqRes.ServiceActionResponse> {
+  async startAppRaw (appId: string): PatchPromise<Unit> {
     await pauseFor(1000)
-    return {
-      jsonrpc: '2.0',
-      id: '0',
-      result: 'Congrats! you did\na new line: ' + action.name,
-      // error: {
-      //   code: 1,
-      //   message: 'woooo that was bad bad bad',
-      // },
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RUNNING }],
     }
+
+    return { patch, response: { } }
   }
 
-  async refreshLAN (): Promise<Unit> {
-    return mockRefreshLAN()
+  async stopAppRaw (appId: string, dryRun = false): PatchPromise<{ breakages: DependentBreakage[] }> {
+    await pauseFor(1000)
+
+    const patch: SeqUpdate<DataModel> = !dryRun ? {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
+    } : undefined
+
+    return { patch, response: mockAppDependentBreakages }
+  }
+
+  async toggleAppLANRaw (appId: string, toggle: 'enable' | 'disable'): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async restartAppRaw (appId: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async createAppBackupRaw (appId: string, logicalname: string, password = ''): PatchPromise<Unit> {
+    await pauseFor(1000)
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.CREATING_BACKUP }],
+    }
+
+    return { patch, response: { } }
+  }
+
+  async stopAppBackupRaw (appId: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
+    }
+
+    return { patch, response: { } }
+  }
+
+  async restoreAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RESTORING_BACKUP }],
+    }
+
+    return { patch, response: { } }
+
+  }
+
+  async patchAppConfigRaw (app: AppInstalledPreview, config: object, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }> {
+    await pauseFor(1000)
+    return { response: mockAppDependentBreakages }
+  }
+
+  async patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit> {
+    await pauseFor(1000)
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: `/server/${attr}`, value }],
+    }
+    return { patch, response: { } }
+  }
+
+  async wipeAppDataRaw (app: AppInstalledPreview): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async addSSHKeyRaw (sshKey: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    const fingerprint = mockApiServer().ssh[0]
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.ADD, path: `/server/ssh/-`, value: fingerprint }],
+    }
+    return { patch, response: { } }
+  }
+
+  async deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit> {
+    await pauseFor(1000)
+
+    const patch: SeqUpdate<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REMOVE, path: `/server/ssh/0` }],
+    }
+
+    return { patch, response: { }}
+  }
+
+  async addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async connectWifiRaw (ssid: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async deleteWifiRaw (ssid: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async restartServerRaw (): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async shutdownServerRaw (): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async serviceActionRaw (appId: string, action: ServiceAction): PatchPromise<ReqRes.ServiceActionResponse> {
+    console.log('service action', appId, action)
+    await pauseFor(1000)
+    return { response: {
+      jsonrpc: '2.0' as '2.0',
+      id: '0',
+      // result: 'Congrats! you did ' + action.name,
+      error: {
+        code: 1,
+        message: 'woooo that was bad bad bad',
+      },
+    }}
+  }
+
+  async refreshLanRaw (): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
   }
 }
 
@@ -295,19 +386,9 @@ async function mockGetNotifications (): Promise<ReqRes.GetNotificationsRes> {
   return mockApiNotifications.concat(cloneAndChange(mockApiNotifications, 'a')).concat(cloneAndChange(mockApiNotifications, 'b'))
 }
 
-async function mockDeleteNotification (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
 async function mockGetExternalDisks (): Promise<ReqRes.GetExternalDisksRes> {
   await pauseFor(1000)
   return mockApiExternalDisks
-}
-
-async function mockPostUpdateAgent (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
 }
 
 async function mockGetAvailableApp (appId: string): Promise<ReqRes.GetAppAvailableRes> {
@@ -320,14 +401,14 @@ async function mockGetAvailableApps (): Promise<ReqRes.GetAppsAvailableRes> {
   return Object.values(mockApiAppAvailableFull)
 }
 
-async function mockGetInstalledApp (appId: string): Promise<ReqRes.GetAppInstalledRes> {
+async function mockGetInstalledApp (appId: string): Promise<ApiAppInstalledFull> {
   await pauseFor(1000)
-  return { ...mockApiAppInstalledFull[appId] }
+  return mockApiAppsInstalledFull[appId]
 }
 
 async function mockGetInstalledApps (): Promise<ApiAppInstalledPreview[]> {
   await pauseFor(1000)
-  return Object.values(mockApiAppInstalledFull).map(toInstalledPreview).filter(({ versionInstalled}) => !!versionInstalled)
+  return Object.values(mockApiAppsInstalledFull).map(toInstalledPreview).filter(({ versionInstalled}) => !!versionInstalled)
 }
 
 async function mockGetAppLogs (): Promise<ReqRes.GetAppLogsRes> {
@@ -353,92 +434,6 @@ async function mockGetAvailableAppVersionInfo (): Promise<ReqRes.GetAppAvailable
 async function mockGetAppConfig (): Promise<ReqRes.GetAppConfigRes> {
   await pauseFor(1000)
   return mockApiAppConfig
-}
-
-async function mockInstallApp (appId: string): Promise<ApiAppInstalledFull & { breakages: DependentBreakage[] }> {
-  await pauseFor(1000)
-  return { ...mockApiAppInstalledFull[appId], ...mockAppDependentBreakages }
-}
-
-async function mockUninstallApp (): Promise< { breakages: DependentBreakage[] } > {
-  await pauseFor(1000)
-  return mockAppDependentBreakages
-}
-
-async function mockStartApp (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockStopApp (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockCreateAppBackup (): Promise<ReqRes.PostAppBackupCreateRes> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockStopAppBackup (): Promise<ReqRes.PostAppBackupStopRes> {
-  await pauseFor(1000)
-  return { }
-}
-
-
-async function mockPatchAppConfig (): Promise<{ breakages: DependentBreakage[] }> {
-  await pauseFor(1000)
-  return mockAppDependentBreakages
-}
-
-async function mockPatchServerConfig (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockWipeAppData (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockAddSSHKey (): Promise<SSHFingerprint> {
-  await pauseFor(1000)
-  return mockApiServer().ssh[0]
-}
-
-async function mockDeleteSSHKey (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockAddWifi (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockConnectWifi (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockDeleteWifi (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockRestartServer (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockShutdownServer (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
-async function mockRefreshLAN (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
 }
 
 const mockApiNotifications: ReqRes.GetNotificationsRes = [
@@ -479,8 +474,7 @@ const mockApiNotifications: ReqRes.GetNotificationsRes = [
 export const mockApiServer: () => ReqRes.GetServerRes = () => ({
   serverId: 'start9-mockxyzab',
   name: 'Embassy:12345678',
-  versionInstalled: '0.2.11',
-  versionLatest: '0.2.12',
+  versionInstalled: '0.2.9',
   status: ServerStatus.RUNNING,
   alternativeRegistryUrl: 'beta-registry.start9labs.com',
   welcomeAck: true,
@@ -510,11 +504,12 @@ export const mockApiServer: () => ReqRes.GetServerRes = () => ({
       hostname: 'matt macbook pro',
     },
   ],
+  notifications: [],
 })
 
 const mockVersionLatest: ReqRes.GetVersionLatestRes = {
   versionLatest: '15.2.8.6',
-  releaseNotes: `*Hello*, **Testing Markdown**. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent aliquet, sapien sit amet pretium lacinia, neque tortor consectetur nunc, non volutpat lectus neque in leo. Curabitur a odio eleifend, placerat purus non, aliquet nulla. Aliquam eget lacinia lectus. Aliquam gravida elit eu magna pretium, non interdum tortor vulputate. Ut ac tortor vel tellus blandit malesuada ac ac tortor. Integer tincidunt est quam, non convallis sapien vehicula sed. Donec ullamcorper convallis massa, nec euismod enim tempus vitae. In condimentum semper pulvinar. Sed viverra est id lectus tincidunt, et malesuada eros malesuada.
+  releaseNotes: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent aliquet, sapien sit amet pretium lacinia, neque tortor consectetur nunc, non volutpat lectus neque in leo. Curabitur a odio eleifend, placerat purus non, aliquet nulla. Aliquam eget lacinia lectus. Aliquam gravida elit eu magna pretium, non interdum tortor vulputate. Ut ac tortor vel tellus blandit malesuada ac ac tortor. Integer tincidunt est quam, non convallis sapien vehicula sed. Donec ullamcorper convallis massa, nec euismod enim tempus vitae. In condimentum semper pulvinar. Sed viverra est id lectus tincidunt, et malesuada eros malesuada.
   Curabitur scelerisque eu mauris eget dapibus. In egestas est sit amet nisi cursus iaculis. Mauris consequat pharetra ex, vitae sollicitudin tortor viverra id. Suspendisse lacinia justo id tincidunt feugiat. Nunc risus elit, viverra vel vestibulum ac, varius vel eros. Nam at tellus tempor, semper metus et, tristique elit. Vivamus a dui sit amet orci tincidunt tincidunt. Cras ut velit pretium, euismod dolor non, pulvinar lorem. Praesent dignissim eros quis tortor bibendum, nec convallis libero viverra. Aenean sit amet massa maximus eros congue pellentesque ac nec massa. Nam feugiat felis mi, a aliquet enim porta eget.
   Phasellus pellentesque magna vel elit malesuada elementum. Curabitur maximus scelerisque vulputate. Duis facilisis et nisi sed facilisis. Ut consectetur odio tortor, vitae elementum velit scelerisque eget. Maecenas bibendum, massa eu bibendum rhoncus, turpis ex condimentum elit, vel pulvinar ex mi sed urna. Etiam ac erat lectus. Suspendisse dignissim massa tortor. Donec ac dolor in tortor faucibus scelerisque. Nullam et lacus eros. Cras eget sapien nec felis condimentum tincidunt. Praesent ac ante dui. Nam euismod nunc neque, et scelerisque erat efficitur nec. Aenean efficitur tincidunt nulla, ac tempor leo blandit sed. Duis sed tellus quis ante consequat ornare nec vitae eros. Praesent ultrices nunc ut lacus tincidunt finibus. Praesent at eros non est commodo ultricies.
   Curabitur eu felis convallis, lobortis nulla laoreet, commodo lacus. Vestibulum at sapien sed metus tincidunt vulputate. Donec cursus augue non sapien imperdiet cursus. Aliquam pellentesque ligula id magna blandit rutrum. Aliquam mattis ipsum leo, nec pharetra lectus tristique eu. Duis egestas mollis aliquam. Duis aliquet dictum risus, quis dictum mauris finibus id.`,

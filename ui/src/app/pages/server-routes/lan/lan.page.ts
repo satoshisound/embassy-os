@@ -54,7 +54,7 @@ export class LANPage {
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync( async () => {
-      await this.apiService.refreshLAN()
+      await this.apiService.refreshLan()
     }).catch(e => {
       console.error(e)
     })

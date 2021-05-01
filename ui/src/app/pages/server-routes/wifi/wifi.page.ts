@@ -2,12 +2,11 @@ import { Component } from '@angular/core'
 import { ActionSheetController } from '@ionic/angular'
 import { ApiService } from 'src/app/services/api/api.service'
 import { ActionSheetButton } from '@ionic/core'
-import { pauseFor } from 'src/app/util/misc.util'
 import { WifiService } from './wifi.service'
-import { PropertySubject } from 'src/app/util/property-subject.util'
-import { S9Server } from 'src/app/models/server-model'
 import { LoaderService } from 'src/app/services/loader.service'
 import { ModelPreload } from 'src/app/models/model-preload'
+import { BehaviorSubject, Observable, of } from 'rxjs'
+import { WiFi } from 'src/app/services/api/api-types'
 
 @Component({
   selector: 'wifi',
@@ -15,8 +14,8 @@ import { ModelPreload } from 'src/app/models/model-preload'
   styleUrls: ['wifi.page.scss'],
 })
 export class WifiListPage {
-  server: PropertySubject<S9Server> = { } as any
-  error: string
+  wifi$: Observable<WiFi>
+  error$ = new BehaviorSubject('')
 
   constructor (
     private readonly apiService: ApiService,
@@ -27,36 +26,26 @@ export class WifiListPage {
   ) { }
 
   async ngOnInit () {
-    this.loader.displayDuring$(
-      this.preload.server(),
-    ).subscribe(s => this.server = s)
+    this.preload.server().subscribe(s => this.wifi$ = of(s.wifi))
   }
 
-  async doRefresh (event: any) {
-    await Promise.all([
-      this.apiService.getServer(),
-      pauseFor(600),
-    ])
-    event.target.complete()
-  }
-
-  async presentAction (ssid: string) {
+  async presentAction (ssid: string, wifi: WiFi) {
     const buttons: ActionSheetButton[] = [
       {
         text: 'Forget',
         cssClass: 'alert-danger',
         handler: () => {
-          this.delete(ssid)
+          this.delete(ssid, wifi)
         },
       },
     ]
 
-    if (ssid !== this.server.wifi.getValue().current) {
+    if (ssid !== wifi.current) {
       buttons.unshift(
         {
           text: 'Connect',
           handler: () => {
-            this.connect(ssid)
+            this.connect(ssid, wifi.current)
           },
         },
       )
@@ -69,41 +58,39 @@ export class WifiListPage {
     await action.present()
   }
 
-  // Let's add country code here.
-  async connect (ssid: string): Promise<void> {
-    this.error = ''
+  // Let's add country code here
+  async connect (ssid: string, current: string): Promise<void> {
+    this.error$.next('')
     this.loader.of({
       message: 'Connecting. This could take while...',
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      const current = this.server.wifi.getValue().current
       await this.apiService.connectWifi(ssid)
       const success = await this.wifiService.confirmWifi(ssid)
       if (success) {
-        this.wifiService.presentAlertSuccess(ssid, current)
+        this.wifiService.presentAlertSuccess(ssid)
       } else {
         this.wifiService.presentToastFail()
       }
     }).catch(e => {
       console.error(e)
-      this.error = e.message
+      this.error$.next(e.message)
     })
   }
 
-  async delete (ssid: string): Promise<void> {
-    this.error = ''
+  async delete (ssid: string, wifi: WiFi): Promise<void> {
+    this.error$.next('')
     this.loader.of({
       message: 'Deleting...',
       spinner: 'lines',
       cssClass: 'loader',
-    }).displayDuringAsync( async () => {
+    }).displayDuringAsync(async () => {
       await this.apiService.deleteWifi(ssid)
-      this.wifiService.removeWifi(ssid)
-      this.error = ''
+      this.error$.next('')
     }).catch(e => {
       console.error(e)
-      this.error = e.message
+      this.error$.next(e.message)
     })
   }
 }

@@ -1,12 +1,10 @@
 import { Component } from '@angular/core'
 import { LoadingOptions } from '@ionic/core'
-import { ServerModel, ServerStatus } from 'src/app/models/server-model'
+import { ServerStatus } from 'src/app/models/server-model'
 import { AlertController } from '@ionic/angular'
 import { S9Server } from 'src/app/models/server-model'
 import { ApiService } from 'src/app/services/api/api.service'
-import { SyncDaemon } from 'src/app/services/sync.service'
 import { Subscription, Observable } from 'rxjs'
-import { doForAtLeast } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
@@ -22,17 +20,14 @@ export class ServerShowPage {
   error = ''
 
   constructor (
-    private readonly serverModel: ServerModel,
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly apiService: ApiService,
-    private readonly syncDaemon: SyncDaemon,
-    public readonly patchDbModel: PatchDbModel,
+    private readonly patch: PatchDbModel,
   ) { }
 
   async ngOnInit () {
-    // this.server = this.serverModel.watch()
-    this.server = this.patchDbModel.watch$('server')
+    this.server = this.patch.watch$('server')
 
     this.subsToTearDown.push(
       // serverUpdateSubscription
@@ -48,21 +43,6 @@ export class ServerShowPage {
 
   ngOnDestroy () {
     this.subsToTearDown.forEach(s => s.unsubscribe())
-  }
-
-  async doRefresh (event: any) {
-    await doForAtLeast([this.getServerAndApps()], 600)
-    event.target.complete()
-  }
-
-  async getServerAndApps (): Promise<void> {
-    try {
-      this.syncDaemon.sync()
-      this.error = ''
-    } catch (e) {
-      console.error(e)
-      this.error = e.message
-    }
   }
 
   async presentAlertRestart () {
@@ -113,8 +93,8 @@ export class ServerShowPage {
     this.loader
       .of(LoadingSpinner(`Restarting...`))
       .displayDuringAsync( async () => {
-          this.serverModel.markUnreachable()
-          await this.apiService.restartServer()
+        // this.serverModel.markUnreachable()
+        await this.apiService.restartServer()
       })
       .catch(e => this.setError(e))
   }
@@ -123,7 +103,7 @@ export class ServerShowPage {
     this.loader
       .of(LoadingSpinner(`Shutting down...`))
       .displayDuringAsync( async () => {
-        this.serverModel.markUnreachable()
+        // this.serverModel.markUnreachable()
         await this.apiService.shutdownServer()
       })
       .catch(e => this.setError(e))

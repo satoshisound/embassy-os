@@ -1,8 +1,8 @@
 import { AppStatus } from '../../models/app-model'
 import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppDependency, BaseApp, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo } from '../../models/app-types'
 import { modulateTime } from 'src/app/util/misc.util'
+import { ApiAppInstalledFull } from './api-types'
 import { S9Server, ServerStatus } from 'src/app/models/server-model'
-import { ApiAppInstalledFull } from '../api/api-types'
 
 export function toAvailablePreview (f: AppAvailableFull): AppAvailablePreview {
   return {
@@ -301,10 +301,10 @@ export const mockApiAppAvailableFull: { [appId: string]: AppAvailableFull; } = {
   bitwarden: bitwardenA,
 }
 
-export const mockApiAppsInstalledFull: { [appId: string]: ApiAppInstalledFull; } = {
+export const mockApiAppInstalledFull: { [appId: string]: ApiAppInstalledFull; } = {
   bitcoind: bitcoinI,
   cups: cupsI,
-  lightning: lightningI,
+  'c-lightning': lightningI,
 }
 
 export const mockApiAppAvailableVersionInfo: AppAvailableVersionSpecificInfo = {
@@ -321,7 +321,6 @@ export const mockAppDependentBreakages: { breakages: DependentBreakage[] } = {
 }
 
 export const mockServer: S9Server = {
-  origin: 'start9-abcdefg.local',
   badge: 0,
   notifications: [],
   serverId: 'start9-mockxyzab',

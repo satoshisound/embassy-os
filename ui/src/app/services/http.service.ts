@@ -37,9 +37,9 @@ export class HttpService {
     }
 
     return (timeout ? withTimeout(req, timeout) : req)
-              .toPromise()
-              .then(res => res.body)
-              .catch(e => { console.error(e); throw humanReadableErrorMessage(e)})
+      .toPromise()
+      .then(res => res.body)
+      .catch(e => { console.error(e); throw humanReadableErrorMessage(e)})
   }
 }
 

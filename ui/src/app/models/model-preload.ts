@@ -1,12 +1,13 @@
 import { Injectable } from '@angular/core'
 import { AppModel } from './app-model'
 import { AppInstalledFull, AppInstalledPreview } from './app-types'
-import { ApiService } from '../services/api/api.service'
 import { PropertySubject, PropertySubjectId } from '../util/property-subject.util'
-import { S9Server, ServerModel } from './server-model'
+import { S9Server } from './server-model'
 import { Observable, of, from } from 'rxjs'
-import { map, concatMap } from 'rxjs/operators'
+import { map, concatMap, take, tap } from 'rxjs/operators'
 import { fromSync$ } from '../util/rxjs.util'
+import { PatchDbModel } from './patch-db/patch-db-model'
+import { ApiService } from '../services/api/api.service'
 
 @Injectable({
   providedIn: 'root',
@@ -15,7 +16,7 @@ export class ModelPreload {
   constructor (
     private readonly appModel: AppModel,
     private readonly api: ApiService,
-    private readonly serverModel: ServerModel,
+    private readonly patchDb: PatchDbModel,
   ) { }
 
   apps (): Observable<PropertySubjectId<AppInstalledFull | AppInstalledPreview>[]> {
@@ -49,7 +50,7 @@ export class ModelPreload {
     )
   }
 
-  loadInstalledApp (appId: string): Promise<PropertySubject<AppInstalledFull>> {
+  async loadInstalledApp (appId: string): Promise<PropertySubject<AppInstalledFull>> {
     const now = new Date()
     return this.api.getInstalledApp(appId).then(res => {
       this.appModel.update({ id: appId, ...res, hasFetchedFull: true }, now)
@@ -57,18 +58,12 @@ export class ModelPreload {
     })
   }
 
-  server (): Observable<PropertySubject<S9Server>> {
-    return fromSync$(() => this.serverModel.watch()).pipe(concatMap(server => {
-      if (server.versionInstalled.getValue()) {
-        return of(server)
-      } else {
-        console.warn(`server not present, preloading`)
-        return from(this.api.getServer()).pipe(
-          map(res => {
-            this.serverModel.update(res)
-            return this.serverModel.watch()
-          }))
-      }
-    }))
+  server (): Observable<S9Server> {
+    return this.patchDb.watch$('server')
+      .pipe(
+        concatMap(server => of(server || { } as S9Server)),
+        take(1),
+      )
+
   }
 }

@@ -1,37 +1,51 @@
-import { Rules } from '../../models/app-model'
+import { AppStatus, Rules } from '../../models/app-model'
 import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, ServiceAction } from '../../models/app-types'
-import { S9Notification, SSHFingerprint, ServerMetrics, DiskInfo } from '../../models/server-model'
+import { S9Notification, SSHFingerprint, DiskInfo } from '../../models/server-model'
 import { Subject, Observable } from 'rxjs'
-import { Unit, ApiServer, ApiAppInstalledFull, ApiAppConfig, ApiAppAvailableFull, ApiAppInstalledPreview } from './api-types'
-import { AppMetrics, AppMetricsVersioned } from 'src/app/util/metrics.util'
+import { Unit, ApiServer, ReqRes } from './api-types'
+import { AppMetrics } from 'src/app/util/metrics.util'
 import { ConfigSpec } from 'src/app/app-config/config-types'
+import { Http, PatchOp, SeqReplace, SeqUpdate, SeqUpdateReal, Source, SeqUpdateTemp } from 'patch-db-client'
+import { DataModel } from 'src/app/models/patch-db/data-model'
+import { filter } from 'rxjs/operators'
+import * as uuid from 'uuid'
 
-export abstract class ApiService {
-  private $unauthorizedApiResponse$: Subject<{ }> = new Subject()
+export type PatchPromise<T> = Promise<{ response: T, patch?: SeqUpdate<DataModel> }>
+
+export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
+  protected readonly sync = new Subject<SeqUpdate<DataModel>>()
+  private syncing = true
+
+  /** PatchDb Source interface. Post/Patch requests provide a source of patches to the db. */
+  // sequenceStream '_' is not used by the live api, but is overridden by the mock
+  watch$ (_?: Observable<number>): Observable<SeqUpdate<DataModel>> {
+    return this.sync.asObservable().pipe(filter(() => this.syncing))
+  }
+
+  /** PatchDb Http interface. We can use the apiService to poll for patches or fetch db dumps */
+  abstract getUpdates (startSequence: number, finishSequence?: number): Promise<SeqUpdateReal<DataModel>[]>
+  abstract getDump (): Promise<SeqReplace<DataModel>>
+
+  private unauthorizedApiResponse$: Subject<{ }> = new Subject()
+  constructor () { }
 
   watch401$ (): Observable<{ }> {
-    return this.$unauthorizedApiResponse$.asObservable()
+    return this.unauthorizedApiResponse$.asObservable()
   }
 
   authenticatedRequestsEnabled: boolean = false
 
   protected received401 () {
     this.authenticatedRequestsEnabled = false
-    this.$unauthorizedApiResponse$.next()
+    this.unauthorizedApiResponse$.next()
   }
 
-  abstract testConnection (url: string): Promise<true>
-  abstract getCheckAuth (): Promise<Unit> // Throws an error on failed auth.
   abstract postLogin (password: string): Promise<Unit> // Throws an error on failed auth.
   abstract postLogout (): Promise<Unit> // Throws an error on failed auth.
-  abstract getServer (timeout?: number): Promise<ApiServer>
+  abstract getServer (): Promise<ApiServer>
   abstract getVersionLatest (): Promise<ReqRes.GetVersionLatestRes>
   abstract getServerMetrics (): Promise<ReqRes.GetServerMetricsRes>
   abstract getNotifications (page: number, perPage: number): Promise<S9Notification[]>
-  abstract deleteNotification (id: string): Promise<Unit>
-  abstract toggleAppLAN (appId: string, toggle: 'enable' | 'disable'): Promise<Unit>
-  abstract updateAgent (version: any): Promise<Unit>
-  abstract acknowledgeOSWelcome (version: string): Promise<Unit>
   abstract getAvailableApps (): Promise<AppAvailablePreview[]>
   abstract getAvailableApp (appId: string): Promise<AppAvailableFull>
   abstract getAvailableAppVersionSpecificInfo (appId: string, versionSpec: string): Promise<AppAvailableVersionSpecificInfo>
@@ -39,85 +53,133 @@ export abstract class ApiService {
   abstract getAppMetrics (appId: string): Promise<AppMetrics>
   abstract getInstalledApps (): Promise<AppInstalledPreview[]>
   abstract getExternalDisks (): Promise<DiskInfo[]>
-  abstract getAppConfig (appId: string): Promise<{ spec: ConfigSpec, config: object, rules: Rules[] }>
+  abstract getAppConfig (appId: string): Promise<{ spec: ConfigSpec, config: object, rules: Rules[]}>
   abstract getAppLogs (appId: string, params?: ReqRes.GetAppLogsReq): Promise<string[]>
   abstract getServerLogs (): Promise<string[]>
-  abstract installApp (appId: string, version: string, dryRun?: boolean): Promise<AppInstalledFull & { breakages: DependentBreakage[] }>
-  abstract uninstallApp (appId: string, dryRun?: boolean): Promise<{ breakages: DependentBreakage[] }>
-  abstract startApp (appId: string): Promise<Unit>
-  abstract stopApp (appId: string, dryRun?: boolean): Promise<{ breakages: DependentBreakage[] }>
-  abstract restartApp (appId: string): Promise<Unit>
-  abstract createAppBackup (appId: string, logicalname: string, password?: string): Promise<Unit>
-  abstract restoreAppBackup (appId: string, logicalname: string, password?: string): Promise<Unit>
-  abstract stopAppBackup (appId: string): Promise<Unit>
-  abstract patchAppConfig (app: AppInstalledPreview, config: object, dryRun?: boolean): Promise<{ breakages: DependentBreakage[] }>
-  abstract postConfigureDependency (dependencyId: string, dependentId: string, dryRun?: boolean): Promise<{ config: object, breakages: DependentBreakage[] }>
-  abstract patchServerConfig (attr: string, value: any): Promise<Unit>
-  abstract wipeAppData (app: AppInstalledPreview): Promise<Unit>
-  abstract addSSHKey (sshKey: string): Promise<Unit>
-  abstract deleteSSHKey (sshKey: SSHFingerprint): Promise<Unit>
-  abstract addWifi (ssid: string, password: string, country: string, connect: boolean): Promise<Unit>
-  abstract connectWifi (ssid: string): Promise<Unit>
-  abstract deleteWifi (ssid: string): Promise<Unit>
-  abstract restartServer (): Promise<Unit>
-  abstract shutdownServer (): Promise<Unit>
-  abstract ejectExternalDisk (logicalName: string): Promise<Unit>
-  abstract serviceAction (appId: string, serviceAction: ServiceAction): Promise<ReqRes.ServiceActionResponse>
-  abstract refreshLAN (): Promise<Unit>
-}
 
-export function isRpcFailure<Error, Result> (arg: { error: Error } | { result: Result }): arg is { error: Error } {
+  /** Any request which mutates state will return a PatchPromise: a patch to state along with the standard response. The syncResponse helper function syncs the patch and returns the response*/
+  protected abstract deleteNotificationRaw (id: string): PatchPromise<Unit>
+  deleteNotification = this.syncResponse((id: string) => this.deleteNotificationRaw(id))
+
+  protected abstract toggleAppLANRaw (appId: string, toggle: 'enable' | 'disable'): PatchPromise<Unit>
+  toggleAppLAN = this.syncResponse((appId: string, toggle: 'enable' | 'disable') => this.toggleAppLANRaw(appId, toggle))
+
+  protected abstract updateAgentRaw (version: string): PatchPromise<Unit>
+  updateAgent = this.syncResponse((version: string) => this.updateAgentRaw(version))
+
+  protected abstract acknowledgeOSWelcomeRaw (version: string): PatchPromise<Unit>
+  acknowledgeOSWelcome = this.syncResponse((version: string) => this.acknowledgeOSWelcomeRaw(version))
+
+  protected abstract installAppRaw (appId: string, version: string, dryRun?: boolean): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }>
+  // An example of making a temp patch to the store when the request is made. syncResponse handles the expiration logic.
+  installApp = this.syncResponse(
+    (appId: string, version: string, dryRun?: boolean) => this.installAppRaw(appId, version, dryRun),
+    (appId, _, dryRun) => {
+      if (dryRun) return undefined
+      //Unfortunately, this 'path' is not type safe.
+      //We could consider a helper function with type safe path parameters like 'watch'?
+      return { expiredBy: uuid.v4(), patch: [{ op: PatchOp.REPLACE, path: `apps/${appId}/status`, value: AppStatus.INSTALLING }] } as SeqUpdateTemp
+    })
+
+  protected abstract uninstallAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
+  uninstallApp = this.syncResponse((appId: string, dryRun?: boolean) => this.uninstallAppRaw(appId, dryRun))
+
+  protected abstract startAppRaw (appId: string): PatchPromise<Unit>
+  startApp = this.syncResponse((appId: string) => this.startAppRaw(appId))
+
+  protected abstract stopAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
+  stopApp = this.syncResponse((appId: string, dryRun?: boolean) => this.stopAppRaw(appId, dryRun))
+
+  protected abstract restartAppRaw (appId: string): PatchPromise<Unit>
+  restartApp = this.syncResponse((appId: string) => this.restartAppRaw(appId))
+
+  protected abstract createAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit>
+  createAppBackup = this.syncResponse((appId: string, logicalname: string, password?: string) => this.createAppBackupRaw(appId, logicalname, password))
+
+  protected abstract restoreAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit>
+  restoreAppBackup = this.syncResponse((appId: string, logicalname: string, password?: string) => this.restoreAppBackupRaw(appId, logicalname, password))
+
+  protected abstract stopAppBackupRaw (appId: string): PatchPromise<Unit>
+  stopAppBackup = this.syncResponse((appId: string) => this.stopAppBackupRaw(appId))
+
+  protected abstract patchAppConfigRaw (app: AppInstalledPreview, config: object, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
+  patchAppConfig = this.syncResponse((app: AppInstalledPreview, config: object, dryRun?: boolean) => this.patchAppConfigRaw(app, config, dryRun))
+
+  protected abstract postConfigureDependencyRaw (dependencyId: string, dependentId: string, dryRun?: boolean): PatchPromise< { config: object, breakages: DependentBreakage[] }>
+  postConfigureDependency = this.syncResponse((dependencyId: string, dependentId: string, dryRun?: boolean) => this.postConfigureDependencyRaw(dependencyId, dependentId, dryRun))
+
+  protected abstract patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit>
+  patchServerConfig = this.syncResponse((attr: string, value: any) => this.patchServerConfigRaw(attr, value))
+
+  protected abstract wipeAppDataRaw (app: AppInstalledPreview): PatchPromise<Unit>
+  wipeAppData = this.syncResponse((app: AppInstalledPreview) => this.wipeAppDataRaw(app))
+
+  protected abstract addSSHKeyRaw (sshKey: string): PatchPromise<Unit>
+  addSSHKey = this.syncResponse(this.addSSHKeyRaw)
+
+  protected abstract deleteSSHKeyRaw (sshKey: SSHFingerprint): PatchPromise<Unit>
+  deleteSSHKey = this.syncResponse((sshKey: SSHFingerprint) => this.deleteSSHKeyRaw(sshKey))
+
+  protected abstract addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit>
+  addWifi = this.syncResponse((ssid: string, password: string, country: string, connect: boolean) => this.addWifiRaw(ssid, password, country, connect))
+
+  protected abstract connectWifiRaw (ssid: string): PatchPromise<Unit>
+  connectWifi = this.syncResponse((ssid: string) => this.connectWifiRaw(ssid))
+
+  protected abstract deleteWifiRaw (ssid: string): PatchPromise<Unit>
+  deleteWifi = this.syncResponse((ssid: string) => this.deleteWifiRaw(ssid))
+
+  protected abstract restartServerRaw (): PatchPromise<Unit>
+  restartServer = this.syncResponse(() => this.restartServerRaw())
+
+  protected abstract shutdownServerRaw (): PatchPromise<Unit>
+  shutdownServer = this.syncResponse(() => this.shutdownServerRaw())
+
+  protected abstract ejectExternalDiskRaw (logicalname: string): PatchPromise<Unit>
+  ejectExternalDisk = this.syncResponse((logicalname: string) => this.ejectExternalDiskRaw(logicalname))
+
+  protected abstract serviceActionRaw (appId: string, serviceAction: ServiceAction): PatchPromise<ReqRes.ServiceActionResponse>
+  serviceAction = this.syncResponse((appId: string, serviceAction: ServiceAction) => this.serviceActionRaw(appId, serviceAction))
+
+  protected abstract refreshLanRaw (): PatchPromise<Unit>
+  refreshLan = this.syncResponse(() => this.refreshLanRaw())
+
+  // Helper allowing quick decoration to sync the response patch and return the response contents.
+  // Pass in a tempUpdate function which returns a SeqUpdateTemp corresponding to a temporary
+  // state change you'd like to enact prior to request and expired when request terminates.
+  private syncResponse<T extends (...args: any[]) => PatchPromise<any>> (f: T, tempUpdate?: (...args: Parameters<T>) => SeqUpdateTemp | undefined): (...args: Parameters<T>) => ExtractResultPromise<ReturnType<T>> {
+    console.log('function', f)
+    console.log('temp', tempUpdate)
+
+    return (...a) => {
+      console.log('aaa', a)
+      let expireId = undefined
+      if (tempUpdate) {
+        const tempPatch = tempUpdate(...a)
+        if (tempPatch) {
+          expireId = tempPatch.expiredBy
+          this.sync.next(tempPatch)
+        }
+      }
+
+      return f(a).then(({ response, patch }) => {
+        console.log('response', response)
+        console.log('patch', patch)
+        if (expireId) patch = { ...patch, expireId }
+        if (patch) this.sync.next(patch)
+        return response
+      }) as any
+   }
+  }
+}
+// used for type inference in syncResponse
+type ExtractResultPromise<T extends PatchPromise<any>> = T extends PatchPromise<infer R> ? Promise<R> : any
+
+
+export function isRpcFailure<Error, Result> (arg: { error: Error } | { result: Result}): arg is { error: Error } {
   return !!(arg as any).error
 }
 
-export function isRpcSuccess<Error, Result> (arg: { error: Error } | { result: Result }): arg is { result: Result } {
+export function isRpcSuccess<Error, Result> (arg: { error: Error } | { result: Result}): arg is { result: Result } {
   return !!(arg as any).result
 }
-
-export module ReqRes {
-  export type GetVersionRes = { version: string }
-  export type PostLoginReq = { password: string }
-  export type PostLoginRes = Unit
-  export type ServiceActionRequest = {
-    jsonrpc: '2.0',
-    id: string,
-    method: string
-  }
-  export type ServiceActionResponse = {
-    jsonrpc: '2.0',
-    id: string
-  } & ({ error: { code: number, message: string } } | { result: string })
-  export type GetCheckAuthRes = { }
-  export type GetServerRes = ApiServer
-  export type GetVersionLatestRes = { versionLatest: string, releaseNotes: string }
-  export type GetServerMetricsRes = ServerMetrics
-  export type GetAppAvailableRes = ApiAppAvailableFull
-  export type GetAppAvailableVersionInfoRes = AppAvailableVersionSpecificInfo
-  export type GetAppsAvailableRes = AppAvailablePreview[]
-  export type GetExternalDisksRes = DiskInfo[]
-  export type GetAppInstalledRes = ApiAppInstalledFull
-  export type GetAppConfigRes = ApiAppConfig
-  export type GetAppLogsReq = { after?: string, before?: string, page?: string, perPage?: string }
-  export type GetServerLogsReq = { }
-  export type GetAppLogsRes = string[]
-  export type GetServerLogsRes = string[]
-  export type GetAppMetricsRes = AppMetricsVersioned<number>
-  export type GetAppsInstalledRes = ApiAppInstalledPreview[]
-  export type PostInstallAppReq = { version: string }
-  export type PostInstallAppRes = ApiAppInstalledFull & { breakages: DependentBreakage[] }
-  export type PostUpdateAgentReq = { version: string }
-  export type PostAppBackupCreateReq = { logicalname: string, password: string }
-  export type PostAppBackupCreateRes = Unit
-  export type PostAppBackupRestoreReq = { logicalname: string, password: string }
-  export type PostAppBackupRestoreRes = Unit
-  export type PostAppBackupStopRes = Unit
-  export type PatchAppConfigReq = { config: object }
-  export type PatchServerConfigReq = { value: string }
-  export type GetNotificationsReq = { page: string, perPage: string }
-  export type GetNotificationsRes = S9Notification[]
-  export type PostAddWifiReq = { ssid: string, password: string, country: string, skipConnect: boolean }
-  export type PostConnectWifiReq = { country: string }
-  export type PostAddSSHKeyReq = { sshKey: string }
-  export type PostAddSSHKeyRes = SSHFingerprint
-}
-

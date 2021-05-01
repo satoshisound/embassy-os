@@ -1,33 +1,37 @@
 import { Injectable } from '@angular/core'
 import { HttpService, Method, HttpOptions } from '../http.service'
+import { AppModel, AppStatus } from '../../models/app-model'
 import { AppAvailablePreview, AppAvailableFull, AppInstalledFull, AppInstalledPreview, DependentBreakage, AppAvailableVersionSpecificInfo, ServiceAction } from '../../models/app-types'
-import { S9Notification, SSHFingerprint, DiskInfo } from '../../models/server-model'
-import { ApiService, PatchPromise  } from './api.service'
-import { ApiServer, ReqRes, Unit } from './api-types'
+import { S9Notification, SSHFingerprint, ServerModel, DiskInfo } from '../../models/server-model'
+import { ApiService, ReqRes  } from './api.service'
+import { ApiServer, Unit } from './api-types'
 import { HttpErrorResponse } from '@angular/common/http'
 import { isUnauthorized } from 'src/app/util/web.util'
 import { Replace } from 'src/app/util/types.util'
 import { AppMetrics, parseMetricsPermissive } from 'src/app/util/metrics.util'
+import { modulateTime } from 'src/app/util/misc.util'
 import { Observable, of, throwError } from 'rxjs'
-import { SeqPatch, SeqReplace } from 'patch-db-client'
-import { DataModel } from 'src/app/models/patch-db/data-model'
-import { ConfigService } from '../config.service'
+import { catchError, mapTo } from 'rxjs/operators'
 import * as uuid from 'uuid'
+import { ConfigService } from '../config.service'
 
 @Injectable()
 export class LiveApiService extends ApiService {
   constructor (
     private readonly http: HttpService,
+    // TODO remove app + server model from here. updates to state should be done in a separate class wrapping ApiService + App/ServerModel
+    private readonly appModel: AppModel,
+    private readonly serverModel: ServerModel,
     private readonly config: ConfigService,
   ) { super() }
 
-  async getUpdates (startSequence: number, finishSequence?: number): Promise<SeqPatch[]> {
-    const queryParams = `start=${startSequence}` + (finishSequence ? `&finish=${finishSequence}` : ``)
-    return this.authRequest({ method: Method.GET, url: `/revisions?${queryParams}` })
+  testConnection (url: string): Promise<true> {
+    return this.http.raw.get(url).pipe(mapTo(true as true), catchError(e => catchHttpStatusError(e))).toPromise()
   }
 
-  async getDump (): Promise<SeqReplace<DataModel>> {
-    return this.authRequest({ method: Method.GET, url: `/revisions?dump` })
+  // Used to check whether password or key is valid. If so, it will be used implicitly by all other calls.
+  async getCheckAuth (): Promise<Unit> {
+    return this.http.serverRequest<Unit>({ method: Method.GET, url: '/authenticate' }, { version: '' })
   }
 
   async postLogin (password: string): Promise<Unit> {
@@ -39,15 +43,19 @@ export class LiveApiService extends ApiService {
   }
 
   async getServer (timeout?: number): Promise<ApiServer> {
-    return this.authRequest<any>({ method: Method.GET, url: '/', readTimeout: timeout })
+    return this.authRequest<ReqRes.GetServerRes>({ method: Method.GET, url: '/', readTimeout: timeout })
+  }
+
+  async acknowledgeOSWelcome (version: string): Promise<Unit> {
+    return this.authRequest<Unit>({ method: Method.POST, url: `/welcome/${version}` })
   }
 
   async getVersionLatest (): Promise<ReqRes.GetVersionLatestRes> {
-    return this.authRequest({ method: Method.GET, url: '/versionLatest' }, { version: '' })
+    return this.authRequest<ReqRes.GetVersionLatestRes>({ method: Method.GET, url: '/versionLatest' }, { version: '' })
   }
 
   async getServerMetrics (): Promise<ReqRes.GetServerMetricsRes> {
-    return this.authRequest({ method: Method.GET, url: `/metrics` })
+    return this.authRequest<ReqRes.GetServerMetricsRes>({ method: Method.GET, url: `/metrics` })
   }
 
   async getNotifications (page: number, perPage: number): Promise<S9Notification[]> {
@@ -55,10 +63,10 @@ export class LiveApiService extends ApiService {
       page: String(page),
       perPage: String(perPage),
     }
-    return this.authRequest({ method: Method.GET, url: `/notifications`, params })
+    return this.authRequest<ReqRes.GetNotificationsRes>({ method: Method.GET, url: `/notifications`, params })
   }
 
-  async deleteNotificationRaw (id: string): PatchPromise<Unit> {
+  async deleteNotification (id: string): Promise<Unit> {
     return this.authRequest({ method: Method.DELETE, url: `/notifications/${id}` })
   }
 
@@ -67,11 +75,11 @@ export class LiveApiService extends ApiService {
   }
 
   // TODO: EJECT-DISKS
-  async ejectExternalDiskRaw (logicalName: string): PatchPromise<Unit> {
+  async ejectExternalDisk (logicalName: string): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: `/disks/eject`, data: { logicalName } })
   }
 
-  async updateAgentRaw (version: string): PatchPromise<Unit> {
+  async updateAgent (version: string): Promise<Unit> {
     const data: ReqRes.PostUpdateAgentReq = {
       version: `=${version}`,
     }
@@ -80,12 +88,12 @@ export class LiveApiService extends ApiService {
 
   async getAvailableAppVersionSpecificInfo (appId: string, versionSpec: string): Promise<AppAvailableVersionSpecificInfo> {
     return this
-      .authRequest<Replace<ReqRes.GetAppAvailableVersionInfoRes, 'versionViewing', 'version'>>( { method: Method.GET, url: `/apps/${appId}/store/${versionSpec}` })
-      .then( res => ({ ...res, versionViewing: res.version }))
-      .then( res => {
+      .authRequest<Replace<ReqRes.GetAppAvailableVersionInfoRes, 'versionViewing', 'version'>>({ method: Method.GET, url: `/apps/${appId}/store/${versionSpec}` })
+      .then(res => ({ ...res, versionViewing: res.version }))
+      .then(res => {
         delete res['version']
         return res
-       })
+      })
   }
 
   async getAvailableApps (): Promise<AppAvailablePreview[]> {
@@ -119,11 +127,6 @@ export class LiveApiService extends ApiService {
       })
   }
 
-  async getAppMetrics (appId: string): Promise<AppMetrics> {
-    return this.authRequest<ReqRes.GetAppMetricsRes | string>( { method: Method.GET, url: `/apps/${appId}/metrics` })
-      .then(parseMetricsPermissive)
-  }
-
   async getInstalledApps (): Promise<AppInstalledPreview[]> {
     return this.authRequest<ReqRes.GetAppsInstalledRes>({ method: Method.GET, url: `/apps/installed` })
       .then(apps => {
@@ -137,100 +140,126 @@ export class LiveApiService extends ApiService {
       })
   }
 
-  async getAppConfig ( appId: string): Promise<ReqRes.GetAppConfigRes> {
+  async getAppConfig (appId: string): Promise<ReqRes.GetAppConfigRes> {
     return this.authRequest<ReqRes.GetAppConfigRes>({ method: Method.GET, url: `/apps/${appId}/config` })
   }
 
   async getAppLogs (appId: string, params: ReqRes.GetAppLogsReq = { }): Promise<string[]> {
-    return this.authRequest<ReqRes.GetAppLogsRes>( { method: Method.GET, url: `/apps/${appId}/logs`, params: params as any })
+    return this.authRequest<ReqRes.GetAppLogsRes>({ method: Method.GET, url: `/apps/${appId}/logs`, params: params as any })
   }
 
-  async getServerLogs (): Promise<string> {
-    return this.authRequest<ReqRes.GetServerLogsRes>( { method: Method.GET, url: `/logs` })
+  async getServerLogs (): Promise<string[]> {
+    return this.authRequest<ReqRes.GetServerLogsRes>({ method: Method.GET, url: `/logs` })
   }
 
-  async acknowledgeOSWelcomeRaw (version: string): PatchPromise<Unit> {
-    return this.authRequest({ method: Method.POST, url: `/welcome/${version}` })
+  async getAppMetrics (appId: string): Promise<AppMetrics> {
+    return this.authRequest<ReqRes.GetAppMetricsRes | string>({ method: Method.GET, url: `/apps/${appId}/metrics` })
+      .then(parseMetricsPermissive)
   }
 
-  async installAppRaw (appId: string, version: string, dryRun: boolean = false): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }> {
+  async installApp (appId: string, version: string, dryRun: boolean = false): Promise<AppInstalledFull & { breakages: DependentBreakage[] }> {
     const data: ReqRes.PostInstallAppReq = {
       version,
     }
-    return this.authRequest({ method: Method.POST, url: `/apps/${appId}/install${dryRunParam(dryRun, true)}`, data })
-      .then(({ patch, response }) => ({ patch, response: { ...response, hasFetchedFull: false }}))
+    return this.authRequest<ReqRes.PostInstallAppRes>({ method: Method.POST, url: `/apps/${appId}/install${dryRunParam(dryRun, true)}`, data })
+      .then(app => {
+        return {
+          ...app,
+          hasFetchedFull: false,
+          hasUI: this.config.hasUI(app),
+          launchable: this.config.isLaunchable(app),
+        }
+      })
   }
 
-  async uninstallAppRaw (appId: string, dryRun: boolean = false): PatchPromise<{ breakages: DependentBreakage[] }> {
+  async uninstallApp (appId: string, dryRun: boolean = false): Promise<{ breakages: DependentBreakage[] }> {
     return this.authRequest({ method: Method.POST, url: `/apps/${appId}/uninstall${dryRunParam(dryRun, true)}`, readTimeout: 60000 })
   }
 
-  async startAppRaw (appId: string): PatchPromise<Unit> {
+  async startApp (appId: string): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: `/apps/${appId}/start`, readTimeout: 60000 })
+      .then(() => this.appModel.update({ id: appId, status: AppStatus.RUNNING }))
+      .then(() => ({ }))
   }
 
-  async stopAppRaw (appId: string, dryRun: boolean = false): PatchPromise<{ breakages: DependentBreakage[] }> {
-    return this.authRequest({ method: Method.POST, url: `/apps/${appId}/stop${dryRunParam(dryRun, true)}`, readTimeout: 60000 })
+  async stopApp (appId: string, dryRun: boolean = false): Promise<{ breakages: DependentBreakage[] }> {
+    const res = await this.authRequest<{ breakages: DependentBreakage[] }>({ method: Method.POST, url: `/apps/${appId}/stop${dryRunParam(dryRun, true)}`, readTimeout: 60000 })
+    if (!dryRun) this.appModel.update({ id: appId, status: AppStatus.STOPPING }, modulateTime(new Date(), 5, 'seconds'))
+    return res
   }
 
-  async restartAppRaw (appId: string): PatchPromise<Unit> {
+  async restartApp (appId: string): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: `/apps/${appId}/restart`, readTimeout: 60000 })
+      .then(() => ({ } as any))
   }
 
-  async createAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit> {
+  async createAppBackup (appId: string, logicalname: string, password?: string): Promise<Unit> {
     const data: ReqRes.PostAppBackupCreateReq = {
       password: password || undefined,
       logicalname,
     }
-    return this.authRequest({ method: Method.POST, url: `/apps/${appId}/backup`, data, readTimeout: 60000 })
+    return this.authRequest<ReqRes.PostAppBackupCreateRes>({ method: Method.POST, url: `/apps/${appId}/backup`, data, readTimeout: 60000 })
+      .then(() => this.appModel.update({ id: appId, status: AppStatus.CREATING_BACKUP }))
+      .then(() => ({ }))
   }
 
-  async stopAppBackupRaw (appId: string): PatchPromise<Unit> {
-    return this.authRequest({ method: Method.POST, url: `/apps/${appId}/backup/stop`, readTimeout: 60000 })
+  async stopAppBackup (appId: string): Promise<Unit> {
+    return this.authRequest<ReqRes.PostAppBackupStopRes>({ method: Method.POST, url: `/apps/${appId}/backup/stop`, readTimeout: 60000 })
+      .then(() => this.appModel.update({ id: appId, status: AppStatus.STOPPED }))
+      .then(() => ({ }))
   }
 
-  async restoreAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit> {
+  async restoreAppBackup (appId: string, logicalname: string, password?: string): Promise<Unit> {
     const data: ReqRes.PostAppBackupRestoreReq = {
       password: password || undefined,
       logicalname,
     }
-    return this.authRequest({ method: Method.POST, url: `/apps/${appId}/backup/restore`, data, readTimeout: 60000 })
+    return this.authRequest<ReqRes.PostAppBackupRestoreRes>({ method: Method.POST, url: `/apps/${appId}/backup/restore`, data, readTimeout: 60000 })
+      .then(() => this.appModel.update({ id: appId, status: AppStatus.RESTORING_BACKUP }))
+      .then(() => ({ }))
   }
 
-  async patchAppConfigRaw (app: AppInstalledPreview, config: object, dryRun = false): PatchPromise<{ breakages: DependentBreakage[] }> {
+  async patchAppConfig (app: AppInstalledPreview, config: object, dryRun = false): Promise<{ breakages: DependentBreakage[] }> {
     const data: ReqRes.PatchAppConfigReq = {
       config,
     }
     return this.authRequest({ method: Method.PATCH, url: `/apps/${app.id}/config${dryRunParam(dryRun, true)}`, data, readTimeout: 60000 })
   }
 
-  async postConfigureDependencyRaw (dependencyId: string, dependentId: string, dryRun?: boolean): PatchPromise<{ config: object, breakages: DependentBreakage[] }> {
+  async postConfigureDependency (dependencyId: string, dependentId: string, dryRun?: boolean): Promise<{ config: object, breakages: DependentBreakage[] }> {
     return this.authRequest({ method: Method.POST, url: `/apps/${dependencyId}/autoconfig/${dependentId}${dryRunParam(dryRun, true)}`, readTimeout: 60000 })
   }
 
-  async patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit> {
+  async patchServerConfig (attr: string, value: any): Promise<Unit> {
     const data: ReqRes.PatchServerConfigReq = {
       value,
     }
     return this.authRequest({ method: Method.PATCH, url: `/${attr}`, data, readTimeout: 60000 })
+      .then(() => this.serverModel.update({ [attr]: value }))
+      .then(() => ({ }))
   }
 
-  async wipeAppDataRaw (app: AppInstalledPreview): PatchPromise<Unit> {
-    return this.authRequest({ method: Method.POST, url: `/apps/${app.id}/wipe`, readTimeout: 60000 })
+  async wipeAppData (app: AppInstalledPreview): Promise<Unit> {
+    return this.authRequest({ method: Method.POST, url: `/apps/${app.id}/wipe`, readTimeout: 60000 }).then((res) => {
+      this.appModel.update({ id: app.id, status: AppStatus.NEEDS_CONFIG })
+      return res
+    })
   }
 
-  async toggleAppLANRaw (appId: string, toggle: 'enable' | 'disable'): PatchPromise<Unit> {
+  async toggleAppLAN (appId: string, toggle: 'enable' | 'disable'): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: `/apps/${appId}/lan/${toggle}` })
   }
 
-  async addSSHKeyRaw (sshKey: string): PatchPromise<Unit> {
+  async addSSHKey (sshKey: string): Promise<Unit> {
     const data: ReqRes.PostAddSSHKeyReq = {
       sshKey,
     }
-    return this.authRequest({ method: Method.POST, url: `/sshKeys`, data })
+    const fingerprint = await this.authRequest<ReqRes.PostAddSSHKeyRes>({ method: Method.POST, url: `/sshKeys`, data })
+    this.serverModel.update({ ssh: [...this.serverModel.peek().ssh, fingerprint] })
+    return { }
   }
 
-  async addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit> {
+  async addWifi (ssid: string, password: string, country: string, connect: boolean): Promise<Unit> {
     const data: ReqRes.PostAddWifiReq = {
       ssid,
       password,
@@ -240,33 +269,40 @@ export class LiveApiService extends ApiService {
     return this.authRequest({ method: Method.POST, url: `/wifi`, data })
   }
 
-  async connectWifiRaw (ssid: string): PatchPromise<Unit> {
+  async connectWifi (ssid: string): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: encodeURI(`/wifi/${ssid}`) })
   }
 
-  async deleteWifiRaw (ssid: string): PatchPromise<Unit> {
+  async deleteWifi (ssid: string): Promise<Unit> {
     return this.authRequest({ method: Method.DELETE, url: encodeURI(`/wifi/${ssid}`) })
   }
 
-  async deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit> {
-    return this.authRequest({ method: Method.DELETE, url: `/sshKeys/${fingerprint.hash}` })
+  async deleteSSHKey (fingerprint: SSHFingerprint): Promise<Unit> {
+    await this.authRequest({ method: Method.DELETE, url: `/sshKeys/${fingerprint.hash}` })
+    const ssh = this.serverModel.peek().ssh
+    this.serverModel.update({ ssh: ssh.filter(s => s !== fingerprint) })
+    return { }
   }
 
-  async restartServerRaw (): PatchPromise<Unit> {
+  async restartServer (): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: '/restart', readTimeout: 60000 })
   }
 
-  async shutdownServerRaw (): PatchPromise<Unit> {
+  async shutdownServer (): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: '/shutdown', readTimeout: 60000 })
   }
 
-  async serviceActionRaw (appId: string, s: ServiceAction): PatchPromise<ReqRes.ServiceActionResponse> {
+  async serviceAction (appId: string, s: ServiceAction): Promise<ReqRes.ServiceActionResponse> {
     const data: ReqRes.ServiceActionRequest = {
       jsonrpc: '2.0',
       id: uuid.v4(),
       method: s.id,
     }
-    return this.authRequest({ method: Method.POST, url: `apps/${appId}/actions`, data })
+    return this.authRequest({ method: Method.POST, url: `/apps/${appId}/actions`, data, readTimeout: 300000 })
+  }
+
+  async refreshLAN (): Promise<Unit> {
+    return this.authRequest({ method: Method.POST, url: '/network/lan/reset' })
   }
 
   private async authRequest<T> (opts: HttpOptions, overrides: Partial<{ version: string }> = { }): Promise<T> {

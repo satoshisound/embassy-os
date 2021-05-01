@@ -6,6 +6,7 @@ import { ConfigService } from 'src/app/services/config.service'
 import { Storage } from '@ionic/storage'
 import { throttleTime, delay } from 'rxjs/operators'
 import { StorageKeys } from './storage-keys'
+import { WiFi } from '../services/api/api-types'
 
 @Injectable({
   providedIn: 'root',
@@ -95,7 +96,6 @@ export class ServerModel {
     return initPropertySubject({
       serverId: undefined,
       name: undefined,
-      origin: this.config.origin,
       versionInstalled: undefined,
       versionLatest: undefined,
       status: ServerStatus.UNKNOWN,
@@ -113,18 +113,18 @@ export class ServerModel {
 export interface S9Server {
   serverId: string
   name: string
-  origin: string
   versionInstalled: string
-  versionLatest: string | undefined // not on the api as of 0.2.8
   status: ServerStatus
-  badge: number
   alternativeRegistryUrl: string | null
   specs: ServerSpecs
-  wifi: { ssids: string[], current: string }
+  wifi: WiFi
   ssh: SSHFingerprint[]
   notifications: S9Notification[]
   welcomeAck: boolean
   autoCheckUpdates: boolean
+  // not on API
+  versionLatest: string | undefined // not on the api as of 0.2.8
+  badge: number
 }
 
 export interface S9Notification {

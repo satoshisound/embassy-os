@@ -30,8 +30,10 @@ export class PatchDbModel {
   }
 
   stop (): void {
-    this.syncSub.unsubscribe()
-    this.syncSub = undefined
+    if (this.syncSub) {
+      this.syncSub.unsubscribe()
+      this.syncSub = undefined
+    }
   }
 
   watch$: Store<DataModel>['watch$'] = (...args: (string | number)[]): Observable<DataModel> => {
@@ -50,8 +52,24 @@ export class PatchDbModel {
     )
   }
 
+  peek: Store<DataModel>['watch$'] = (...args: (string | number)[]): Observable<DataModel> => {
+    const overlay$ = this.getOverlay(...args).pipe(filter(a => exists(a)))
+    const base$ = this.patchDb.store.watch$(...(args as []))
+    return combineLatest([overlay$, base$]).pipe(
+      map(([o, b]) => {
+        if (!o) return b
+        if (o.expired(b)) {
+          this.clearOverlay(...args)
+          return b
+        } else {
+          return o.value
+        }
+      }),
+    )
+  }
+
   /* overlays allow the FE to override the patch-db values for FE behavior not represented in the BE. For example, the server status of 'Unreachable' is set with
-    `patchDbModel.overlay({ expired: () => true, value: 'UNREACHABLE' }, 'server', 'status')`
+    `setOverlay({ expired: () => true, value: 'UNREACHABLE' }, 'server', 'status')`
     And will expire as soon as a genuine server status emits from the BE.
   */
   private readonly overlays: { [path: string]: BehaviorSubject<{ value: any, expired: (newValue: any) => boolean } | null>} = { }

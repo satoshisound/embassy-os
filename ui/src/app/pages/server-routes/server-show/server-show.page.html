@@ -1,6 +1,6 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>{{ (server | async).name }}</ion-title>
+    <ion-title>{{ (server | async)?.name }}</ion-title>
     <ion-buttons slot="end">
       <badge-menu-button></badge-menu-button>
     </ion-buttons>
@@ -18,10 +18,6 @@
   </ng-container>
 
   <ng-container *ngIf="!updating">
-
-    <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
-      <ion-refresher-content pullingIcon="lines" refreshingSpinner="lines"></ion-refresher-content>
-    </ion-refresher>
 
     <ion-item *ngIf="error">
       <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>

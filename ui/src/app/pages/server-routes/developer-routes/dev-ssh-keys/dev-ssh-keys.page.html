@@ -9,17 +9,13 @@
 
 <ion-content class="ion-padding-top">
 
-  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
-    <ion-refresher-content pullingIcon="lines" refreshingSpinner="lines"></ion-refresher-content>
-  </ion-refresher>
-
-  <ion-item *ngIf="error" style="margin-bottom: 16px;">
+  <ion-item *ngIf="error$ | async as error" class="ion-margin-bottom">
     <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
   </ion-item>
 
   <ion-item-group>
     <ion-item-divider>Saved Keys</ion-item-divider>
-    <ion-item *ngFor="let fingerprint of server.ssh | async">
+    <ion-item *ngFor="let fingerprint of fingerprints$ | async">
       <ion-label class="ion-text-wrap">
         {{ fingerprint.alg }} {{ fingerprint.hash }} {{ fingerprint.hostname }}
       </ion-label>

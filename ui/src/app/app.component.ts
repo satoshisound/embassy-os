@@ -81,7 +81,6 @@ export class AppComponent {
 
     const serverStatus$ = this.patch.watch$('server', 'status')
     .pipe(
-      tap(_ => console.log('testing')),
       tap(status => isUpdating = status === ServerStatus.UPDATING),
       takeWhile(_ => !!authed),
     )
