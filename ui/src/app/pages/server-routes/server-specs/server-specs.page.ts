@@ -1,10 +1,7 @@
 import { Component } from '@angular/core'
-import { ServerSpecs } from 'src/app/models/server-model'
 import { ToastController } from '@ionic/angular'
 import { copyToClipboard } from 'src/app/util/web.util'
-import { ModelPreload } from 'src/app/models/model-preload'
-import { markAsLoadingDuring$ } from 'src/app/services/loader.service'
-import { BehaviorSubject, Observable, of } from 'rxjs'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
   selector: 'server-specs',
@@ -12,24 +9,11 @@ import { BehaviorSubject, Observable, of } from 'rxjs'
   styleUrls: ['./server-specs.page.scss'],
 })
 export class ServerSpecsPage {
-  loading$ = new BehaviorSubject(true)
-  error$ = new BehaviorSubject('')
-  specs: Observable<ServerSpecs>
 
   constructor (
     private readonly toastCtrl: ToastController,
-    private readonly preload: ModelPreload,
+    public readonly patch: PatchDbModel,
   ) { }
-
-  async ngOnInit () {
-    markAsLoadingDuring$(this.loading$, this.preload.server()).subscribe({
-      next: s => this.specs = of(s.specs),
-      error: e => {
-        console.error(e)
-        this.error$.next(e.message)
-      },
-    })
-  }
 
   async copyTor (address: string) {
     let message = ''

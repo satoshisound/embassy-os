@@ -1,6 +1,6 @@
 {
   "patchDb": {
-    "timeoutForMissingPatch": 5000,
+    "timeoutForMissingRevision": 5000,
     "poll": {
       "cooldown": 5000
     },
@@ -17,6 +17,6 @@
     "version": "/v0",
     "root": ""
   },
-  "maskAs": "lan",
+  "maskAs": "tor",
   "skipStartupAlerts": true
 }

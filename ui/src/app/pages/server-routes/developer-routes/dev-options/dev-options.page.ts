@@ -1,7 +1,6 @@
 import { Component } from '@angular/core'
 import { ServerConfigService } from 'src/app/services/server-config.service'
-import { ModelPreload } from 'src/app/models/model-preload'
-import { Observable, of } from 'rxjs'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
   selector: 'dev-options',
@@ -9,18 +8,13 @@ import { Observable, of } from 'rxjs'
   styleUrls: ['./dev-options.page.scss'],
 })
 export class DevOptionsPage {
-  altRegistryUrl: Observable<string>
 
   constructor (
     private readonly serverConfigService: ServerConfigService,
-    private readonly preload: ModelPreload,
+    public readonly patch: PatchDbModel,
   ) { }
 
-  ngOnInit () {
-    this.preload.server().subscribe(s => this.altRegistryUrl = of(s.alternativeRegistryUrl))
-  }
-
-  async presentModalValueEdit (key: string): Promise<void> {
-    await this.serverConfigService.presentModalValueEdit(key)
+  async presentModalValueEdit (key: string, current?: any): Promise<void> {
+    await this.serverConfigService.presentModalValueEdit(key, current)
   }
 }

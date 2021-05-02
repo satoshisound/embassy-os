@@ -328,7 +328,7 @@ export const mockServer: S9Server = {
   versionInstalled: '0.2.9',
   versionLatest: '0.2.10',
   status: ServerStatus.RUNNING,
-  alternativeRegistryUrl: 'beta-registry.start9labs.com',
+  altRegistryUrl: 'beta-registry.start9labs.com',
   welcomeAck: true,
   autoCheckUpdates: true,
   specs: {

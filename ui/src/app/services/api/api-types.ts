@@ -11,7 +11,7 @@ export interface ApiServer {
   name: string
   versionInstalled: string
   status: ServerStatus
-  alternativeRegistryUrl: string | null
+  altRegistryUrl: string | null
   specs: ServerSpecs
   wifi: WiFi
   ssh: SSHFingerprint[]

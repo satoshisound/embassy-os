@@ -1,10 +1,7 @@
 import { Component } from '@angular/core'
 import { LoadingOptions } from '@ionic/core'
-import { ServerStatus } from 'src/app/models/server-model'
 import { AlertController } from '@ionic/angular'
-import { S9Server } from 'src/app/models/server-model'
 import { ApiService } from 'src/app/services/api/api.service'
-import { Subscription, Observable } from 'rxjs'
 import { LoaderService } from 'src/app/services/loader.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
@@ -14,35 +11,17 @@ import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
   styleUrls: ['server-show.page.scss'],
 })
 export class ServerShowPage {
-  server: Observable<S9Server>
-  subsToTearDown: Subscription[] = []
-  updating = false
   error = ''
 
   constructor (
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly apiService: ApiService,
-    private readonly patch: PatchDbModel,
+    public readonly patch: PatchDbModel,
   ) { }
-
-  async ngOnInit () {
-    this.server = this.patch.watch$('server')
-
-    this.subsToTearDown.push(
-      // serverUpdateSubscription
-      this.server.subscribe(s => {
-        this.updating = s.status === ServerStatus.UPDATING
-      }),
-    )
-  }
 
   ionViewDidEnter () {
     this.error = ''
-  }
-
-  ngOnDestroy () {
-    this.subsToTearDown.forEach(s => s.unsubscribe())
   }
 
   async presentAlertRestart () {

@@ -5,7 +5,7 @@ import { ServerConfigPage } from './server-config.page'
 import { Routes, RouterModule } from '@angular/router'
 import { SharingModule } from 'src/app/modules/sharing.module'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
-import { ObjectConfigComponentModule } from 'src/app/components/object-config/object-config.component.module'
+import { VarDirective } from 'src/app/directives/var.directive'
 
 const routes: Routes = [
   {
@@ -19,10 +19,12 @@ const routes: Routes = [
     CommonModule,
     IonicModule,
     SharingModule,
-    ObjectConfigComponentModule,
     RouterModule.forChild(routes),
     PwaBackComponentModule,
   ],
-  declarations: [ServerConfigPage],
+  declarations: [
+    ServerConfigPage,
+    VarDirective,
+  ],
 })
 export class ServerConfigPageModule { }

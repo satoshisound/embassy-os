@@ -6,7 +6,6 @@ import { AlertController } from '@ionic/angular'
 import { BehaviorSubject } from 'rxjs'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { PatchOp, Operation } from 'patch-db-client'
-import { map, take, tap } from 'rxjs/operators'
 
 @Component({
   selector: 'dev-ssh-keys',
@@ -21,25 +20,19 @@ export class DevSSHKeysPage {
     private readonly apiService: ApiService,
     private readonly serverConfigService: ServerConfigService,
     private readonly alertCtrl: AlertController,
-    private readonly patch: PatchDbModel,
+    public readonly patch: PatchDbModel,
   ) { }
 
-  ngOnInit () {
-    this.patch.watch$('server', 'ssh').subscribe(ssh => {
-      console.log('new ssh', ssh.length)
-      this.fingerprints$.next(ssh || [])
-    })
-  }
-
   async presentModalAdd () {
-    await this.serverConfigService.presentModalValueEdit('ssh', true)
+    await this.serverConfigService.presentModalValueEdit('ssh')
   }
 
-  async presentAlertDelete (fingerprint: SSHFingerprint) {
+  async presentAlertDelete (fingerprint: SSHFingerprint, index: number) {
+    console.log(index)
     const alert = await this.alertCtrl.create({
       backdropDismiss: false,
       header: 'Caution',
-      message: `Are you sure you want to delete this SSH key?`,
+      message: `Are you sure you want to delete this key?`,
       buttons: [
         {
           text: 'Cancel',
@@ -49,7 +42,7 @@ export class DevSSHKeysPage {
           text: 'Delete',
           cssClass: 'alert-danger',
           handler: () => {
-            this.delete(fingerprint)
+            this.delete(fingerprint, index)
           },
         },
       ],
@@ -57,15 +50,9 @@ export class DevSSHKeysPage {
     await alert.present()
   }
 
-  async delete (fingerprint: SSHFingerprint) {
-    let index: number
-    this.fingerprints$.pipe(
-      map(fps => fps.map(fp => fp.hash).indexOf(fingerprint.hash)),
-      tap(i => index = i),
-      take(1),
-    ).subscribe()
+  async delete (fingerprint: SSHFingerprint, index: number) {
     const temp: Operation = { op: PatchOp.REMOVE, path: `/server/ssh/${index}` }
-    this.apiService.deleteSSHKey(fingerprint, temp)()
+    this.apiService.deleteSSHKey(fingerprint, temp)
     this.error$.next('')
   }
 }

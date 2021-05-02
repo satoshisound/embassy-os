@@ -52,7 +52,6 @@ export abstract class ApiService {
   abstract patchAppConfig (app: AppInstalledPreview, config: object, dryRun?: boolean): Promise<{ breakages: DependentBreakage[] }>
   abstract postConfigureDependency (dependencyId: string, dependentId: string, dryRun?: boolean): Promise<{ config: object, breakages: DependentBreakage[] }>
   abstract patchServerConfig (attr: string, value: any): Promise<Unit>
-  abstract wipeAppData (app: AppInstalledPreview): Promise<Unit>
   abstract addSSHKey (sshKey: string): Promise<Unit>
   abstract deleteSSHKey (sshKey: SSHFingerprint): Promise<Unit>
   abstract addWifi (ssid: string, password: string, country: string, connect: boolean): Promise<Unit>

@@ -1,6 +1,4 @@
-import {
-  ValueSpec, ConfigSpec, UniqueBy, ValueSpecOf, ValueType, ValueSpecObject, ValueSpecUnion
-} from './config-types'
+import { ValueSpec, ConfigSpec, UniqueBy, ValueSpecOf, ValueType, ValueSpecObject, ValueSpecUnion } from './config-types'
 import * as pointer from 'json-pointer'
 import * as handlebars from 'handlebars'
 import { Annotations, getDefaultObject, getDefaultUnion, listInnerSpec, mapConfigSpec, Range } from './config-utilities'

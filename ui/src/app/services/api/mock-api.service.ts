@@ -303,11 +303,6 @@ export class MockApiService extends ApiService {
     return { patch, response: { } }
   }
 
-  async wipeAppDataRaw (app: AppInstalledPreview): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
-  }
-
   async addSSHKeyRaw (sshKey: string): PatchPromise<Unit> {
     await pauseFor(1000)
     const fingerprint = mockApiServer().ssh[0]
@@ -320,7 +315,6 @@ export class MockApiService extends ApiService {
   }
 
   async deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit> {
-    console.log('FINGERPRINT', fingerprint.hash)
     await pauseFor(1000)
 
     const patch: Update<DataModel> = {
@@ -334,12 +328,26 @@ export class MockApiService extends ApiService {
 
   async addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit> {
     await pauseFor(1000)
-    return { response: { } }
+
+    const patch: Update<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.ADD, path: `/server/wifi/ssids/2`, value: ssid }],
+      expireId: null,
+    }
+
+    return { patch, response: { }}
   }
 
   async connectWifiRaw (ssid: string): PatchPromise<Unit> {
     await pauseFor(1000)
-    return { response: { } }
+
+    const patch: Update<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: '/server/wifi/current', value: ssid }],
+      expireId: null,
+    }
+
+    return { patch, response: { }}
   }
 
   async deleteWifiRaw (ssid: string): PatchPromise<Unit> {
@@ -488,7 +496,7 @@ export const mockApiServer: () => ReqRes.GetServerRes = () => ({
   name: 'Embassy:12345678',
   versionInstalled: '0.2.9',
   status: ServerStatus.RUNNING,
-  alternativeRegistryUrl: 'beta-registry.start9labs.com',
+  altRegistryUrl: 'beta-registry.start9labs.com',
   welcomeAck: true,
   autoCheckUpdates: true,
   specs: {

@@ -4,9 +4,9 @@ import { ApiService } from 'src/app/services/api/api.service'
 import { ActionSheetButton } from '@ionic/core'
 import { WifiService } from './wifi.service'
 import { LoaderService } from 'src/app/services/loader.service'
-import { ModelPreload } from 'src/app/models/model-preload'
-import { BehaviorSubject, Observable, of } from 'rxjs'
+import { BehaviorSubject } from 'rxjs'
 import { WiFi } from 'src/app/services/api/api-types'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
   selector: 'wifi',
@@ -14,7 +14,6 @@ import { WiFi } from 'src/app/services/api/api-types'
   styleUrls: ['wifi.page.scss'],
 })
 export class WifiListPage {
-  wifi$: Observable<WiFi>
   error$ = new BehaviorSubject('')
 
   constructor (
@@ -22,12 +21,8 @@ export class WifiListPage {
     private readonly loader: LoaderService,
     private readonly actionCtrl: ActionSheetController,
     private readonly wifiService: WifiService,
-    private readonly preload: ModelPreload,
+    public readonly patch: PatchDbModel,
   ) { }
-
-  async ngOnInit () {
-    this.preload.server().subscribe(s => this.wifi$ = of(s.wifi))
-  }
 
   async presentAction (ssid: string, wifi: WiFi) {
     const buttons: ActionSheetButton[] = [

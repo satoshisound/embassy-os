@@ -9,7 +9,7 @@ export interface ApiServer {
   name: string
   status: ServerStatus
   versionInstalled: string
-  alternativeRegistryUrl: string | null
+  altRegistryUrl: string | null
   specs: ServerSpecs
   wifi: {
     ssids: string[]

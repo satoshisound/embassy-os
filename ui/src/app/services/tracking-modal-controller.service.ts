@@ -43,7 +43,6 @@ export class TrackingModalController {
     )
   }
 
-
   dismiss (val?: any): Promise<boolean> {
     return this.modalCtrl.dismiss(val)
   }

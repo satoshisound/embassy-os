@@ -23,7 +23,7 @@ export class WifiAddPage {
     private readonly wifiService: WifiService,
   ) { }
 
-  async add (): Promise<void> {
+  async save (): Promise<void> {
     this.error = ''
     this.loader.of({
       message: 'Saving...',
@@ -38,7 +38,7 @@ export class WifiAddPage {
     })
   }
 
-  async addAndConnect (): Promise<void> {
+  async saveAndConnect (): Promise<void> {
     this.error = ''
     this.loader.of({
       message: 'Connecting. This could take while...',

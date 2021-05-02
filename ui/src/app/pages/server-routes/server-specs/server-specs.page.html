@@ -8,25 +8,18 @@
 </ion-header>
 
 <ion-content class="ion-padding-top">
-  <ion-spinner *ngIf="loading$ | async" class="center" name="lines" color="warning"></ion-spinner>
 
-  <ng-container *ngIf="!($loading$ | async)">
-    <ion-item *ngIf="error$ | async as error" class="ion-margin-bottom">
-      <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
+  <ion-item-group>
+    <ion-item *ngFor="let spec of patch.watch$('server', 'specs') | async | keyvalue : asIsOrder" [class.break-all]="spec.key === 'Tor Address'">
+      <ion-label class="ion-text-wrap">
+        <h2>{{ spec.key }}</h2>
+        <p *ngIf="spec.value | isValidEmver">{{ spec.value | displayEmver }}</p>
+        <p *ngIf="!(spec.value | isValidEmver)">{{ spec.value }}</p>
+      </ion-label>
+      <ion-button slot="end" *ngIf="spec.key === 'Tor Address'" fill="clear" (click)="copyTor(spec.value)">
+        <ion-icon slot="icon-only" name="copy-outline" color="primary"></ion-icon>
+      </ion-button>
     </ion-item>
-
-    <ion-item-group>
-      <ion-item *ngFor="let spec of (specs$ | async) | keyvalue : asIsOrder" [class.break-all]="spec.key === 'Tor Address'">
-        <ion-label class="ion-text-wrap">
-          <h2>{{ spec.key }}</h2>
-          <p *ngIf="spec.value | isValidEmver">{{ spec.value | displayEmver }}</p>
-          <p *ngIf="!(spec.value | isValidEmver)">{{ spec.value }}</p>
-        </ion-label>
-        <ion-button slot="end" *ngIf="spec.key === 'Tor Address'" fill="clear" (click)="copyTor(spec.value)">
-          <ion-icon slot="icon-only" name="copy-outline" color="primary"></ion-icon>
-        </ion-button>
-      </ion-item>
-    </ion-item-group>
-  </ng-container>
+  </ion-item-group>
 
 </ion-content>

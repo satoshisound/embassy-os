@@ -5,6 +5,7 @@ import { DevOptionsPage } from './dev-options.page'
 import { Routes, RouterModule } from '@angular/router'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
 import { ObjectConfigComponentModule } from 'src/app/components/object-config/object-config.component.module'
+import { VarDirective } from 'src/app/directives/var.directive'
 
 const routes: Routes = [
   {
@@ -21,6 +22,9 @@ const routes: Routes = [
     RouterModule.forChild(routes),
     PwaBackComponentModule,
   ],
-  declarations: [DevOptionsPage],
+  declarations: [
+    DevOptionsPage,
+    VarDirective,
+  ],
 })
 export class DevOptionsPageModule { }

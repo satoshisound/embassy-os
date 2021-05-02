@@ -11,7 +11,7 @@ export function PatchDbModelFactory (
   http: ApiService,
 ): PatchDbModel {
 
-  const { patchDb: { usePollOverride, poll, websocket, timeoutForMissingPatch }, isConsulate } = config
+  const { patchDb: { usePollOverride, poll, websocket, timeoutForMissingRevision }, isConsulate } = config
 
   let source: Source<DataModel>
   if (isConsulate || usePollOverride) {
@@ -20,5 +20,5 @@ export function PatchDbModelFactory (
     source = new WebsocketSource({ ...websocket })
   }
 
-  return new PatchDbModel({ sources: [source, http], bootstrapper, http, timeoutForMissingPatch })
+  return new PatchDbModel({ sources: [source, http], bootstrapper, http, timeoutForMissingRevision })
 }

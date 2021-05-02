@@ -1,6 +1,6 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>{{ (server | async)?.name }}</ion-title>
+    <ion-title>{{ patch.watch$('server', 'name') | async }}</ion-title>
     <ion-buttons slot="end">
       <badge-menu-button></badge-menu-button>
     </ion-buttons>
@@ -8,7 +8,7 @@
 </ion-header>
 
 <ion-content class="ion-padding-top ion-padding-bottom">
-  <ng-container *ngIf="updating">
+  <ng-container *ngIf="(patch.watch$('server', 'status') | async) === 'UPDATING'">
     <ion-item class="ion-text-center">
       <div style="display: flex; justify-content: center; width: 100%;">
         <ion-text class="ion-text-wrap" style="margin-right: 5px; margin-top: 5px" color="primary">Server Updating</ion-text>
@@ -17,7 +17,7 @@
     </ion-item>
   </ng-container>
 
-  <ng-container *ngIf="!updating">
+  <ng-container *ngIf="(patch.watch$('server', 'status') | async) !== 'UPDATING'">
 
     <ion-item *ngIf="error">
       <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>

@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core'
 import { AlertController, ToastController } from '@ionic/angular'
-import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
-import { WiFi } from 'src/app/services/api/api-types'
 import { ApiService } from 'src/app/services/api/api.service'
 import { pauseFor } from 'src/app/util/misc.util'
 
@@ -14,7 +12,6 @@ export class WifiService {
     private readonly apiService: ApiService,
     private readonly toastCtrl: ToastController,
     private readonly alertCtrl: AlertController,
-    private readonly patch: PatchDbModel,
   ) { }
 
   async confirmWifi (ssid: string): Promise<boolean> {
@@ -26,7 +23,7 @@ export class WifiService {
     while (attempts < maxAttempts) {
       try {
         const start = new Date().valueOf()
-        const { current, ssids } = (await this.apiService.getServer()).wifi
+        const { current } = (await this.apiService.getServer()).wifi
         const end = new Date().valueOf()
         if (current === ssid) {
           success = true
@@ -60,7 +57,7 @@ export class WifiService {
           },
         },
       ],
-      cssClass: 'notification-toast',
+      cssClass: 'notification-toast-error',
     })
 
     await toast.present()

@@ -239,13 +239,6 @@ export class LiveApiService extends ApiService {
       .then(() => ({ }))
   }
 
-  async wipeAppData (app: AppInstalledPreview): Promise<Unit> {
-    return this.authRequest({ method: Method.POST, url: `/apps/${app.id}/wipe`, readTimeout: 60000 }).then((res) => {
-      this.appModel.update({ id: app.id, status: AppStatus.NEEDS_CONFIG })
-      return res
-    })
-  }
-
   async toggleAppLAN (appId: string, toggle: 'enable' | 'disable'): Promise<Unit> {
     return this.authRequest({ method: Method.POST, url: `/apps/${appId}/lan/${toggle}` })
   }

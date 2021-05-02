@@ -17,7 +17,7 @@ type UiConfig = {
       version: number
     }
     // Wait this long (ms) before asking BE for a dump when out of order messages are received
-    timeoutForMissingPatch: number
+    timeoutForMissingRevision: number
   }
   api: {
     mocks: boolean

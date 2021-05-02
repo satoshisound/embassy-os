@@ -207,10 +207,6 @@ export class MockApiService extends ApiService {
     return { }
   }
 
-  async wipeAppData (app: AppInstalledPreview): Promise<EmptyResponse> {
-    return mockWipeAppData()
-  }
-
   async addSSHKey (sshKey: string): Promise<EmptyResponse> {
     const fingerprint = await mockAddSSHKey()
     this.serverModel.update({ ssh: [...this.serverModel.peek().ssh, fingerprint] })
@@ -384,11 +380,6 @@ async function mockPatchServerConfig (): Promise<Unit> {
   return { }
 }
 
-async function mockWipeAppData (): Promise<Unit> {
-  await pauseFor(1000)
-  return { }
-}
-
 async function mockAddSSHKey (): Promise<SSHFingerprint> {
   await pauseFor(1000)
   return mockApiServer().ssh[0]
@@ -470,7 +461,7 @@ export const mockApiServer: () => ReqRes.GetServerRes = () => ({
   versionInstalled: '0.2.11',
   versionLatest: '0.2.12',
   status: ServerStatus.RUNNING,
-  alternativeRegistryUrl: 'beta-registry.start9labs.com',
+  altRegistryUrl: 'beta-registry.start9labs.com',
   welcomeAck: true,
   autoCheckUpdates: true,
   specs: {

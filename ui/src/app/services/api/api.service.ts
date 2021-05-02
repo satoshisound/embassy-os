@@ -74,7 +74,7 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   installApp = (appId: string, version: string, dryRun?: boolean) => this.syncResponse(
     () => this.installAppRaw(appId, version, dryRun),
     dryRun ? undefined : { op: PatchOp.REPLACE, path: `apps/${appId}/status`, value: AppStatus.INSTALLING },
-  )
+  )()
 
   protected abstract uninstallAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
   uninstallApp = this.syncResponse((appId: string, dryRun?: boolean) => this.uninstallAppRaw(appId, dryRun))
@@ -87,6 +87,11 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
   protected abstract restartAppRaw (appId: string): PatchPromise<Unit>
   restartApp = this.syncResponse((appId: string) => this.restartAppRaw(appId))
+
+  protected abstract serviceActionRaw (appId: string, serviceAction: ServiceAction): PatchPromise<ReqRes.ServiceActionResponse>
+  serviceAction = (appId: string, serviceAction: ServiceAction) => this.syncResponse(
+    () => this.serviceActionRaw(appId, serviceAction),
+  )()
 
   protected abstract createAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit>
   createAppBackup = this.syncResponse((appId: string, logicalname: string, password?: string) => this.createAppBackupRaw(appId, logicalname, password))
@@ -104,43 +109,55 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   postConfigureDependency = this.syncResponse((dependencyId: string, dependentId: string, dryRun?: boolean) => this.postConfigureDependencyRaw(dependencyId, dependentId, dryRun))
 
   protected abstract patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit>
-  patchServerConfig = this.syncResponse((attr: string, value: any) => this.patchServerConfigRaw(attr, value))
+  patchServerConfig = (attr: string, value: any) => this.syncResponse(
+    () => this.patchServerConfigRaw(attr, value),
+  )()
 
-  protected abstract wipeAppDataRaw (app: AppInstalledPreview): PatchPromise<Unit>
-  wipeAppData = this.syncResponse((app: AppInstalledPreview) => this.wipeAppDataRaw(app))
+  protected abstract ejectExternalDiskRaw (logicalname: string): PatchPromise<Unit>
+  ejectExternalDisk = (logicalname: string) => this.syncResponse(
+    () => this.ejectExternalDiskRaw(logicalname),
+  )()
+
+  protected abstract refreshLanRaw (): PatchPromise<Unit>
+  refreshLan = () => this.syncResponse(
+    () => this.refreshLanRaw(),
+  )
 
   protected abstract addSSHKeyRaw (sshKey: string): PatchPromise<Unit>
-  addSSHKey = this.syncResponse((sshKey: string) => this.addSSHKeyRaw(sshKey))
+  addSSHKey = (sshKey: string) => this.syncResponse(
+    () => this.addSSHKeyRaw(sshKey),
+  )()
 
   protected abstract deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit>
   deleteSSHKey = (fingerprint: SSHFingerprint, temp: Operation) => this.syncResponse(
     () => this.deleteSSHKeyRaw(fingerprint),
     temp,
-  )
+  )()
 
   protected abstract addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit>
-  addWifi = this.syncResponse((ssid: string, password: string, country: string, connect: boolean) => this.addWifiRaw(ssid, password, country, connect))
+  addWifi = (ssid: string, password: string, country: string, connect: boolean) => this.syncResponse(
+    () => this.addWifiRaw(ssid, password, country, connect),
+  )()
 
   protected abstract connectWifiRaw (ssid: string): PatchPromise<Unit>
-  connectWifi = this.syncResponse((ssid: string) => this.connectWifiRaw(ssid))
+  connectWifi = (ssid: string) => this.syncResponse(
+    () => this.connectWifiRaw(ssid),
+  )()
 
   protected abstract deleteWifiRaw (ssid: string): PatchPromise<Unit>
-  deleteWifi = this.syncResponse((ssid: string) => this.deleteWifiRaw(ssid))
+  deleteWifi = (ssid: string) => this.syncResponse(
+    () => this.deleteWifiRaw(ssid),
+  )()
 
   protected abstract restartServerRaw (): PatchPromise<Unit>
-  restartServer = this.syncResponse(() => this.restartServerRaw())
+  restartServer = () => this.syncResponse(
+    () => this.restartServerRaw(),
+  )()
 
   protected abstract shutdownServerRaw (): PatchPromise<Unit>
-  shutdownServer = this.syncResponse(() => this.shutdownServerRaw())
-
-  protected abstract ejectExternalDiskRaw (logicalname: string): PatchPromise<Unit>
-  ejectExternalDisk = this.syncResponse((logicalname: string) => this.ejectExternalDiskRaw(logicalname))
-
-  protected abstract serviceActionRaw (appId: string, serviceAction: ServiceAction): PatchPromise<ReqRes.ServiceActionResponse>
-  serviceAction = this.syncResponse((appId: string, serviceAction: ServiceAction) => this.serviceActionRaw(appId, serviceAction))
-
-  protected abstract refreshLanRaw (): PatchPromise<Unit>
-  refreshLan = this.syncResponse(() => this.refreshLanRaw())
+  shutdownServer = () => this.syncResponse(
+    () => this.shutdownServerRaw(),
+  )()
 
   // Helper allowing quick decoration to sync the response patch and return the response contents.
   // Pass in a tempUpdate function which returns a UpdateTemp corresponding to a temporary

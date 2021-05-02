@@ -16,18 +16,15 @@
   <ion-item-group>
     <ion-item>
       <ion-label class="ion-text-wrap">
-        <ion-text color="dark">By providing your Embassy with WiFi credentials for one or more networks, you can remove the Ethernet cable and place your Embassy anywhere.</ion-text>
+        <p>About</p>
+        <h2>Embassy will automatically connect to available networks, allowing you to remove the Ethernet cable and place your Embassy anywhere.</h2>
         <br />
-        <br />
-        <ion-text color="warning">Warning!</ion-text>
-        <br />
-        <br />
-        <ion-text color="dark">Connecting, disconnecting, or changing WiFi networks can cause your Embassy and its services to become unreachable for up to an hour. Please be patient.</ion-text>
+        <h2>Connecting, disconnecting, or changing WiFi networks can cause your Embassy and its services to become unreachable for up to an hour. Please be patient.</h2>
       </ion-label>
     </ion-item>
 
     <ion-item-divider>Saved Networks</ion-item-divider>
-    <ng-container *ngIf="wifi$ | async as wifi">
+    <ng-container *ngIf="patch.watch$('server', 'wifi') | async as wifi">
       <ion-item button detail="false" *ngFor="let ssid of wifi.ssids" (click)="presentAction(ssid, wifi)">
         <ion-label>{{ ssid }}</ion-label>
         <ion-icon *ngIf="ssid === wifi.current" name="wifi" color="success"></ion-icon>

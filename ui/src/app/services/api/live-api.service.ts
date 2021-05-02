@@ -66,7 +66,6 @@ export class LiveApiService extends ApiService {
     return this.authRequest<ReqRes.GetExternalDisksRes>({ method: Method.GET, url: `/disks` })
   }
 
-  // TODO: EJECT-DISKS
   async ejectExternalDiskRaw (logicalName: string): PatchPromise<Unit> {
     return this.authRequest({ method: Method.POST, url: `/disks/eject`, data: { logicalName } })
   }
@@ -213,10 +212,6 @@ export class LiveApiService extends ApiService {
       value,
     }
     return this.authRequest({ method: Method.PATCH, url: `/${attr}`, data, readTimeout: 60000 })
-  }
-
-  async wipeAppDataRaw (app: AppInstalledPreview): PatchPromise<Unit> {
-    return this.authRequest({ method: Method.POST, url: `/apps/${app.id}/wipe`, readTimeout: 60000 })
   }
 
   async toggleAppLANRaw (appId: string, toggle: 'enable' | 'disable'): PatchPromise<Unit> {

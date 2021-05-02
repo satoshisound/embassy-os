@@ -88,8 +88,17 @@
 
 .notification-toast {
   --background: var(--ion-color-light);
-  --button-color: var(--ion-color-primary);
+  --button-color: var(--ion-color-medium);
   --border-color: var(--ion-color-warning);
+  --border-style: solid;
+  --border-width: 1px;
+  --color: white;
+}
+
+.notification-toast-error {
+  --background: var(--ion-color-light);
+  --button-color: var(--ion-color-medium);
+  --border-color: var(--ion-color-danger);
   --border-style: solid;
   --border-width: 1px;
   --color: white;

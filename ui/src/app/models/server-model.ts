@@ -100,7 +100,7 @@ export class ServerModel {
       versionLatest: undefined,
       status: ServerStatus.UNKNOWN,
       badge: 0,
-      alternativeRegistryUrl: undefined,
+      altRegistryUrl: undefined,
       specs: { },
       wifi: { ssids: [], current: undefined },
       ssh: [],
@@ -115,7 +115,7 @@ export interface S9Server {
   name: string
   versionInstalled: string
   status: ServerStatus
-  alternativeRegistryUrl: string | null
+  altRegistryUrl: string | null
   specs: ServerSpecs
   wifi: WiFi
   ssh: SSHFingerprint[]
