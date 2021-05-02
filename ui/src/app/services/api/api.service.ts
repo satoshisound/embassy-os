@@ -5,26 +5,26 @@ import { Subject, Observable } from 'rxjs'
 import { Unit, ApiServer, ReqRes } from './api-types'
 import { AppMetrics } from 'src/app/util/metrics.util'
 import { ConfigSpec } from 'src/app/app-config/config-types'
-import { Http, PatchOp, SeqReplace, SeqUpdate, SeqUpdateReal, Source, SeqUpdateTemp } from 'patch-db-client'
+import { Http, PatchOp, Source, Dump, Update, UpdateReal, Operation } from 'patch-db-client'
 import { DataModel } from 'src/app/models/patch-db/data-model'
 import { filter } from 'rxjs/operators'
 import * as uuid from 'uuid'
 
-export type PatchPromise<T> = Promise<{ response: T, patch?: SeqUpdate<DataModel> }>
+export type PatchPromise<T> = Promise<{ response: T, patch?: Update<DataModel> }>
 
 export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
-  protected readonly sync = new Subject<SeqUpdate<DataModel>>()
+  protected readonly sync = new Subject<Update<DataModel>>()
   private syncing = true
 
   /** PatchDb Source interface. Post/Patch requests provide a source of patches to the db. */
   // sequenceStream '_' is not used by the live api, but is overridden by the mock
-  watch$ (_?: Observable<number>): Observable<SeqUpdate<DataModel>> {
+  watch$ (_?: Observable<number>): Observable<Update<DataModel>> {
     return this.sync.asObservable().pipe(filter(() => this.syncing))
   }
 
   /** PatchDb Http interface. We can use the apiService to poll for patches or fetch db dumps */
-  abstract getUpdates (startSequence: number, finishSequence?: number): Promise<SeqUpdateReal<DataModel>[]>
-  abstract getDump (): Promise<SeqReplace<DataModel>>
+  abstract getUpdates (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]>
+  abstract getDump (): Promise<Dump<DataModel>>
 
   private unauthorizedApiResponse$: Subject<{ }> = new Subject()
   constructor () { }
@@ -71,15 +71,10 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   acknowledgeOSWelcome = this.syncResponse((version: string) => this.acknowledgeOSWelcomeRaw(version))
 
   protected abstract installAppRaw (appId: string, version: string, dryRun?: boolean): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }>
-  // An example of making a temp patch to the store when the request is made. syncResponse handles the expiration logic.
-  installApp = this.syncResponse(
-    (appId: string, version: string, dryRun?: boolean) => this.installAppRaw(appId, version, dryRun),
-    (appId, _, dryRun) => {
-      if (dryRun) return undefined
-      //Unfortunately, this 'path' is not type safe.
-      //We could consider a helper function with type safe path parameters like 'watch'?
-      return { expiredBy: uuid.v4(), patch: [{ op: PatchOp.REPLACE, path: `apps/${appId}/status`, value: AppStatus.INSTALLING }] } as SeqUpdateTemp
-    })
+  installApp = (appId: string, version: string, dryRun?: boolean) => this.syncResponse(
+    () => this.installAppRaw(appId, version, dryRun),
+    dryRun ? undefined : { op: PatchOp.REPLACE, path: `apps/${appId}/status`, value: AppStatus.INSTALLING },
+  )
 
   protected abstract uninstallAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
   uninstallApp = this.syncResponse((appId: string, dryRun?: boolean) => this.uninstallAppRaw(appId, dryRun))
@@ -115,10 +110,13 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   wipeAppData = this.syncResponse((app: AppInstalledPreview) => this.wipeAppDataRaw(app))
 
   protected abstract addSSHKeyRaw (sshKey: string): PatchPromise<Unit>
-  addSSHKey = this.syncResponse(this.addSSHKeyRaw)
+  addSSHKey = this.syncResponse((sshKey: string) => this.addSSHKeyRaw(sshKey))
 
-  protected abstract deleteSSHKeyRaw (sshKey: SSHFingerprint): PatchPromise<Unit>
-  deleteSSHKey = this.syncResponse((sshKey: SSHFingerprint) => this.deleteSSHKeyRaw(sshKey))
+  protected abstract deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit>
+  deleteSSHKey = (fingerprint: SSHFingerprint, temp: Operation) => this.syncResponse(
+    () => this.deleteSSHKeyRaw(fingerprint),
+    temp,
+  )
 
   protected abstract addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit>
   addWifi = this.syncResponse((ssid: string, password: string, country: string, connect: boolean) => this.addWifiRaw(ssid, password, country, connect))
@@ -145,36 +143,26 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   refreshLan = this.syncResponse(() => this.refreshLanRaw())
 
   // Helper allowing quick decoration to sync the response patch and return the response contents.
-  // Pass in a tempUpdate function which returns a SeqUpdateTemp corresponding to a temporary
+  // Pass in a tempUpdate function which returns a UpdateTemp corresponding to a temporary
   // state change you'd like to enact prior to request and expired when request terminates.
-  private syncResponse<T extends (...args: any[]) => PatchPromise<any>> (f: T, tempUpdate?: (...args: Parameters<T>) => SeqUpdateTemp | undefined): (...args: Parameters<T>) => ExtractResultPromise<ReturnType<T>> {
-    console.log('function', f)
-    console.log('temp', tempUpdate)
-
+  private syncResponse<T extends (...args: any[]) => PatchPromise<any>> (f: T, temp?: Operation): (...args: Parameters<T>) => ExtractResultPromise<ReturnType<T>> {
     return (...a) => {
-      console.log('aaa', a)
       let expireId = undefined
-      if (tempUpdate) {
-        const tempPatch = tempUpdate(...a)
-        if (tempPatch) {
-          expireId = tempPatch.expiredBy
-          this.sync.next(tempPatch)
-        }
+      if (temp) {
+        expireId = uuid.v4()
+        this.sync.next({ patch: [temp], expiredBy: expireId })
       }
 
       return f(a).then(({ response, patch }) => {
-        console.log('response', response)
-        console.log('patch', patch)
         if (expireId) patch = { ...patch, expireId }
         if (patch) this.sync.next(patch)
         return response
       }) as any
-   }
+    }
   }
 }
 // used for type inference in syncResponse
 type ExtractResultPromise<T extends PatchPromise<any>> = T extends PatchPromise<infer R> ? Promise<R> : any
-
 
 export function isRpcFailure<Error, Result> (arg: { error: Error } | { result: Result}): arg is { error: Error } {
   return !!(arg as any).error

@@ -55,7 +55,7 @@ export class WizardBaker {
             action,
             verb: 'beginning installation for',
             title,
-            executeAction: () => this.apiService.installApp(id, version).then(app => { this.appModel.add({ ...app, status: AppStatus.INSTALLING })}),
+            executeAction: () => this.apiService.installApp(id, version)().then(app => { this.appModel.add({ ...app, status: AppStatus.INSTALLING })}),
           },
         },
         bottomBar: {
@@ -103,7 +103,7 @@ export class WizardBaker {
       { slide: {
           selector: 'dependents',
           params: {
-            skipConfirmationDialogue: true, action, verb: 'updating', title, fetchBreakages: () => this.apiService.installApp(id, version, true).then( ({ breakages }) => breakages ),
+            skipConfirmationDialogue: true, action, verb: 'updating', title, fetchBreakages: () => this.apiService.installApp(id, version, true)().then( ({ breakages }) => breakages ),
           },
         },
         bottomBar: {
@@ -114,7 +114,7 @@ export class WizardBaker {
       { slide: {
           selector: 'complete',
           params: {
-            action, verb: 'beginning update for', title, executeAction: () => this.apiService.installApp(id, version).then(app => {
+            action, verb: 'beginning update for', title, executeAction: () => this.apiService.installApp(id, version)().then(app => {
               this.appModel.update({ id: app.id, status: AppStatus.INSTALLING })
             }),
           },
@@ -194,7 +194,7 @@ export class WizardBaker {
       { slide: {
           selector: 'dependents',
           params: {
-            skipConfirmationDialogue: true, action, verb: 'downgrading', title, fetchBreakages: () => this.apiService.installApp(id, version, true).then( ({ breakages }) => breakages ),
+            skipConfirmationDialogue: true, action, verb: 'downgrading', title, fetchBreakages: () => this.apiService.installApp(id, version, true)().then( ({ breakages }) => breakages ),
           },
         },
         bottomBar: {
@@ -204,7 +204,7 @@ export class WizardBaker {
       { slide: {
           selector: 'complete',
           params: {
-            action, verb: 'beginning downgrade for', title, executeAction: () => this.apiService.installApp(id, version).then(app => {
+            action, verb: 'beginning downgrade for', title, executeAction: () => this.apiService.installApp(id, version)().then(app => {
               this.appModel.update({ id: app.id, status: AppStatus.INSTALLING })
             }),
           },

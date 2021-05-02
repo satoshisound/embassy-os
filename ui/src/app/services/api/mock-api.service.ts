@@ -8,7 +8,7 @@ import { ApiAppInstalledFull, ApiAppInstalledPreview, ApiServer, ReqRes, Unit } 
 import { AppMetrics, AppMetricsVersioned, parseMetricsPermissive } from 'src/app/util/metrics.util'
 import { mockApiAppAvailableFull, mockApiAppAvailableVersionInfo, mockApiAppsInstalledFull, mockAppDependentBreakages, mockServer, toInstalledPreview } from './mock-app-fixures'
 import { Observable } from 'rxjs'
-import { PatchOp, SeqReplace, SeqUpdate, SeqUpdateReal } from 'patch-db-client'
+import { PatchOp, Dump, Update, UpdateReal } from 'patch-db-client'
 import { DataModel } from 'src/app/models/patch-db/data-model'
 import { ConfigService } from '../config.service'
 
@@ -24,19 +24,19 @@ export class MockApiService extends ApiService {
   }
 
   // every time a patch is returned from the mock, we override its sequence to be 1 more than the last sequence in the patch-db as provided by `o`.
-  watch$ (sequenceStream: Observable<number>): Observable<SeqUpdate<DataModel>> {
+  watch$ (sequenceStream: Observable<number>): Observable<Update<DataModel>> {
     sequenceStream.subscribe(i => this.sequence < i ? (this.sequence = i) : { })
 
     return super.watch$()
   }
 
-  async getUpdates (startSequence: number, finishSequence?: number): Promise<SeqUpdateReal<DataModel>[]> {
+  async getUpdates (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]> {
     console.log('getting updates: ', startSequence, finishSequence)
     const data = await this.getDump()
     return [data]
   }
 
-  async getDump (): Promise<SeqReplace<DataModel>> {
+  async getDump (): Promise<Dump<DataModel>> {
     console.log('PAUSING')
     await pauseFor(10000)
     console.log('PAUSE COMPLETE')
@@ -62,6 +62,7 @@ export class MockApiService extends ApiService {
         server: mockServer,
         apps: obj,
       },
+      expireId: null,
     }
   }
 
@@ -193,18 +194,20 @@ export class MockApiService extends ApiService {
       launchable: this.config.isLaunchable(app),
       ...mockAppDependentBreakages,
     }
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.ADD, path: `/apps/${appId}`, value: response }],
+      expireId: null,
     }
     return { response, patch }
   }
 
   async uninstallAppRaw (appId: string, dryRun: boolean): PatchPromise<{ breakages: DependentBreakage[] }> {
     await pauseFor(1000)
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REMOVE, path: `/apps/${appId}` }],
+      expireId: null,
     }
 
     return { patch, response: mockAppDependentBreakages}
@@ -218,9 +221,10 @@ export class MockApiService extends ApiService {
 
   async startAppRaw (appId: string): PatchPromise<Unit> {
     await pauseFor(1000)
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RUNNING }],
+      expireId: null,
     }
 
     return { patch, response: { } }
@@ -229,9 +233,10 @@ export class MockApiService extends ApiService {
   async stopAppRaw (appId: string, dryRun = false): PatchPromise<{ breakages: DependentBreakage[] }> {
     await pauseFor(1000)
 
-    const patch: SeqUpdate<DataModel> = !dryRun ? {
+    const patch: Update<DataModel> = !dryRun ? {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
+      expireId: null,
     } : undefined
 
     return { patch, response: mockAppDependentBreakages }
@@ -249,9 +254,10 @@ export class MockApiService extends ApiService {
 
   async createAppBackupRaw (appId: string, logicalname: string, password = ''): PatchPromise<Unit> {
     await pauseFor(1000)
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.CREATING_BACKUP }],
+      expireId: null,
     }
 
     return { patch, response: { } }
@@ -260,9 +266,10 @@ export class MockApiService extends ApiService {
   async stopAppBackupRaw (appId: string): PatchPromise<Unit> {
     await pauseFor(1000)
 
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
+      expireId: null,
     }
 
     return { patch, response: { } }
@@ -271,9 +278,10 @@ export class MockApiService extends ApiService {
   async restoreAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit> {
     await pauseFor(1000)
 
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RESTORING_BACKUP }],
+      expireId: null,
     }
 
     return { patch, response: { } }
@@ -287,9 +295,10 @@ export class MockApiService extends ApiService {
 
   async patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit> {
     await pauseFor(1000)
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/server/${attr}`, value }],
+      expireId: null,
     }
     return { patch, response: { } }
   }
@@ -302,19 +311,22 @@ export class MockApiService extends ApiService {
   async addSSHKeyRaw (sshKey: string): PatchPromise<Unit> {
     await pauseFor(1000)
     const fingerprint = mockApiServer().ssh[0]
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.ADD, path: `/server/ssh/-`, value: fingerprint }],
+      expireId: null,
     }
     return { patch, response: { } }
   }
 
   async deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit> {
+    console.log('FINGERPRINT', fingerprint.hash)
     await pauseFor(1000)
 
-    const patch: SeqUpdate<DataModel> = {
+    const patch: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REMOVE, path: `/server/ssh/0` }],
+      expireId: null,
     }
 
     return { patch, response: { }}

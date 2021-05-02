@@ -9,7 +9,7 @@ import { isUnauthorized } from 'src/app/util/web.util'
 import { Replace } from 'src/app/util/types.util'
 import { AppMetrics, parseMetricsPermissive } from 'src/app/util/metrics.util'
 import { Observable, of, throwError } from 'rxjs'
-import { SeqPatch, SeqReplace } from 'patch-db-client'
+import { Revision, Dump } from 'patch-db-client'
 import { DataModel } from 'src/app/models/patch-db/data-model'
 import { ConfigService } from '../config.service'
 import * as uuid from 'uuid'
@@ -21,12 +21,12 @@ export class LiveApiService extends ApiService {
     private readonly config: ConfigService,
   ) { super() }
 
-  async getUpdates (startSequence: number, finishSequence?: number): Promise<SeqPatch[]> {
+  async getUpdates (startSequence: number, finishSequence?: number): Promise<Revision[]> {
     const queryParams = `start=${startSequence}` + (finishSequence ? `&finish=${finishSequence}` : ``)
     return this.authRequest({ method: Method.GET, url: `/revisions?${queryParams}` })
   }
 
-  async getDump (): Promise<SeqReplace<DataModel>> {
+  async getDump (): Promise<Dump<DataModel>> {
     return this.authRequest({ method: Method.GET, url: `/revisions?dump` })
   }
 
