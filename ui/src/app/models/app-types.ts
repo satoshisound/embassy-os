@@ -56,13 +56,13 @@ export interface AppInstalledFull extends AppInstalledPreview {
   hasFetchedFull: boolean
 }
 
-export type Actions = ServiceAction[]
-export interface ServiceAction {
-    id: string,
-    name: string,
-    description: string,
-    warning?: string
-    allowedStatuses: AppStatus[]
+export type Actions = AppAction[]
+export interface AppAction {
+  id: string,
+  name: string,
+  description: string,
+  warning?: string
+  allowedStatuses: AppStatus[]
 }
 export interface AppDependency extends InstalledAppDependency {
   // explanation of why it *is* optional. null represents it is required.

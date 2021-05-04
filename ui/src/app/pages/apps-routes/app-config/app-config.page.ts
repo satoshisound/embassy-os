@@ -1,14 +1,13 @@
 import { Component } from '@angular/core'
 import { NavController, AlertController, ModalController, PopoverController } from '@ionic/angular'
 import { ActivatedRoute } from '@angular/router'
-import { AppModel, AppStatus } from 'src/app/models/app-model'
+import { AppStatus } from 'src/app/models/app-model'
 import { AppInstalledFull } from 'src/app/models/app-types'
 import { ApiService } from 'src/app/services/api/api.service'
 import { pauseFor, isEmptyObject, modulateTime } from 'src/app/util/misc.util'
 import { PropertySubject, peekProperties } from 'src/app/util/property-subject.util'
 import { LoaderService, markAsLoadingDuring$ } from 'src/app/services/loader.service'
 import { TrackingModalController } from 'src/app/services/tracking-modal-controller.service'
-import { ModelPreload } from 'src/app/models/model-preload'
 import { BehaviorSubject, forkJoin, from, fromEvent, of } from 'rxjs'
 import { catchError, concatMap, map, take, tap } from 'rxjs/operators'
 import { Recommendation } from 'src/app/components/recommendation-button/recommendation-button.component'
@@ -53,14 +52,12 @@ export class AppConfigPage extends Cleanup {
     private readonly navCtrl: NavController,
     private readonly route: ActivatedRoute,
     private readonly wizardBaker: WizardBaker,
-    private readonly preload: ModelPreload,
     private readonly apiService: ApiService,
     private readonly loader: LoaderService,
     private readonly alertCtrl: AlertController,
     private readonly modalController: ModalController,
     private readonly trackingModalCtrl: TrackingModalController,
     private readonly popoverController: PopoverController,
-    private readonly appModel: AppModel,
   ) { super() }
 
   backButtonDefense = false
@@ -102,7 +99,7 @@ export class AppConfigPage extends Cleanup {
             const rec = history.state && history.state.configRecommendation as Recommendation
             if (rec) {
               this.$loadingText$.next(`Setting properties to accomodate ${rec.title}...`)
-              return from(this.apiService.postConfigureDependency(this.appId, rec.appId, true))
+              return from(this.apiService.postConfigureDependency(this.appId, rec.appId))
               .pipe(
                 map(res => ({
                   spec,
@@ -191,7 +188,7 @@ export class AppConfigPage extends Cleanup {
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
       const config = this.config
-      const { breakages } = await this.apiService.patchAppConfig(app, config, true)
+      const { breakages } = await this.apiService.patchAppConfig(app.id, config, true)
 
       if (breakages.length) {
         const { cancelled } = await wizardModal(
@@ -204,7 +201,7 @@ export class AppConfigPage extends Cleanup {
         if (cancelled) return { skip: true }
       }
 
-      return this.apiService.patchAppConfig(app, config).then(
+      return this.apiService.patchAppConfig(app.id, config).then(
         () => this.preload.loadInstalledApp(this.appId).then(() => ({ skip: false })),
       )
     })

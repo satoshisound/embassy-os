@@ -1,18 +1,20 @@
 import { AppStatus, Rules } from '../../models/app-model'
-import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, ServiceAction } from '../../models/app-types'
-import { S9Notification, SSHFingerprint, DiskInfo } from '../../models/server-model'
+import { AppAvailablePreview, AppAvailableFull, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, AppAction } from '../../models/app-types'
+import { DiskInfo, S9Notification, ServerMetrics, SSHFingerprint } from '../../models/server-model'
 import { Subject, Observable } from 'rxjs'
-import { Unit, ApiServer, ReqRes } from './api-types'
+import { Unit } from './api-types'
 import { AppMetrics } from 'src/app/util/metrics.util'
 import { ConfigSpec } from 'src/app/app-config/config-types'
-import { Http, PatchOp, Source, Dump, Update, UpdateReal, Operation } from 'patch-db-client'
+import { Http, PatchOp, Source, Dump, Update, UpdateReal, Operation, Revision } from 'patch-db-client'
 import { DataModel } from 'src/app/models/patch-db/data-model'
 import { filter } from 'rxjs/operators'
 import * as uuid from 'uuid'
 
-export type PatchPromise<T> = Promise<{ response: T, patch?: Update<DataModel> }>
+export type PatchPromise<T> = Promise<{ response: T, revision?: Revision }>
 
 export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
+  constructor () { }
+
   protected readonly sync = new Subject<Update<DataModel>>()
   private syncing = true
 
@@ -22,53 +24,46 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
     return this.sync.asObservable().pipe(filter(() => this.syncing))
   }
 
-  /** PatchDb Http interface. We can use the apiService to poll for patches or fetch db dumps */
-  abstract getUpdates (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]>
-  abstract getDump (): Promise<Dump<DataModel>>
-
-  private unauthorizedApiResponse$: Subject<{ }> = new Subject()
-  constructor () { }
-
-  watch401$ (): Observable<{ }> {
-    return this.unauthorizedApiResponse$.asObservable()
-  }
-
-  authenticatedRequestsEnabled: boolean = false
-
-  protected received401 () {
-    this.authenticatedRequestsEnabled = false
-    this.unauthorizedApiResponse$.next()
-  }
-
-  abstract postLogin (password: string): Promise<Unit> // Throws an error on failed auth.
-  abstract postLogout (): Promise<Unit> // Throws an error on failed auth.
-  abstract getServer (): Promise<ApiServer>
-  abstract getVersionLatest (): Promise<ReqRes.GetVersionLatestRes>
-  abstract getServerMetrics (): Promise<ReqRes.GetServerMetricsRes>
+  // REST
+  abstract login (password: string): Promise<Unit>
+  abstract logout (): Promise<Unit>
+  abstract getVersionLatest (): Promise<{ versionLatest: string, relaseNotes: string }>
+  abstract getServerLogs (): Promise<string[]>
+  abstract getServerMetrics (): Promise<ServerMetrics>
   abstract getNotifications (page: number, perPage: number): Promise<S9Notification[]>
+
+  // RPC
+  abstract getRevisions (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]>
+  abstract getDump (): Promise<Dump<DataModel>>
+  abstract getExternalDisks (): Promise<DiskInfo[]>
   abstract getAvailableApps (): Promise<AppAvailablePreview[]>
   abstract getAvailableApp (appId: string): Promise<AppAvailableFull>
   abstract getAvailableAppVersionSpecificInfo (appId: string, versionSpec: string): Promise<AppAvailableVersionSpecificInfo>
-  abstract getInstalledApp (appId: string): Promise<AppInstalledFull>
   abstract getAppMetrics (appId: string): Promise<AppMetrics>
-  abstract getInstalledApps (): Promise<AppInstalledPreview[]>
-  abstract getExternalDisks (): Promise<DiskInfo[]>
   abstract getAppConfig (appId: string): Promise<{ spec: ConfigSpec, config: object, rules: Rules[]}>
-  abstract getAppLogs (appId: string, params?: ReqRes.GetAppLogsReq): Promise<string[]>
-  abstract getServerLogs (): Promise<string[]>
+  abstract getAppLogs (appId: string, params?: {
+    appId: string
+    after?: string
+    before?: string
+    page?: string
+    perPage?: string
+}): Promise<string[]>
 
   /** Any request which mutates state will return a PatchPromise: a patch to state along with the standard response. The syncResponse helper function syncs the patch and returns the response*/
   protected abstract deleteNotificationRaw (id: string): PatchPromise<Unit>
-  deleteNotification = this.syncResponse((id: string) => this.deleteNotificationRaw(id))
-
-  protected abstract toggleAppLANRaw (appId: string, toggle: 'enable' | 'disable'): PatchPromise<Unit>
-  toggleAppLAN = this.syncResponse((appId: string, toggle: 'enable' | 'disable') => this.toggleAppLANRaw(appId, toggle))
+  deleteNotification = (id: string) => this.syncResponse(
+    () => this.deleteNotificationRaw(id),
+  )()
 
   protected abstract updateAgentRaw (version: string): PatchPromise<Unit>
-  updateAgent = this.syncResponse((version: string) => this.updateAgentRaw(version))
+  updateAgent = (version: string) => this.syncResponse(
+    () => this.updateAgentRaw(version),
+  )()
 
   protected abstract acknowledgeOSWelcomeRaw (version: string): PatchPromise<Unit>
-  acknowledgeOSWelcome = this.syncResponse((version: string) => this.acknowledgeOSWelcomeRaw(version))
+  acknowledgeOSWelcome = (version: string) => this.syncResponse(
+    () => this.acknowledgeOSWelcomeRaw(version),
+  )()
 
   protected abstract installAppRaw (appId: string, version: string, dryRun?: boolean): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }>
   installApp = (appId: string, version: string, dryRun?: boolean) => this.syncResponse(
@@ -77,36 +72,54 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   )()
 
   protected abstract uninstallAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
-  uninstallApp = this.syncResponse((appId: string, dryRun?: boolean) => this.uninstallAppRaw(appId, dryRun))
+  uninstallApp = (appId: string, dryRun?: boolean) => this.syncResponse(
+    () => this.uninstallAppRaw(appId, dryRun),
+  )()
 
   protected abstract startAppRaw (appId: string): PatchPromise<Unit>
-  startApp = this.syncResponse((appId: string) => this.startAppRaw(appId))
+  startApp = (appId: string) => this.syncResponse(
+    () => this.startAppRaw(appId),
+  )()
 
   protected abstract stopAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
-  stopApp = this.syncResponse((appId: string, dryRun?: boolean) => this.stopAppRaw(appId, dryRun))
+  stopApp = (appId: string, dryRun?: boolean) => this.syncResponse(
+    () => this.stopAppRaw(appId, dryRun),
+  )()
 
   protected abstract restartAppRaw (appId: string): PatchPromise<Unit>
-  restartApp = this.syncResponse((appId: string) => this.restartAppRaw(appId))
+  restartApp = (appId: string) => this.syncResponse(
+    () => this.restartAppRaw(appId),
+  )()
 
-  protected abstract serviceActionRaw (appId: string, serviceAction: ServiceAction): PatchPromise<ReqRes.ServiceActionResponse>
-  serviceAction = (appId: string, serviceAction: ServiceAction) => this.syncResponse(
-    () => this.serviceActionRaw(appId, serviceAction),
+  protected abstract appActionRaw (appId: string, appAction: AppAction): PatchPromise<string>
+  appAction = (appId: string, appAction: AppAction) => this.syncResponse(
+    () => this.appActionRaw(appId, appAction),
   )()
 
   protected abstract createAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit>
-  createAppBackup = this.syncResponse((appId: string, logicalname: string, password?: string) => this.createAppBackupRaw(appId, logicalname, password))
+  createAppBackup = (appId: string, logicalname: string, password?: string) => this.syncResponse(
+    () => this.createAppBackupRaw(appId, logicalname, password),
+  )()
 
   protected abstract restoreAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit>
-  restoreAppBackup = this.syncResponse((appId: string, logicalname: string, password?: string) => this.restoreAppBackupRaw(appId, logicalname, password))
+  restoreAppBackup = (appId: string, logicalname: string, password?: string) => this.syncResponse(
+    () => this.restoreAppBackupRaw(appId, logicalname, password),
+  )()
 
   protected abstract stopAppBackupRaw (appId: string): PatchPromise<Unit>
-  stopAppBackup = this.syncResponse((appId: string) => this.stopAppBackupRaw(appId))
+  stopAppBackup = (appId: string) => this.syncResponse(
+    () => this.stopAppBackupRaw(appId),
+  )()
 
-  protected abstract patchAppConfigRaw (app: AppInstalledPreview, config: object, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
-  patchAppConfig = this.syncResponse((app: AppInstalledPreview, config: object, dryRun?: boolean) => this.patchAppConfigRaw(app, config, dryRun))
+  protected abstract patchAppConfigRaw (appId: string, config: object, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
+  patchAppConfig = (appId: string, config: object, dryRun?: boolean) => this.syncResponse(
+    () => this.patchAppConfigRaw(appId, config, dryRun),
+  )()
 
   protected abstract postConfigureDependencyRaw (dependencyId: string, dependentId: string, dryRun?: boolean): PatchPromise< { config: object, breakages: DependentBreakage[] }>
-  postConfigureDependency = this.syncResponse((dependencyId: string, dependentId: string, dryRun?: boolean) => this.postConfigureDependencyRaw(dependencyId, dependentId, dryRun))
+  postConfigureDependency = (dependencyId: string, dependentId: string, dryRun?: boolean) => this.syncResponse(
+    () => this.postConfigureDependencyRaw(dependencyId, dependentId, dryRun),
+  )()
 
   protected abstract patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit>
   patchServerConfig = (attr: string, value: any) => this.syncResponse(
@@ -170,9 +183,8 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
         this.sync.next({ patch: [temp], expiredBy: expireId })
       }
 
-      return f(a).then(({ response, patch }) => {
-        if (expireId) patch = { ...patch, expireId }
-        if (patch) this.sync.next(patch)
+      return f(a).then(({ response, revision }) => {
+        if (revision) this.sync.next(revision)
         return response
       }) as any
     }
@@ -180,11 +192,3 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 }
 // used for type inference in syncResponse
 type ExtractResultPromise<T extends PatchPromise<any>> = T extends PatchPromise<infer R> ? Promise<R> : any
-
-export function isRpcFailure<Error, Result> (arg: { error: Error } | { result: Result}): arg is { error: Error } {
-  return !!(arg as any).error
-}
-
-export function isRpcSuccess<Error, Result> (arg: { error: Error } | { result: Result}): arg is { result: Result } {
-  return !!(arg as any).result
-}

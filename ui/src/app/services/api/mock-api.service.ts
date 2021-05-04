@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core'
 import { AppStatus } from '../../models/app-model'
-import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, ServiceAction } from '../../models/app-types'
+import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, AppAction } from '../../models/app-types'
 import { S9Notification, SSHFingerprint, ServerStatus, DiskInfo } from '../../models/server-model'
 import { pauseFor } from '../../util/misc.util'
 import { ApiService, PatchPromise } from './api.service'
-import { ApiAppInstalledFull, ApiAppInstalledPreview, ApiServer, ReqRes, Unit } from './api-types'
+import { ApiAppInstalledFull, ApiAppInstalledPreview, ReqRes, Unit } from './api-types'
 import { AppMetrics, AppMetricsVersioned, parseMetricsPermissive } from 'src/app/util/metrics.util'
 import { mockApiAppAvailableFull, mockApiAppAvailableVersionInfo, mockApiAppsInstalledFull, mockAppDependentBreakages, mockServer, toInstalledPreview } from './mock-app-fixures'
 import { Observable } from 'rxjs'
@@ -19,9 +19,7 @@ export class MockApiService extends ApiService {
 
   constructor (
     private readonly config: ConfigService,
-  ) {
-    super()
-  }
+  ) { super() }
 
   // every time a patch is returned from the mock, we override its sequence to be 1 more than the last sequence in the patch-db as provided by `o`.
   watch$ (sequenceStream: Observable<number>): Observable<Update<DataModel>> {
@@ -30,15 +28,138 @@ export class MockApiService extends ApiService {
     return super.watch$()
   }
 
-  async getUpdates (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]> {
-    console.log('getting updates: ', startSequence, finishSequence)
+  // auth
+
+  async login () : Promise<Unit> {
+    return { }
+  }
+
+  async logout () : Promise<Unit> {
+    return { }
+  }
+
+  // server
+
+  async getVersionLatest (): Promise<ReqRes.GetVersionLatestRes> {
+    return mockGetVersionLatest()
+  }
+
+  async getServerLogs (): Promise<string[]> {
+    return mockGetServerLogs()
+  }
+
+  async getServerMetrics (): Promise<ReqRes.GetServerMetricsRes> {
+    return mockGetServerMetrics()
+  }
+
+  async refreshLanRaw (): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async updateAgentRaw (thing: any): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit> {
+    await pauseFor(1000)
+    const revision: Update<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: `/server/${attr}`, value }],
+      expireId: null,
+    }
+    return { revision, response: { } }
+  }
+
+  async restartServerRaw (): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  async shutdownServerRaw (): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  // notifications
+
+  async getNotifications (page: number, perPage: number): Promise<S9Notification[]> {
+    return mockGetNotifications()
+  }
+
+  async deleteNotificationRaw (id: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  // ssh
+
+  async addSSHKeyRaw (sshKey: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    const fingerprint = mockApiServer().ssh[0]
+    const revision: Update<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.ADD, path: `/server/ssh/-`, value: fingerprint }],
+      expireId: null,
+    }
+    return { revision, response: { } }
+  }
+
+  async deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit> {
+    await pauseFor(1000)
+
+    const revision: Update<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REMOVE, path: `/server/ssh/0` }],
+      expireId: null,
+    }
+
+    return { revision, response: { }}
+  }
+
+  // wifi
+
+  async addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit> {
+    await pauseFor(1000)
+
+    const revision: Update<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.ADD, path: `/server/wifi/ssids/2`, value: ssid }],
+      expireId: null,
+    }
+
+    return { revision, response: { }}
+  }
+
+  async connectWifiRaw (ssid: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+
+    const revision: Update<DataModel> = {
+      id: this.nextSequence(),
+      patch: [{ op: PatchOp.REPLACE, path: '/server/wifi/current', value: ssid }],
+      expireId: null,
+    }
+
+    return { revision, response: { }}
+  }
+
+  async deleteWifiRaw (ssid: string): PatchPromise<Unit> {
+    await pauseFor(1000)
+    return { response: { } }
+  }
+
+  // patchDB
+
+  async getRevisions (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]> {
+    console.log('getting revisions: ', startSequence, finishSequence)
     const data = await this.getDump()
     return [data]
   }
 
   async getDump (): Promise<Dump<DataModel>> {
     console.log('PAUSING')
-    await pauseFor(10000)
+    await pauseFor(5000)
     console.log('PAUSE COMPLETE')
     const apps: AppInstalledFull[] = Object.values(mockApiAppsInstalledFull)
       .filter(({ versionInstalled }) => !!versionInstalled)
@@ -66,31 +187,16 @@ export class MockApiService extends ApiService {
     }
   }
 
-  private nextSequence () {
-    console.log('next')
-    this.sequence++
-    return this.sequence
-  }
-
-  async postLogin () : Promise<Unit> {
-    return { }
-  }
-
-  async postLogout () : Promise<Unit> {
-    return { }
-  }
-
-  async postConfigureDependencyRaw (dependencyId: string, dependentId: string, dryRun?: boolean): PatchPromise<{ config: object, breakages: DependentBreakage[] }> {
+  async acknowledgeOSWelcomeRaw (version: string): PatchPromise<Unit> {
     await pauseFor(2000)
-    throw new Error ('some misc backend error ohh we forgot to make this endpoint or something')
+    this.welcomeAck = true
+    return { response: { } }
   }
 
-  async getServer (): Promise<ApiServer> {
-    const res = await mockGetServer()
-    return {
-      ...res,
-      welcomeAck: this.welcomeAck,
-    }
+  // drives
+
+  async getExternalDisks (): Promise<DiskInfo[]> {
+    return mockGetExternalDisks()
   }
 
   async ejectExternalDiskRaw (): PatchPromise<Unit> {
@@ -98,31 +204,7 @@ export class MockApiService extends ApiService {
     return { response: { } }
   }
 
-  async getVersionLatest (): Promise<ReqRes.GetVersionLatestRes> {
-    return mockGetVersionLatest()
-  }
-
-  async getServerMetrics (): Promise<ReqRes.GetServerMetricsRes> {
-    return mockGetServerMetrics()
-  }
-
-  async getNotifications (page: number, perPage: number): Promise<S9Notification[]> {
-    return mockGetNotifications()
-  }
-
-  async deleteNotificationRaw (id: string): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
-  }
-
-  async getExternalDisks (): Promise<DiskInfo[]> {
-    return mockGetExternalDisks()
-  }
-
-  async updateAgentRaw (thing: any): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
-  }
+  // apps available
 
   async getAvailableApps (): Promise<AppAvailablePreview[]> {
     return mockGetAvailableApps()
@@ -143,6 +225,21 @@ export class MockApiService extends ApiService {
     return mockGetAvailableAppVersionInfo()
   }
 
+  // apps installed
+
+  async getInstalledApps (): Promise<AppInstalledPreview[]> {
+    return mockGetInstalledApps()
+      .then(apps => {
+        return apps.map(app => {
+          return {
+            ...app,
+            hasUI: this.config.hasUI(app),
+            launchable: this.config.isLaunchable(app),
+          }
+        })
+      })
+  }
+
   async getInstalledApp (appId: string): Promise<AppInstalledFull> {
     return mockGetInstalledApp(appId)
     .then(app => {
@@ -159,29 +256,8 @@ export class MockApiService extends ApiService {
     return mockGetAppMetrics().then(parseMetricsPermissive)
   }
 
-  async getInstalledApps (): Promise<AppInstalledPreview[]> {
-    return mockGetInstalledApps()
-      .then(apps => {
-        return apps.map(app => {
-          return {
-            ...app,
-            hasUI: this.config.hasUI(app),
-            launchable: this.config.isLaunchable(app),
-          }
-        })
-      })
-  }
-
-  async getAppConfig (appId: string): Promise<ReqRes.GetAppConfigRes> {
-    return mockGetAppConfig()
-  }
-
-  async getAppLogs (appId: string, params: ReqRes.GetAppLogsReq = { }): Promise<string[]> {
+  async getAppLogs (appId: string, params: Omit<ReqRes.GetAppLogsReq, 'appId'> = { }): Promise<string[]> {
     return mockGetAppLogs()
-  }
-
-  async getServerLogs (): Promise<string[]> {
-    return mockGetServerLogs()
   }
 
   async installAppRaw (appId: string, version: string, dryRun: boolean): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }> {
@@ -194,57 +270,46 @@ export class MockApiService extends ApiService {
       launchable: this.config.isLaunchable(app),
       ...mockAppDependentBreakages,
     }
-    const patch: Update<DataModel> = {
+    const revision: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.ADD, path: `/apps/${appId}`, value: response }],
       expireId: null,
     }
-    return { response, patch }
+    return { response, revision }
   }
 
   async uninstallAppRaw (appId: string, dryRun: boolean): PatchPromise<{ breakages: DependentBreakage[] }> {
     await pauseFor(1000)
-    const patch: Update<DataModel> = {
+    const revision: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REMOVE, path: `/apps/${appId}` }],
       expireId: null,
     }
 
-    return { patch, response: mockAppDependentBreakages}
-  }
-
-  async acknowledgeOSWelcomeRaw (version: string): PatchPromise<Unit> {
-    await pauseFor(2000)
-    this.welcomeAck = true
-    return { response: { } }
+    return { revision, response: mockAppDependentBreakages}
   }
 
   async startAppRaw (appId: string): PatchPromise<Unit> {
     await pauseFor(1000)
-    const patch: Update<DataModel> = {
+    const revision: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RUNNING }],
       expireId: null,
     }
 
-    return { patch, response: { } }
+    return { revision, response: { } }
   }
 
   async stopAppRaw (appId: string, dryRun = false): PatchPromise<{ breakages: DependentBreakage[] }> {
     await pauseFor(1000)
 
-    const patch: Update<DataModel> = !dryRun ? {
+    const revision: Update<DataModel> = !dryRun ? {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
       expireId: null,
     } : undefined
 
-    return { patch, response: mockAppDependentBreakages }
-  }
-
-  async toggleAppLANRaw (appId: string, toggle: 'enable' | 'disable'): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
+    return { revision, response: mockAppDependentBreakages }
   }
 
   async restartAppRaw (appId: string): PatchPromise<Unit> {
@@ -252,142 +317,69 @@ export class MockApiService extends ApiService {
     return { response: { } }
   }
 
+  // backups
+
   async createAppBackupRaw (appId: string, logicalname: string, password = ''): PatchPromise<Unit> {
     await pauseFor(1000)
-    const patch: Update<DataModel> = {
+    const revision: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.CREATING_BACKUP }],
       expireId: null,
     }
 
-    return { patch, response: { } }
+    return { revision, response: { } }
   }
 
   async stopAppBackupRaw (appId: string): PatchPromise<Unit> {
     await pauseFor(1000)
 
-    const patch: Update<DataModel> = {
+    const revision: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.STOPPED }],
       expireId: null,
     }
 
-    return { patch, response: { } }
+    return { revision, response: { } }
   }
 
   async restoreAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit> {
     await pauseFor(1000)
 
-    const patch: Update<DataModel> = {
+    const revision: Update<DataModel> = {
       id: this.nextSequence(),
       patch: [{ op: PatchOp.REPLACE, path: `/apps/${appId}/status`, value: AppStatus.RESTORING_BACKUP }],
       expireId: null,
     }
 
-    return { patch, response: { } }
-
+    return { revision, response: { } }
   }
 
-  async patchAppConfigRaw (app: AppInstalledPreview, config: object, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }> {
+  // config
+
+  async getAppConfig (appId: string): Promise<ReqRes.GetAppConfigRes> {
+    return mockGetAppConfig()
+  }
+
+  async patchAppConfigRaw (appId: string, config: object, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }> {
     await pauseFor(1000)
     return { response: mockAppDependentBreakages }
   }
 
-  async patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit> {
-    await pauseFor(1000)
-    const patch: Update<DataModel> = {
-      id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: `/server/${attr}`, value }],
-      expireId: null,
-    }
-    return { patch, response: { } }
+  async postConfigureDependencyRaw (dependencyId: string, dependentId: string, dryRun?: boolean): PatchPromise<{ config: object, breakages: DependentBreakage[] }> {
+    await pauseFor(2000)
+    throw new Error ('some misc backend error ohh we forgot to make this endpoint or something')
   }
 
-  async addSSHKeyRaw (sshKey: string): PatchPromise<Unit> {
+  async appActionRaw (appId: string, action: AppAction): PatchPromise<string> {
     await pauseFor(1000)
-    const fingerprint = mockApiServer().ssh[0]
-    const patch: Update<DataModel> = {
-      id: this.nextSequence(),
-      patch: [{ op: PatchOp.ADD, path: `/server/ssh/-`, value: fingerprint }],
-      expireId: null,
-    }
-    return { patch, response: { } }
+    return { response: 'yay, you did it!' }
   }
 
-  async deleteSSHKeyRaw (fingerprint: SSHFingerprint): PatchPromise<Unit> {
-    await pauseFor(1000)
-
-    const patch: Update<DataModel> = {
-      id: this.nextSequence(),
-      patch: [{ op: PatchOp.REMOVE, path: `/server/ssh/0` }],
-      expireId: null,
-    }
-
-    return { patch, response: { }}
+  private nextSequence () {
+    console.log('next')
+    this.sequence++
+    return this.sequence
   }
-
-  async addWifiRaw (ssid: string, password: string, country: string, connect: boolean): PatchPromise<Unit> {
-    await pauseFor(1000)
-
-    const patch: Update<DataModel> = {
-      id: this.nextSequence(),
-      patch: [{ op: PatchOp.ADD, path: `/server/wifi/ssids/2`, value: ssid }],
-      expireId: null,
-    }
-
-    return { patch, response: { }}
-  }
-
-  async connectWifiRaw (ssid: string): PatchPromise<Unit> {
-    await pauseFor(1000)
-
-    const patch: Update<DataModel> = {
-      id: this.nextSequence(),
-      patch: [{ op: PatchOp.REPLACE, path: '/server/wifi/current', value: ssid }],
-      expireId: null,
-    }
-
-    return { patch, response: { }}
-  }
-
-  async deleteWifiRaw (ssid: string): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
-  }
-
-  async restartServerRaw (): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
-  }
-
-  async shutdownServerRaw (): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
-  }
-
-  async serviceActionRaw (appId: string, action: ServiceAction): PatchPromise<ReqRes.ServiceActionResponse> {
-    console.log('service action', appId, action)
-    await pauseFor(1000)
-    return { response: {
-      jsonrpc: '2.0' as '2.0',
-      id: '0',
-      // result: 'Congrats! you did ' + action.name,
-      error: {
-        code: 1,
-        message: 'woooo that was bad bad bad',
-      },
-    }}
-  }
-
-  async refreshLanRaw (): PatchPromise<Unit> {
-    await pauseFor(1000)
-    return { response: { } }
-  }
-}
-
-async function mockGetServer (): Promise<ReqRes.GetServerRes> {
-  await pauseFor(1000)
-  return mockApiServer()
 }
 
 async function mockGetVersionLatest (): Promise<ReqRes.GetVersionLatestRes> {
@@ -411,14 +403,14 @@ async function mockGetExternalDisks (): Promise<ReqRes.GetExternalDisksRes> {
   return mockApiExternalDisks
 }
 
-async function mockGetAvailableApp (appId: string): Promise<ReqRes.GetAppAvailableRes> {
-  await pauseFor(1000)
-  return mockApiAppAvailableFull[appId]
-}
-
 async function mockGetAvailableApps (): Promise<ReqRes.GetAppsAvailableRes> {
   await pauseFor(1000)
   return Object.values(mockApiAppAvailableFull)
+}
+
+async function mockGetAvailableApp (appId: string): Promise<ReqRes.GetAppAvailableRes> {
+  await pauseFor(1000)
+  return mockApiAppAvailableFull[appId]
 }
 
 async function mockGetInstalledApp (appId: string): Promise<ApiAppInstalledFull> {

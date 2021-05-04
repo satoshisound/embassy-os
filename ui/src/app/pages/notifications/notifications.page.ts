@@ -3,6 +3,7 @@ import { ServerModel, S9Notification } from 'src/app/models/server-model'
 import { ApiService } from 'src/app/services/api/api.service'
 import { pauseFor } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
+
 @Component({
   selector: 'notifications',
   templateUrl: 'notifications.page.html',
@@ -23,21 +24,14 @@ export class NotificationsPage {
   ) { }
 
   async ngOnInit () {
-    const [notifications] = await Promise.all([
-      this.getNotifications(),
-      pauseFor(600),
-    ])
-    this.notifications = notifications
+    this.notifications = await this.getNotifications()
     this.serverModel.update({ badge: 0 })
     this.loading = false
   }
 
   async doRefresh (e: any) {
     this.page = 1
-    await Promise.all([
-      this.getNotifications(),
-      pauseFor(600),
-    ])
+    this.notifications = await this.getNotifications(),
     e.target.complete()
   }
 
@@ -50,7 +44,10 @@ export class NotificationsPage {
   async getNotifications (): Promise<S9Notification[]> {
     let notifications: S9Notification[] = []
     try {
-      notifications = await this.apiService.getNotifications(this.page, this.perPage)
+      [notifications] = await Promise.all([
+        this.apiService.getNotifications(this.page, this.perPage),
+        pauseFor(600),
+      ])
       this.needInfinite = notifications.length >= this.perPage
       this.page++
       this.error = ''

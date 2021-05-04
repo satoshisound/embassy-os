@@ -1,11 +1,10 @@
 import { Injectable } from '@angular/core'
-import { BehaviorSubject, Observable, Subscription } from 'rxjs'
+import { BehaviorSubject, Observable } from 'rxjs'
 import { distinctUntilChanged } from 'rxjs/operators'
 import { ApiService } from './api/api.service'
-import { chill } from '../util/misc.util'
-import { isUnauthorized } from '../util/web.util'
 import { Storage } from '@ionic/storage'
 import { StorageKeys } from '../models/storage-keys'
+import { isUnauthorized } from './http.service'
 
 export enum AuthState {
   UNVERIFIED,
@@ -44,7 +43,7 @@ export class AuthService {
 
   async login (password: string): Promise<void> {
     try {
-      await this.api.postLogin(password)
+      await this.api.login(password)
       await this.storage.set(StorageKeys.LOGGED_IN_KEY, true)
       this.authState$.next(AuthState.VERIFIED)
     } catch (e) {

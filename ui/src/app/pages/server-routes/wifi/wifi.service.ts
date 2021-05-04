@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core'
 import { AlertController, ToastController } from '@ionic/angular'
-import { ApiService } from 'src/app/services/api/api.service'
-import { pauseFor } from 'src/app/util/misc.util'
+import { merge, Observable, timer } from 'rxjs'
+import { filter, map, take, tap } from 'rxjs/operators'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Injectable({
   providedIn: 'root',
@@ -9,37 +10,26 @@ import { pauseFor } from 'src/app/util/misc.util'
 export class WifiService {
 
   constructor (
-    private readonly apiService: ApiService,
     private readonly toastCtrl: ToastController,
     private readonly alertCtrl: AlertController,
+    private readonly patch: PatchDbModel,
   ) { }
 
-  async confirmWifi (ssid: string): Promise<boolean> {
-    const timeout = 4000
-    const maxAttempts = 5
-    let attempts = 0
+  confirmWifi (ssid: string): Observable<boolean> {
+    const success$ = this.patch.watch$('server', 'wifi', 'current')
+    .pipe(
+      filter(current => current === ssid),
+      tap(current => this.presentAlertSuccess(current)),
+      map(_ => true),
+    )
 
-    let success = false
-    while (attempts < maxAttempts) {
-      try {
-        const start = new Date().valueOf()
-        const { current } = (await this.apiService.getServer()).wifi
-        const end = new Date().valueOf()
-        if (current === ssid) {
-          success = true
-          break
-        } else {
-          attempts++
-          const diff = end - start
-          await pauseFor(Math.max(2000, timeout - diff))
-        }
-      } catch (e) {
-        attempts++
-        console.error(e)
-      }
-    }
+    const timer$ = timer(20000)
+    .pipe(
+      map(_ => false),
+      tap(_ => this.presentToastFail()),
+    )
 
-    return success
+    return merge(success$, timer$).pipe(take(1))
   }
 
   async presentToastFail (): Promise<void> {

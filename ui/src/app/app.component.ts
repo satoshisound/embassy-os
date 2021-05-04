@@ -13,6 +13,7 @@ import { SplitPaneTracker } from './services/split-pane.service'
 import { LoadingOptions } from '@ionic/core'
 import { pauseFor } from './util/misc.util'
 import { PatchDbModel } from './models/patch-db/patch-db-model'
+import { HttpService } from './services/http.service'
 
 @Component({
   selector: 'app-root',
@@ -23,6 +24,7 @@ export class AppComponent {
   fullPageMenu = true
   showMenuContent$ = new BehaviorSubject(false)
   selectedIndex = 0
+  isUpdating = false
   untilLoaded = true
   appPages = [
     {
@@ -52,6 +54,7 @@ export class AppComponent {
     private readonly authService: AuthService,
     private readonly router: Router,
     private readonly api: ApiService,
+    private readonly http: HttpService,
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly emver: Emver,
@@ -76,12 +79,11 @@ export class AppComponent {
     await this.emver.init()
 
     let fromFresh = true
-    let isUpdating = false
     let authed = false
 
     const serverStatus$ = this.patch.watch$('server', 'status')
     .pipe(
-      tap(status => isUpdating = status === ServerStatus.UPDATING),
+      tap(status => this.isUpdating = status === ServerStatus.UPDATING),
       takeWhile(_ => !!authed),
     )
 
@@ -95,7 +97,7 @@ export class AppComponent {
         if (appPageIndex > -1) this.selectedIndex = appPageIndex
 
         // TODO: while this works, it is dangerous and impractical.
-        if (e.urlAfterRedirects !== '/embassy' && e.urlAfterRedirects !== '/authenticate' && isUpdating) {
+        if (e.urlAfterRedirects !== '/embassy' && e.urlAfterRedirects !== '/authenticate' && this.isUpdating) {
           this.router.navigateByUrl('/embassy')
         }
       }),
@@ -106,7 +108,7 @@ export class AppComponent {
     .subscribe(auth => {
       // VERIFIED
       if (auth === AuthState.VERIFIED) {
-        this.api.authenticatedRequestsEnabled = true
+        this.http.authReqEnabled = true
         this.showMenuContent$.next(true)
         this.patch.start()
         serverStatus$.subscribe()
@@ -114,7 +116,7 @@ export class AppComponent {
       // UNVERIFIED
       } else if (auth === AuthState.UNVERIFIED) {
         authed = false
-        this.api.authenticatedRequestsEnabled = false
+        this.http.authReqEnabled = false
         this.patch.stop()
         this.storage.clear()
         this.router.navigate(['/authenticate'], { replaceUrl: true })
@@ -127,9 +129,8 @@ export class AppComponent {
       }
     })
 
-    this.api.watch401$().subscribe(() => {
+    this.http.watch401$().subscribe(() => {
       this.authService.setAuthStateUnverified()
-      return this.api.postLogout()
     })
   }
 
@@ -157,7 +158,7 @@ export class AppComponent {
 
   private async logout () {
     this.loader.of(LoadingSpinner('Logging out...'))
-    .displayDuringP(this.api.postLogout())
+    .displayDuringP(this.api.logout())
     .then(() => this.authService.setAuthStateUnverified())
     .catch(e => this.setError(e))
   }

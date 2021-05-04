@@ -30,7 +30,7 @@ export class WifiListPage {
         text: 'Forget',
         cssClass: 'alert-danger',
         handler: () => {
-          this.delete(ssid, wifi)
+          this.delete(ssid)
         },
       },
     ]
@@ -40,7 +40,7 @@ export class WifiListPage {
         {
           text: 'Connect',
           handler: () => {
-            this.connect(ssid, wifi.current)
+            this.connect(ssid)
           },
         },
       )
@@ -54,7 +54,7 @@ export class WifiListPage {
   }
 
   // Let's add country code here
-  async connect (ssid: string, current: string): Promise<void> {
+  async connect (ssid: string): Promise<void> {
     this.error$.next('')
     this.loader.of({
       message: 'Connecting. This could take while...',
@@ -62,19 +62,14 @@ export class WifiListPage {
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
       await this.apiService.connectWifi(ssid)
-      const success = await this.wifiService.confirmWifi(ssid)
-      if (success) {
-        this.wifiService.presentAlertSuccess(ssid)
-      } else {
-        this.wifiService.presentToastFail()
-      }
+      this.wifiService.confirmWifi(ssid).subscribe()
     }).catch(e => {
       console.error(e)
       this.error$.next(e.message)
     })
   }
 
-  async delete (ssid: string, wifi: WiFi): Promise<void> {
+  async delete (ssid: string): Promise<void> {
     this.error$.next('')
     this.loader.of({
       message: 'Deleting...',

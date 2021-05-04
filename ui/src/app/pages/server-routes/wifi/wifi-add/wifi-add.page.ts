@@ -46,13 +46,11 @@ export class WifiAddPage {
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
       await this.apiService.addWifi(this.ssid, this.password, this.countryCode, true)
-      const success = await this.wifiService.confirmWifi(this.ssid)
-      if (success) {
-        this.navCtrl.back()
-        this.wifiService.presentAlertSuccess(this.ssid)
-      } else {
-        this.wifiService.presentToastFail()
-      }
+      this.wifiService.confirmWifi(this.ssid).subscribe(success => {
+        if (success) {
+          this.navCtrl.back()
+        }
+      })
     }).catch (e => {
       console.error(e)
       this.error = e.message

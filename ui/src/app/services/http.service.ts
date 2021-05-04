@@ -1,31 +1,55 @@
 import { Injectable } from '@angular/core'
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http'
-import { Observable, from, interval, race } from 'rxjs'
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http'
+import { Observable, from, interval, race, Subject } from 'rxjs'
 import { map, take } from 'rxjs/operators'
 import { ConfigService } from './config.service'
+import { Revision } from 'patch-db-client'
 
 @Injectable({
   providedIn: 'root',
 })
 export class HttpService {
+  private unauthorizedApiResponse$ = new Subject()
+  authReqEnabled: boolean = false
+
   constructor (
     private readonly http: HttpClient,
     private readonly config: ConfigService,
   ) { }
 
-  get raw () : HttpClient {
-    return this.http
+  watch401$ (): Observable<{ }> {
+    return this.unauthorizedApiResponse$.asObservable()
   }
 
-  async serverRequest<T> (options: HttpOptions, overrides: Partial<{ version: string }> = { }): Promise<T> {
-    options.url = leadingSlash(`${this.config.api.url}${exists(overrides.version) ? overrides.version : this.config.api.version}${options.url}`)
-    if ( this.config.api.root && this.config.api.root !== '' ) {
+  async restRequest<T> (options: HttpOptions, version = this.config.api.version, authReq = true): Promise<T> {
+    if (authReq) {
+      if (!this.authReqEnabled) throw new Error('Unauthenticated')
+      options.withCredentials = true
+    }
+
+    options.url = handleSlashes(`${this.config.api.url}${version}${options.url}`)
+    if (this.config.api.root && this.config.api.root !== '' ) {
       options.url = `${this.config.api.root}${options.url}`
     }
-    return this.request<T>(options)
+    return this.httpRequest<T>(options)
   }
 
-  async request<T> (httpOpts: HttpOptions): Promise<T> {
+  async rpcRequest<T> (options: RPCOptions): Promise<T> {
+    options.params = options.params || { }
+    const httpOpts = {
+      method: Method.POST,
+      url: this.config.api.url,
+      data: options,
+    }
+
+    const res = await this.httpRequest<RPCResponse<T>>(httpOpts)
+
+    if (isRpcError(res)) throw new RpcError(res.error)
+
+    if (isRpcSuccess(res)) return res.result
+  }
+
+  private async httpRequest<T> (httpOpts: HttpOptions): Promise<T> {
     const { url, body, timeout, ...rest} = translateOptions(httpOpts)
     let req: Observable<{ body: T }>
     switch (httpOpts.method){
@@ -39,23 +63,47 @@ export class HttpService {
     return (timeout ? withTimeout(req, timeout) : req)
       .toPromise()
       .then(res => res.body)
-      .catch(e => { console.error(e); throw humanReadableErrorMessage(e)})
+      .catch(e => { throw new HttpError(e) })
   }
 }
 
-function humanReadableErrorMessage (e: any): Error {
-  // server up, custom backend error
-  if (e.error && e.error.message) return { ...e, message: e.error.message }
-  if (e.message) return { ...e, message: e.message }
-  if (e.status && e.statusText) return { ...e, message: `${e.status} ${e.statusText}` }
-  return { ...e, message: `Unidentifiable HTTP exception` }
+export function isUnauthorized (e: HttpErrorResponse): boolean {
+  return e.status == 401
 }
 
-function leadingSlash (url: string): string {
+function handleSlashes (url: string): string {
   let toReturn = url
   toReturn = toReturn.startsWith('/') ? toReturn : '/' + toReturn
   toReturn = !toReturn.endsWith('/')  ? toReturn : toReturn.slice(0, -1)
   return toReturn
+}
+
+function RpcError (e: RPCError['error']): void {
+  const { code, message, data } = e
+  this.status = code
+  this.message = message
+  this.data = { ...data, code }
+}
+
+function HttpError (e: HttpErrorResponse): void {
+  const { status, statusText, error } = e
+  this.status = status
+  this.message = statusText
+  this.data = error || { } // error = { code: string, message: string }
+}
+
+function isRpcError<Error, Result> (arg: { error: Error } | { result: Result}): arg is { error: Error } {
+  return !!(arg as any).error
+}
+
+function isRpcSuccess<Error, Result> (arg: { error: Error } | { result: Result}): arg is { result: Result } {
+  return !!(arg as any).result
+}
+
+export interface RequestError {
+  status: number
+  message: string
+  data: { code: string, message: string, revision: Revision | null }
 }
 
 export enum Method {
@@ -66,12 +114,49 @@ export enum Method {
   DELETE = 'DELETE',
 }
 
+export interface RPCOptions {
+  method: string
+  // @TODO what are valid params? object, bool?
+  params?: {
+    [param: string]: string | number | boolean | object | string[] | number[];
+  }
+}
+
+interface RPCBase {
+  jsonrpc: '2.0'
+  id: string
+}
+
+export interface RPCRequest<T> extends RPCBase {
+  method: string
+  params?: T
+}
+
+export interface RPCSuccess<T> extends RPCBase {
+  result: T
+}
+
+export interface RPCError extends RPCBase {
+  error: {
+    code: number,
+    message: string
+    data: {
+      message: string
+      revision: Revision
+    }
+  }
+}
+
+export type RPCResponse<T> = RPCSuccess<T> | RPCError
+
+type HttpError = HttpErrorResponse & { error: { code: string, message: string } }
+
 export interface HttpOptions {
   withCredentials?: boolean
   url: string
   method: Method
   params?: {
-    [param: string]: string | string[];
+    [param: string]: string | string[]
   }
   data?: any
   headers?: {
@@ -82,11 +167,11 @@ export interface HttpOptions {
 
 export interface HttpJsonOptions {
   headers?: HttpHeaders | {
-      [header: string]: string | string[];
+      [header: string]: string | string[]
   }
   observe: 'events'
   params?: HttpParams | {
-      [param: string]: string | string[];
+      [param: string]: string | string[]
   }
   reportProgress?: boolean
   responseType?: 'json'
@@ -115,8 +200,4 @@ function withTimeout<U> (req: Observable<U>, timeout: number): Observable<U> {
     from(req.toPromise()), // this guarantees it only emits on completion, intermediary emissions are suppressed.
     interval(timeout).pipe(take(1), map(() => { throw new Error('timeout') })),
   )
-}
-
-function exists (str?: string): boolean {
-  return !!str || str === ''
 }

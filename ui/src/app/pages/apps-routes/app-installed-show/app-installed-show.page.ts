@@ -3,39 +3,31 @@ import { AlertController, NavController, ToastController, ModalController, IonCo
 import { ApiService } from 'src/app/services/api/api.service'
 import { ActivatedRoute } from '@angular/router'
 import { copyToClipboard } from 'src/app/util/web.util'
-import { AppModel, AppStatus } from 'src/app/models/app-model'
+import { AppStatus } from 'src/app/models/app-model'
 import { AppInstalledFull } from 'src/app/models/app-types'
-import { ModelPreload } from 'src/app/models/model-preload'
-import { chill, pauseFor } from 'src/app/util/misc.util'
-import { PropertySubject, peekProperties } from 'src/app/util/property-subject.util'
+import { chill } from 'src/app/util/misc.util'
 import { AppBackupPage } from 'src/app/modals/app-backup/app-backup.page'
-import { LoaderService, markAsLoadingDuring$, markAsLoadingDuringP } from 'src/app/services/loader.service'
-import { BehaviorSubject, Observable, of } from 'rxjs'
+import { LoaderService } from 'src/app/services/loader.service'
+import { Observable, of, Subscription } from 'rxjs'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
 import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
-import { catchError, concatMap, filter, switchMap, tap } from 'rxjs/operators'
-import { Cleanup } from 'src/app/util/cleanup'
 import { InformationPopoverComponent } from 'src/app/components/information-popover/information-popover.component'
 import { ConfigService } from 'src/app/services/config.service'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
   selector: 'app-installed-show',
   templateUrl: './app-installed-show.page.html',
   styleUrls: ['./app-installed-show.page.scss'],
 })
-export class AppInstalledShowPage extends Cleanup {
-  $loading$ = new BehaviorSubject(true)
-  $loadingDependencies$ = new BehaviorSubject(false) // when true, dependencies will render with spinners.
-
-  $error$ = new BehaviorSubject<string>('')
-  app: PropertySubject<AppInstalledFull> = { } as any
-  appId: string
+export class AppInstalledShowPage {
+  error: string
+  appSub: Subscription
+  app: AppInstalledFull = { } as AppInstalledFull
   AppStatus = AppStatus
-  showInstructions = false
-
   hideLAN: boolean
 
-  dependencyDefintion = () => `<span style="font-style: italic">Dependencies</span> are other services which must be installed, configured appropriately, and started in order to start ${this.app.title.getValue()}`
+  dependencyDefintion = () => `<span style="font-style: italic">Dependencies</span> are other services which must be installed, configured appropriately, and started in order to start ${this.app.title}`
 
   @ViewChild(IonContent) content: IonContent
 
@@ -47,71 +39,29 @@ export class AppInstalledShowPage extends Cleanup {
     private readonly toastCtrl: ToastController,
     private readonly modalCtrl: ModalController,
     private readonly apiService: ApiService,
-    private readonly preload: ModelPreload,
     private readonly wizardBaker: WizardBaker,
-    private readonly appModel: AppModel,
     private readonly popoverController: PopoverController,
     private readonly config: ConfigService,
-  ) {
-    super()
-  }
+    private readonly patch$: PatchDbModel,
+  ) { }
 
   async ngOnInit () {
-    this.appId = this.route.snapshot.paramMap.get('appId') as string
-
-    this.cleanup(
-      markAsLoadingDuring$(this.$loading$, this.preload.appFull(this.appId))
-        .pipe(
-          tap(app => {
-            this.app = app
-            const appP = peekProperties(this.app)
-            this.hideLAN = !appP.lanAddress || (appP.id === 'mastodon' && appP.versionInstalled === '3.3.0') // @TODO delete this hack in 0.3.0
-          }),
-          concatMap(() => this.syncWhenDependencyInstalls()), // must be final in stack
-          catchError(e => of(this.setError(e))),
-        ).subscribe(),
-    )
+    const appId = this.route.snapshot.paramMap.get('appId')
+    this.appSub = this.patch$.watch$('apps', appId).subscribe(app => this.app = app)
   }
 
-  ionViewDidEnter () {
-    markAsLoadingDuringP(this.$loadingDependencies$, this.getApp())
-  }
-
-  async doRefresh (event: any) {
-    await Promise.all([
-      this.getApp(),
-      pauseFor(600),
-    ])
-    event.target.complete()
-  }
-
-  async scrollToRequirements () {
-    return this.scrollToElement('service-requirements-' + this.appId)
-  }
-
-  async getApp (): Promise<void> {
-    try {
-      await this.preload.loadInstalledApp(this.appId)
-      this.clearError()
-    } catch (e) {
-      this.setError(e)
-    }
+  async ngOnDestroy () {
+    this.appSub.unsubscribe()
   }
 
   async launchUiTab () {
-    let uiAddress: string
-    if (this.config.isTor()) {
-      uiAddress = `http://${this.app.torAddress.getValue()}`
-    } else {
-      uiAddress = `https://${this.app.lanAddress.getValue()}`
-    }
-    return window.open(uiAddress, '_blank')
+    const url = this.config.isTor() ? `http://${this.app.torAddress}` : `https://${this.app.lanAddress}`
+    return window.open(url, '_blank')
   }
 
   async copyTor () {
-    const app = peekProperties(this.app)
     let message = ''
-    await copyToClipboard(app.torAddress || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
+    await copyToClipboard(this.app.torAddress || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
 
     const toast = await this.toastCtrl.create({
       header: message,
@@ -123,9 +73,8 @@ export class AppInstalledShowPage extends Cleanup {
   }
 
   async copyLAN () {
-    const app = peekProperties(this.app)
     let message = ''
-    await copyToClipboard(app.lanAddress).then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
+    await copyToClipboard(this.app.lanAddress).then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
 
     const toast = await this.toastCtrl.create({
       header: message,
@@ -137,22 +86,20 @@ export class AppInstalledShowPage extends Cleanup {
   }
 
   async stop (): Promise<void> {
-    const app = peekProperties(this.app)
-
     await this.loader.of({
-      message: `Stopping ${app.title}...`,
+      message: `Stopping ${this.app.title}...`,
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      const { breakages } = await this.apiService.stopApp(this.appId, true)
+      const { breakages } = await this.apiService.stopApp(this.app.id, true)
 
       if (breakages.length) {
         const { cancelled } = await wizardModal(
           this.modalCtrl,
           this.wizardBaker.stop({
-            id: app.id,
-            title: app.title,
-            version: app.versionInstalled,
+            id: this.app.id,
+            title: this.app.title,
+            version: this.app.versionInstalled,
             breakages,
           }),
         )
@@ -160,16 +107,15 @@ export class AppInstalledShowPage extends Cleanup {
         if (cancelled) return { }
       }
 
-      return this.apiService.stopApp(this.appId).then(chill)
+      return this.apiService.stopApp(this.app.id).then(chill)
     }).catch(e => this.setError(e))
   }
 
   async tryStart (): Promise<void> {
-    const app = peekProperties(this.app)
-    if (app.startAlert) {
-      this.presentAlertStart(app)
+    if (this.app.startAlert) {
+      this.presentAlertStart()
     } else {
-      this.start(app)
+      this.start()
     }
   }
 
@@ -179,7 +125,7 @@ export class AppInstalledShowPage extends Cleanup {
       component: AppBackupPage,
       presentingElement: await this.modalCtrl.getTop(),
       componentProps: {
-        app: peekProperties(this.app),
+        app: this.app,
         type,
       },
     })
@@ -188,12 +134,10 @@ export class AppInstalledShowPage extends Cleanup {
   }
 
   async presentAlertStopBackup (): Promise<void> {
-    const app = peekProperties(this.app)
-
     const alert = await this.alertCtrl.create({
       backdropDismiss: false,
       header: 'Warning',
-      message: `${app.title} is not finished backing up. Are you sure you want stop the process?`,
+      message: `${this.app.title} is not finished backing up. Are you sure you want stop the process?`,
       buttons: [
         {
           text: 'Cancel',
@@ -211,25 +155,14 @@ export class AppInstalledShowPage extends Cleanup {
     await alert.present()
   }
 
-  async stopBackup (): Promise<void> {
-    await this.loader.of({
-      message: `Stopping backup...`,
-      spinner: 'lines',
-      cssClass: 'loader',
-    }).displayDuringP(this.apiService.stopAppBackup(this.appId))
-    .catch (e => this.setError(e))
-  }
-
   async uninstall () {
-    const app = peekProperties(this.app)
-
     const data = await wizardModal(
       this.modalCtrl,
       this.wizardBaker.uninstall({
-        id: app.id,
-        title: app.title,
-        version: app.versionInstalled,
-        uninstallAlert: app.uninstallAlert,
+        id: this.app.id,
+        title: this.app.title,
+        version: this.app.versionInstalled,
+        uninstallAlert: this.app.uninstallAlert,
       }),
     )
 
@@ -251,10 +184,26 @@ export class AppInstalledShowPage extends Cleanup {
     return await popover.present()
   }
 
-  private async presentAlertStart (app: AppInstalledFull): Promise<void> {
+  scrollToRequirements () {
+    const el = document.getElementById('service-requirements-' + this.app.id)
+    if (!el) return
+    let y = el.offsetTop
+    return this.content.scrollToPoint(0, y, 1000)
+  }
+
+  private async stopBackup (): Promise<void> {
+    await this.loader.of({
+      message: `Stopping backup...`,
+      spinner: 'lines',
+      cssClass: 'loader',
+    }).displayDuringP(this.apiService.stopAppBackup(this.app.id))
+    .catch (e => this.setError(e))
+  }
+
+  private async presentAlertStart (): Promise<void> {
     const alert = await this.alertCtrl.create({
       header: 'Warning',
-      message: app.startAlert,
+      message: this.app.startAlert,
       buttons: [
         {
           text: 'Cancel',
@@ -263,7 +212,7 @@ export class AppInstalledShowPage extends Cleanup {
         {
           text: 'Start',
           handler: () => {
-            this.start(app)
+            this.start()
           },
         },
       ],
@@ -271,40 +220,18 @@ export class AppInstalledShowPage extends Cleanup {
     await alert.present()
   }
 
-  private async start (app: AppInstalledFull): Promise<void> {
+  private async start (): Promise<void> {
     this.loader.of({
-      message: `Starting ${app.title}...`,
+      message: `Starting ${this.app.title}...`,
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringP(
-      this.apiService.startApp(this.appId),
+      this.apiService.startApp(this.app.id),
     ).catch(e => this.setError(e))
   }
 
   private setError (e: Error): Observable<void> {
-    this.$error$.next(e.message)
+    this.error = e.message
     return of()
-  }
-
-  private clearError () {
-    this.$error$.next('')
-  }
-
-  private async scrollToElement (elementId: string) {
-    const el = document.getElementById(elementId)
-
-    if (!el) return
-
-    let y = el.offsetTop
-    return this.content.scrollToPoint(0, y, 1000)
-  }
-
-  private syncWhenDependencyInstalls (): Observable<void> {
-    return this.app.configuredRequirements.pipe(
-      filter(deps => !!deps),
-      switchMap(reqs => this.appModel.watchForInstallations(reqs)),
-      concatMap(() => markAsLoadingDuringP(this.$loadingDependencies$, this.getApp())),
-      catchError(e => of(console.error(e))),
-    )
   }
 }

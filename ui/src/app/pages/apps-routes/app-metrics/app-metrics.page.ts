@@ -9,10 +9,8 @@ import { AppMetrics } from 'src/app/util/metrics.util'
 import { QRComponent } from 'src/app/components/qr/qr.component'
 import { AppMetricStore } from './metric-store'
 import * as JSONpointer from 'json-pointer'
-import { ModelPreload } from 'src/app/models/model-preload'
-import { markAsLoadingDuringP } from 'src/app/services/loader.service'
 import { AppInstalledFull } from 'src/app/models/app-types'
-import { peekProperties } from 'src/app/util/property-subject.util'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
   selector: 'app-metrics',
@@ -25,7 +23,6 @@ export class AppMetricsPage {
   appId: string
   pointer: string
   qrCode: string
-  app: AppInstalledFull
   $metrics$ = new BehaviorSubject<AppMetrics>({ })
   $hasMetrics$ = new BehaviorSubject<boolean>(null)
   unmasked: { [key: string]: boolean } = { }
@@ -38,51 +35,33 @@ export class AppMetricsPage {
     private readonly popoverCtrl: PopoverController,
     private readonly metricStore: AppMetricStore,
     private readonly navCtrl: NavController,
-    private readonly preload: ModelPreload,
+    public patch: PatchDbModel,
   ) { }
 
   ngOnInit () {
     this.appId = this.route.snapshot.paramMap.get('appId')
     this.pointer = this.route.queryParams['pointer']
 
-    markAsLoadingDuringP(this.$loading$, Promise.all([
-      this.preload.appFull(this.appId).toPromise(),
-      this.getMetrics(),
-      pauseFor(600),
-    ])).then(([app]) => {
-      this.app = peekProperties(app)
-      this.metricStore.watch().subscribe(m => {
-        const metrics = JSONpointer.get(m, this.pointer || '')
-        this.$metrics$.next(metrics)
-      })
-      this.$metrics$.subscribe(m => {
-        this.$hasMetrics$.next(!!Object.keys(m || { }).length)
-      })
-      this.route.queryParams.subscribe(queryParams => {
-        if (queryParams['pointer'] === this.pointer) return
-        this.pointer = queryParams['pointer']
-        const metrics = JSONpointer.get(this.metricStore.$metrics$.getValue(), this.pointer || '')
-        this.$metrics$.next(metrics)
-      })
+    this.getMetrics().then(() => this.$loading$.next(false))
+
+    this.metricStore.watch().subscribe(m => {
+      const metrics = JSONpointer.get(m, this.pointer || '')
+      this.$metrics$.next(metrics)
+    })
+    this.$metrics$.subscribe(m => {
+      this.$hasMetrics$.next(!!Object.keys(m || { }).length)
+    })
+    this.route.queryParams.subscribe(queryParams => {
+      if (queryParams['pointer'] === this.pointer) return
+      this.pointer = queryParams['pointer']
+      const metrics = JSONpointer.get(this.metricStore.$metrics$.getValue(), this.pointer || '')
+      this.$metrics$.next(metrics)
     })
   }
 
   async doRefresh (event: any) {
-    await Promise.all([
-      this.getMetrics(),
-      pauseFor(600),
-    ])
+    await this.getMetrics(),
     event.target.complete()
-  }
-
-  async getMetrics (): Promise<void> {
-    try {
-      const metrics = await this.apiService.getAppMetrics(this.appId)
-      this.metricStore.update(metrics)
-    } catch (e) {
-      console.error(e)
-      this.error = e.message
-    }
   }
 
   async presentDescription (metric: { key: string, value: AppMetrics[''] }, e: Event) {
@@ -134,5 +113,18 @@ export class AppMetricsPage {
 
   asIsOrder (a: any, b: any) {
     return 0
+  }
+
+  private async getMetrics (): Promise<void> {
+    try {
+      const [metrics] = await Promise.all([
+        this.apiService.getAppMetrics(this.appId),
+        pauseFor(600),
+      ])
+      this.metricStore.update(metrics)
+    } catch (e) {
+      console.error(e)
+      this.error = e.message
+    }
   }
 }

@@ -11,18 +11,12 @@ import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
   styleUrls: ['server-show.page.scss'],
 })
 export class ServerShowPage {
-  error = ''
-
   constructor (
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly apiService: ApiService,
     public readonly patch: PatchDbModel,
   ) { }
-
-  ionViewDidEnter () {
-    this.error = ''
-  }
 
   async presentAlertRestart () {
     const alert = await this.alertCtrl.create({
@@ -90,7 +84,6 @@ export class ServerShowPage {
 
   setError (e: Error) {
     console.error(e)
-    this.error = e.message
   }
 }
 

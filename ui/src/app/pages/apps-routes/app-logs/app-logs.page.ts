@@ -13,38 +13,32 @@ import { BehaviorSubject } from 'rxjs'
 })
 export class AppLogsPage {
   @ViewChild(IonContent, { static: false }) private content: IonContent
-  $loading$ = new BehaviorSubject(true)
-  error = ''
   appId: string
-  logs: string
+  logs = ''
+  error = ''
 
   constructor (
     private readonly route: ActivatedRoute,
     private readonly apiService: ApiService,
   ) { }
 
-  async ngOnInit () {
-    this.appId = this.route.snapshot.paramMap.get('appId') as string
-
-    markAsLoadingDuringP(this.$loading$, Promise.all([
-      this.getLogs(),
-      pauseFor(600),
-    ]))
+  ngOnInit () {
+    this.appId = this.route.snapshot.paramMap.get('appId')
+    this.getLogs()
   }
 
   async getLogs () {
     this.logs = ''
-    this.$loading$.next(true)
+
     try {
-      const logs = await this.apiService.getAppLogs(this.appId)
+      const logs = await Promise.all([
+        this.apiService.getAppLogs(this.appId),
+        pauseFor(600),
+      ])
       this.logs = logs.join('\n\n')
-      this.error = ''
       setTimeout(async () => await this.content.scrollToBottom(100), 200)
     } catch (e) {
-      console.error(e)
       this.error = e.message
-    } finally {
-      this.$loading$.next(false)
     }
   }
 }
