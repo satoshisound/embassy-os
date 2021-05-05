@@ -66,7 +66,7 @@ where
 pub struct CustomVolumeId<S: AsRef<str> = String>(Id<S>);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Volumes(LinkedHashMap<VolumeId, Volume>); // TODO
+pub struct Volumes(LinkedHashMap<VolumeId, Volume>);
 impl Volumes {
     pub fn get_path_for(&self, pkg_id: &PackageId, volume_id: &VolumeId) -> Option<PathBuf> {
         self.0

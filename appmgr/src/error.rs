@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use patch_db::Revision;
 use rpc_toolkit::yajrc::RpcError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,6 +89,7 @@ impl Display for ErrorKind {
 pub struct Error {
     pub source: anyhow::Error,
     pub kind: ErrorKind,
+    pub revision: Option<Revision>,
 }
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -99,6 +101,7 @@ impl Error {
         Error {
             source: source.into(),
             kind,
+            revision: None,
         }
     }
 }
@@ -142,12 +145,29 @@ impl From<ed25519_dalek::SignatureError> for Error {
         Error::new(e, ErrorKind::InvalidSignature)
     }
 }
+impl From<bollard::errors::Error> for Error {
+    fn from(e: bollard::errors::Error) -> Self {
+        Error::new(e, ErrorKind::Docker)
+    }
+}
 impl From<Error> for RpcError {
     fn from(e: Error) -> Self {
+        let mut data_object = serde_json::Map::with_capacity(2);
+        data_object.insert("message".to_owned(), format!("{}", e).into());
+        data_object.insert(
+            "revision".to_owned(),
+            match serde_json::to_value(&e.revision) {
+                Ok(a) => a,
+                Err(e) => {
+                    log::warn!("Error serializing revision for Error object: {}", e);
+                    serde_json::Value::Null
+                }
+            },
+        );
         RpcError {
             code: e.kind as i32,
             message: e.kind.as_str().into(),
-            data: Some(format!("{}", e).into()),
+            data: Some(data_object.into()),
         }
     }
 }
@@ -170,6 +190,7 @@ where
         self.map_err(|e| Error {
             source: e.into(),
             kind,
+            revision: None,
         })
     }
 
@@ -185,6 +206,7 @@ where
             Error {
                 kind,
                 source: source.into(),
+                revision: None,
             }
         })
     }
@@ -194,10 +216,7 @@ where
 macro_rules! ensure_code {
     ($x:expr, $c:expr, $fmt:expr $(, $arg:expr)*) => {
         if !($x) {
-            return Err(crate::Error {
-                source: anyhow::anyhow!($fmt, $($arg, )*),
-                kind: $c,
-            });
+            return Err(crate::Error::new(anyhow::anyhow!($fmt, $($arg, )*), $c));
         }
     };
 }

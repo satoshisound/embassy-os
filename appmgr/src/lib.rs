@@ -45,6 +45,7 @@ pub mod pack;
 pub mod registry;
 pub mod remove;
 pub mod s9pk;
+pub mod status;
 pub mod tor;
 pub mod update;
 pub mod util;

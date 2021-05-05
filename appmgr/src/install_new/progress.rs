@@ -22,6 +22,7 @@ pub struct InstallProgress {
     pub validated: AtomicU64,
     pub validation_complete: AtomicBool,
     pub read: AtomicU64,
+    pub read_complete: AtomicBool,
 }
 impl InstallProgress {
     pub fn new(size: Option<u64>) -> Arc<Self> {
@@ -32,6 +33,7 @@ impl InstallProgress {
             validated: AtomicU64::new(0),
             validation_complete: AtomicBool::new(false),
             read: AtomicU64::new(0),
+            read_complete: AtomicBool::new(false),
         })
     }
     pub fn download_complete(&self) {

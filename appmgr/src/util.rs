@@ -8,10 +8,9 @@ use std::process::Stdio;
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use emver::Version;
 use file_lock::FileLock;
 use id_pool::IdPool;
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
@@ -648,17 +647,14 @@ pub fn deserialize_from_str_opt<
 
 pub async fn daemon<F: Fn() -> Fut, Fut: Future<Output = ()> + Send + 'static>(
     f: F,
-    max_cooldown: std::time::Duration,
+    cooldown: std::time::Duration,
 ) -> Result<Never, anyhow::Error> {
     loop {
         match tokio::spawn(f()).await {
             Err(e) if e.is_panic() => return Err(anyhow::anyhow!("daemon panicked!")),
             _ => (),
         }
-        tokio::select! {
-            _ = tokio::task::yield_now() => { () }
-            _ = tokio::time::sleep(max_cooldown) => { () }
-        };
+        tokio::time::sleep(cooldown).await
     }
 }
 
@@ -683,6 +679,7 @@ impl<T> SNone<T> {
 }
 impl<T> SOption<T> for SNone<T> {}
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct IpPool(IdPool);
 impl IpPool {
     pub fn new() -> Self {
@@ -824,53 +821,71 @@ impl<'de> serde::de::Deserialize<'de> for ValuePrimative {
 }
 
 #[derive(Debug, Clone)]
-pub struct VersionString {
-    version: Version,
+pub struct Version {
+    version: emver::Version,
     string: String,
 }
-impl VersionString {
+impl Version {
     pub fn as_str(&self) -> &str {
         self.string.as_str()
     }
 }
-impl From<Version> for VersionString {
-    fn from(v: Version) -> Self {
-        VersionString {
+impl From<emver::Version> for Version {
+    fn from(v: emver::Version) -> Self {
+        Version {
             string: v.to_string(),
             version: v,
         }
     }
 }
-impl From<VersionString> for Version {
-    fn from(v: VersionString) -> Self {
+impl From<Version> for emver::Version {
+    fn from(v: Version) -> Self {
         v.version
     }
 }
-impl Deref for VersionString {
-    type Target = Version;
+impl Deref for Version {
+    type Target = emver::Version;
     fn deref(&self) -> &Self::Target {
         &self.version
     }
 }
-impl AsRef<Version> for VersionString {
-    fn as_ref(&self) -> &Version {
+impl AsRef<emver::Version> for Version {
+    fn as_ref(&self) -> &emver::Version {
         &self.version
     }
 }
-impl AsRef<str> for VersionString {
+impl AsRef<str> for Version {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
-impl PartialEq for VersionString {
-    fn eq(&self, other: &VersionString) -> bool {
+impl PartialEq for Version {
+    fn eq(&self, other: &Version) -> bool {
         self.version.eq(&other.version)
     }
 }
-impl Eq for VersionString {}
-impl Hash for VersionString {
+impl Eq for Version {}
+impl Hash for Version {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.version.hash(state)
+    }
+}
+impl<'de> Deserialize<'de> for Version {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+        let version = emver::Version::from_str(&string).map_err(serde::de::Error::custom)?;
+        Ok(Self { string, version })
+    }
+}
+impl Serialize for Version {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.string.serialize(serializer)
     }
 }
 

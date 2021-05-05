@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use emver::Version;
 use hashlink::LinkedHashMap;
 use patch_db::json_ptr::JsonPointer;
 use patch_db::{DbHandle, HasModel, Map, MapModel, ModelData};
@@ -9,7 +8,8 @@ use serde_json::Value;
 
 use crate::install_new::progress::InstallProgress;
 use crate::s9pk::manifest::{Manifest, PackageId};
-use crate::util::VersionString;
+use crate::status::Status;
+use crate::util::{IpPool, Version};
 use crate::Error;
 
 #[derive(Debug, Deserialize, Serialize, HasModel)]
@@ -17,6 +17,8 @@ use crate::Error;
 pub struct Database {
     #[model]
     pub package_data: AllPackageData,
+    #[model]
+    pub resources: Resources,
     pub ui: Value,
     pub agent: Value,
 }
@@ -24,6 +26,11 @@ impl DatabaseModel {
     pub fn new() -> Self {
         Self::from(JsonPointer::default())
     }
+}
+
+#[derive(Debug, Deserialize, Serialize, HasModel)]
+pub struct Resources {
+    ip_pool: IpPool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -39,16 +46,36 @@ impl HasModel for AllPackageData {
     type Model = MapModel<Self>;
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct VersionedPackageData(pub LinkedHashMap<Version, PackageDataEntry>);
-impl Map for VersionedPackageData {
-    type Key = VersionString;
-    type Value = PackageDataEntry;
-    fn get(&self, key: &Self::Key) -> Option<&Self::Value> {
-        self.0.get(&*key)
+#[derive(Debug, Default, Deserialize, Serialize, HasModel)]
+pub struct VersionedPackageData {
+    selected: Option<Version>,
+    #[model]
+    versions: VersionedPackageDataMap,
+}
+impl VersionedPackageDataModel {
+    pub async fn selected_version<Db: DbHandle>(
+        self,
+        db: &mut Db,
+    ) -> Result<Option<PackageDataEntryModel>, Error> {
+        let selected = self.clone().selected().get(db).await?;
+        if let Some(selected) = &*selected {
+            Ok(Some(self.versions().idx_model(&selected).expect(db).await?))
+        } else {
+            Ok(None)
+        }
     }
 }
-impl HasModel for VersionedPackageData {
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct VersionedPackageDataMap(pub LinkedHashMap<Version, PackageDataEntry>);
+impl Map for VersionedPackageDataMap {
+    type Key = Version;
+    type Value = PackageDataEntry;
+    fn get(&self, key: &Self::Key) -> Option<&Self::Value> {
+        self.0.get(&key)
+    }
+}
+impl HasModel for VersionedPackageDataMap {
     type Model = MapModel<Self>;
 }
 
@@ -72,7 +99,7 @@ impl PackageDataEntryModel {
         self,
         db: &mut Db,
     ) -> Result<PackageDataEntryModelKnown, Error> {
-        let variant: ModelData<String> = self.0.child("state").get(db).await?;
+        let variant: ModelData<String> = self.0.clone().child("state").get(db).await?;
         Ok(match &**variant {
             "installing" => PackageDataEntryModelKnown::Installing,
             "removing" => PackageDataEntryModelKnown::Removing,
@@ -91,4 +118,5 @@ impl PackageDataEntryModel {
 pub struct InstalledPackageDataEntry {
     #[model]
     manifest: Manifest,
+    status: Status,
 }

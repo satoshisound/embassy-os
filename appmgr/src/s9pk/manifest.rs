@@ -1,7 +1,8 @@
 use std::borrow::Borrow;
+use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 
-use emver::Version;
+use hashlink::LinkedHashMap;
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize, Serializer};
 use url::Url;
@@ -10,9 +11,12 @@ use crate::action::ActionImplementation;
 use crate::backup_new::BackupActions;
 use crate::config::action::ConfigActions;
 use crate::dependencies::Dependencies;
-use crate::id::{Id, SYSTEM_ID};
+use crate::id::{Id, InterfaceId, SYSTEM_ID};
 use crate::migration::Migrations;
+use crate::status::health_check::{HealthCheck, HealthCheckResult};
+use crate::util::Version;
 use crate::volume::Volumes;
+use crate::Error;
 
 pub const SYSTEM_PACKAGE_ID: PackageId<&'static str> = PackageId(SYSTEM_ID);
 
@@ -86,8 +90,9 @@ pub struct Manifest {
     pub marketing_page: Option<Url>,
     #[model]
     pub main: ActionImplementation,
+    pub health_check: HealthCheck,
     #[model]
-    pub config: ConfigActions,
+    pub config: Option<ConfigActions>,
     #[model]
     pub volumes: Volumes,
     #[serde(default)]
@@ -112,6 +117,19 @@ pub struct Manifest {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Interfaces {} // TODO
+impl Interfaces {
+    pub async fn install(&self, ip: &Ipv4Addr) -> Result<(), Error> {
+        todo!()
+    }
+    pub async fn check_all(
+        &self,
+        pkg_id: &PackageId,
+        version: &Version,
+        volumes: &Volumes,
+    ) -> Result<LinkedHashMap<InterfaceId, HealthCheckResult>, Error> {
+        todo!()
+    }
+}
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Actions {} // TODO
 #[derive(Debug, Deserialize, Serialize)]

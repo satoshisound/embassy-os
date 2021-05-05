@@ -3,13 +3,14 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use bollard::Docker;
 use patch_db::PatchDb;
 use rpc_toolkit::url::Host;
 use rpc_toolkit::Context;
 use serde::Deserialize;
 use tokio::fs::File;
 
-use crate::util::from_yaml_async_reader;
+use crate::util::{from_yaml_async_reader, AsyncFileExt};
 use crate::ResultExt;
 
 #[derive(Debug, Default, Deserialize)]
@@ -20,6 +21,7 @@ pub struct RpcContextConfig {
 pub struct RpcContextSeed {
     pub bind: SocketAddr,
     pub db: PatchDb,
+    pub docker: Docker,
 }
 
 #[derive(Clone)]
@@ -27,13 +29,11 @@ pub struct RpcContext(Arc<RpcContextSeed>);
 impl RpcContext {
     pub async fn init() -> Result<Self, crate::Error> {
         let cfg_path = Path::new(crate::CONFIG_PATH);
-        let base = if cfg_path.exists() {
-            from_yaml_async_reader(
-                File::open(cfg_path)
-                    .await
-                    .with_ctx(|_| (crate::ErrorKind::Filesystem, cfg_path.display().to_string()))?,
-            )
-            .await?
+        let base = if let Some(f) = File::maybe_open(cfg_path)
+            .await
+            .with_ctx(|_| (crate::ErrorKind::Filesystem, cfg_path.display().to_string()))?
+        {
+            from_yaml_async_reader(f).await?
         } else {
             RpcContextConfig::default()
         };
@@ -44,6 +44,7 @@ impl RpcContext {
                     .unwrap_or_else(|| Path::new("/mnt/embassy-os").to_owned()),
             )
             .await?,
+            docker: Docker::connect_with_unix_defaults()?,
         })))
     }
 }
