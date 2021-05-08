@@ -1,5 +1,5 @@
 import { Component } from '@angular/core'
-import { ServerStatus } from './models/server-model'
+import { ServerStatus } from './models/server-types'
 import { Storage } from '@ionic/storage'
 import { AuthService, AuthState } from './services/auth.service'
 import { ApiService } from './services/api/api.service'

@@ -1,7 +1,7 @@
 import { Component, Input, OnInit } from '@angular/core'
 import { PopoverController } from '@ionic/angular'
 import { BehaviorSubject, Subject } from 'rxjs'
-import { AppStatus } from 'src/app/models/app-model'
+import { AppStatus } from 'src/app/models/app-types'
 import { AppDependency, DependencyViolationSeverity, getViolationSeverity } from 'src/app/models/app-types'
 import { displayEmver } from 'src/app/pipes/emver.pipe'
 import { InformationPopoverComponent } from '../../information-popover/information-popover.component'

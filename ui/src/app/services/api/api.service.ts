@@ -1,12 +1,10 @@
-import { AppStatus, Rules } from '../../models/app-model'
-import { AppAvailablePreview, AppAvailableFull, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, AppAction } from '../../models/app-types'
-import { DiskInfo, S9Notification, ServerMetrics, SSHFingerprint } from '../../models/server-model'
+import { AppAvailablePreview, AppAvailableFull, DependentBreakage, AppAvailableVersionSpecificInfo, AppAction } from '../../models/app-types'
 import { Subject, Observable } from 'rxjs'
-import { Unit } from './api-types'
-import { AppMetrics } from 'src/app/util/metrics.util'
+import { ReqRes, ServerMetrics, Unit } from './api-types'
+import { AppProperties } from 'src/app/util/properties.util'
 import { ConfigSpec } from 'src/app/app-config/config-types'
-import { Http, PatchOp, Source, Dump, Update, UpdateReal, Operation, Revision } from 'patch-db-client'
-import { DataModel } from 'src/app/models/patch-db/data-model'
+import { Http, Source, Dump, Update, Operation, Revision } from 'patch-db-client'
+import { Action, DataModel, ServerNotification, SSHFingerprint } from 'src/app/models/patch-db/data-model'
 import { filter } from 'rxjs/operators'
 import * as uuid from 'uuid'
 
@@ -24,36 +22,30 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
     return this.sync.asObservable().pipe(filter(() => this.syncing))
   }
 
-  // REST
+  // ** REST **
+
+  // auth
   abstract login (password: string): Promise<Unit>
   abstract logout (): Promise<Unit>
-  abstract getVersionLatest (): Promise<{ versionLatest: string, relaseNotes: string }>
+
+  // server
+  abstract getVersionLatest (): Promise<{ versionLatest: string, releaseNotes: string }>
   abstract getServerLogs (): Promise<string[]>
   abstract getServerMetrics (): Promise<ServerMetrics>
-  abstract getNotifications (page: number, perPage: number): Promise<S9Notification[]>
+  abstract getNotifications (page: number, perPage: number): Promise<ServerNotification[]>
+  abstract deleteNotification (id: string): Promise<Unit>
 
-  // RPC
-  abstract getRevisions (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]>
+  // ** RPC **
+
+  abstract getRevisions (since: number): Promise<Revision[] | Dump<DataModel>>
   abstract getDump (): Promise<Dump<DataModel>>
   abstract getExternalDisks (): Promise<DiskInfo[]>
   abstract getAvailableApps (): Promise<AppAvailablePreview[]>
   abstract getAvailableApp (appId: string): Promise<AppAvailableFull>
   abstract getAvailableAppVersionSpecificInfo (appId: string, versionSpec: string): Promise<AppAvailableVersionSpecificInfo>
-  abstract getAppMetrics (appId: string): Promise<AppMetrics>
+  abstract getAppProperties (appId: string): Promise<AppProperties>
+  abstract getAppLogs (id: string, before?: string): Promise<ReqRes.GetAppLogsRes>
   abstract getAppConfig (appId: string): Promise<{ spec: ConfigSpec, config: object, rules: Rules[]}>
-  abstract getAppLogs (appId: string, params?: {
-    appId: string
-    after?: string
-    before?: string
-    page?: string
-    perPage?: string
-}): Promise<string[]>
-
-  /** Any request which mutates state will return a PatchPromise: a patch to state along with the standard response. The syncResponse helper function syncs the patch and returns the response*/
-  protected abstract deleteNotificationRaw (id: string): PatchPromise<Unit>
-  deleteNotification = (id: string) => this.syncResponse(
-    () => this.deleteNotificationRaw(id),
-  )()
 
   protected abstract updateAgentRaw (version: string): PatchPromise<Unit>
   updateAgent = (version: string) => this.syncResponse(
@@ -65,10 +57,19 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
     () => this.acknowledgeOSWelcomeRaw(version),
   )()
 
-  protected abstract installAppRaw (appId: string, version: string, dryRun?: boolean): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }>
-  installApp = (appId: string, version: string, dryRun?: boolean) => this.syncResponse(
-    () => this.installAppRaw(appId, version, dryRun),
-    dryRun ? undefined : { op: PatchOp.REPLACE, path: `apps/${appId}/status`, value: AppStatus.INSTALLING },
+  protected abstract installAppRaw (id: string, version: string): PatchPromise<Unit>
+  installApp = (id: string, version: string) => this.syncResponse(
+    () => this.installAppRaw(id, version),
+  )()
+
+  protected abstract dryrunUpdateAppRaw (id: string, version: string): PatchPromise<ReqRes.DryrunUpdateAppRes>
+  dryrunUpdateApp = (id: string, version: string) => this.syncResponse(
+    () => this.installAppRaw(id, version),
+  )()
+
+  protected abstract updateAppRaw (id: string, version: string): PatchPromise<Unit>
+  updateApp = (id: string, version: string) => this.syncResponse(
+    () => this.installAppRaw(id, version),
   )()
 
   protected abstract uninstallAppRaw (appId: string, dryRun?: boolean): PatchPromise<{ breakages: DependentBreakage[] }>
@@ -91,9 +92,9 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
     () => this.restartAppRaw(appId),
   )()
 
-  protected abstract appActionRaw (appId: string, appAction: AppAction): PatchPromise<string>
-  appAction = (appId: string, appAction: AppAction) => this.syncResponse(
-    () => this.appActionRaw(appId, appAction),
+  protected abstract executeActionRaw (appId: string, action: Action): PatchPromise<string>
+  executeAction = (appId: string, action: Action) => this.syncResponse(
+    () => this.executeActionRaw(appId, action),
   )()
 
   protected abstract createAppBackupRaw (appId: string, logicalname: string, password?: string): PatchPromise<Unit>

@@ -1,5 +1,5 @@
 import { AppStatus } from 'src/app/models/app-model'
-import { ServerStatus } from 'src/app/models/server-model'
+import { ServerStatus } from '../models/patch-db/data-model'
 
 export const ServerStatusRendering: {
   [k in ServerStatus]: { display: string; color: string; showDots: boolean; }

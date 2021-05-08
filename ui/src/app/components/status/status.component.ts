@@ -1,6 +1,5 @@
 import { Component, Input } from '@angular/core'
-import { AppStatus } from 'src/app/models/app-model'
-import { ServerStatus } from 'src/app/models/server-model'
+import { ServerStatus } from 'src/app/models/patch-db/data-model'
 import { ServerStatusRendering, AppStatusRendering } from '../../util/status-rendering'
 
 @Component({

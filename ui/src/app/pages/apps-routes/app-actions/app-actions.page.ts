@@ -3,11 +3,10 @@ import { ActivatedRoute } from '@angular/router'
 import { ApiService } from 'src/app/services/api/api.service'
 import { AlertController } from '@ionic/angular'
 import { LoaderService } from 'src/app/services/loader.service'
-import { AppAction, AppInstalledFull } from 'src/app/models/app-types'
-import { AppStatus } from 'src/app/models/app-model'
 import { HttpErrorResponse } from '@angular/common/http'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { Observable } from 'rxjs'
+import { Action, InstalledPackageDataEntry, PackageMainStatus } from 'src/app/models/patch-db/data-model'
 
 @Component({
   selector: 'app-actions',
@@ -15,7 +14,7 @@ import { Observable } from 'rxjs'
   styleUrls: ['./app-actions.page.scss'],
 })
 export class AppActionsPage {
-  app$: Observable<AppInstalledFull>
+  app$: Observable<InstalledPackageDataEntry>
 
   constructor (
     private readonly route: ActivatedRoute,
@@ -27,11 +26,11 @@ export class AppActionsPage {
 
   ngOnInit () {
     const appId = this.route.snapshot.paramMap.get('appId')
-    this.app$ = this.patch.watch$('apps', appId)
+    this.app$ = this.patch.watch$('package-data', appId, 'installed')
   }
 
-  async handleAction (app: AppInstalledFull, action: AppAction) {
-    if (action.allowedStatuses.includes(app.status)) {
+  async handleAction (app: InstalledPackageDataEntry, action: Action) {
+    if ((action['allowed-statuses'] as PackageMainStatus[]).includes(app.status.main.status)) {
       const alert = await this.alertCtrl.create({
         header: 'Confirm',
         message: `Are you sure you want to execute action "${action.name}"? ${action.warning ? action.warning : ''}`,
@@ -43,14 +42,14 @@ export class AppActionsPage {
           {
             text: 'Execute',
             handler: () => {
-              this.executeAction(app.id, action)
+              this.executeAction(app.manifest.id, action)
             },
           },
         ],
       })
       await alert.present()
     } else {
-      const joinStatuses = (statuses: AppStatus[]) => {
+      const joinStatuses = (statuses: string[]) => {
         const last = statuses.pop()
         let s = statuses.join(', ')
         if (last) {
@@ -71,7 +70,7 @@ export class AppActionsPage {
     }
   }
 
-  private async executeAction (id: string, action: AppAction) {
+  private async executeAction (id: string, action: Action) {
     try {
       const res = await this.loaderService.displayDuringP(
         this.apiService.appAction(id, action),

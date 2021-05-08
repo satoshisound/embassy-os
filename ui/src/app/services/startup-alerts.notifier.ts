@@ -3,7 +3,6 @@ import { AlertController, IonicSafeString, ModalController, NavController } from
 import { wizardModal } from '../components/install-wizard/install-wizard.component'
 import { WizardBaker } from '../components/install-wizard/prebaked-wizards'
 import { OSWelcomePage } from '../modals/os-welcome/os-welcome.page'
-import { S9Server } from '../models/server-model'
 import { displayEmver } from '../pipes/emver.pipe'
 import { ApiService } from './api/api.service'
 import { ReqRes } from './api/api-types'

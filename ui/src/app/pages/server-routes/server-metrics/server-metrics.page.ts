@@ -1,5 +1,5 @@
 import { Component } from '@angular/core'
-import { ServerMetrics } from 'src/app/models/server-model'
+import { ServerMetrics } from 'src/app/services/api/api-types'
 import { ApiService } from 'src/app/services/api/api.service'
 import { pauseFor } from 'src/app/util/misc.util'
 

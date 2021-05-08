@@ -152,26 +152,3 @@ function emptyAppInstalledFull (): Omit<AppInstalledFull, keyof AppInstalledPrev
     actions: [],
   }
 }
-
-export interface Rules {
-  rule: string
-  description: string
-}
-
-export enum AppStatus {
-  // shared
-  UNKNOWN = 'UNKNOWN',
-  UNREACHABLE = 'UNREACHABLE',
-  INSTALLING = 'INSTALLING',
-  NEEDS_CONFIG = 'NEEDS_CONFIG',
-  RUNNING = 'RUNNING',
-  STOPPED = 'STOPPED',
-  CREATING_BACKUP = 'CREATING_BACKUP',
-  RESTORING_BACKUP = 'RESTORING_BACKUP',
-  CRASHED = 'CRASHED',
-  REMOVING = 'REMOVING',
-  DEAD = 'DEAD',
-  BROKEN_DEPENDENCIES = 'BROKEN_DEPENDENCIES',
-  STOPPING = 'STOPPING',
-  RESTARTING = 'RESTARTING',
-}

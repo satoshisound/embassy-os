@@ -2,7 +2,7 @@ import { Component, Input, OnInit } from '@angular/core'
 import { ModalController } from '@ionic/angular'
 import { BehaviorSubject } from 'rxjs'
 import { AppInstalledFull } from 'src/app/models/app-types'
-import { DiskPartition } from 'src/app/models/server-model'
+import { DiskPartition } from 'src/app/models/server-types'
 
 @Component({
   selector: 'app-backup-confirmation',

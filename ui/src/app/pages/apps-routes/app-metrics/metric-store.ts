@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core'
 import { BehaviorSubject } from 'rxjs'
-import { AppMetrics } from '../../../util/metrics.util'
+import { AppMetrics } from '../../../util/properties.util'
 
 @Injectable({
   providedIn: 'root',

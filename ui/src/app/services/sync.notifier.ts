@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core'
 import { ToastController, NavController } from '@ionic/angular'
-import { ServerModel, S9Server } from '../models/server-model'
+
 @Injectable({
   providedIn: 'root',
 })

@@ -1,14 +1,14 @@
 import { Injectable } from '@angular/core'
 import { HttpService, Method } from '../http.service'
-import { AppAvailablePreview, AppAvailableFull, AppInstalledFull, AppInstalledPreview, DependentBreakage, AppAvailableVersionSpecificInfo, AppAction } from '../../models/app-types'
-import { S9Notification, SSHFingerprint, DiskInfo } from '../../models/server-model'
+import { AppAvailablePreview, AppAvailableFull, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, AppAction } from '../../models/app-types'
+import { DiskInfo } from '../../models/server-types'
 import { ApiService, PatchPromise  } from './api.service'
 import { ReqRes, Unit } from './api-types'
 import { Replace } from 'src/app/util/types.util'
-import { AppMetrics, parseMetricsPermissive } from 'src/app/util/metrics.util'
 import { Revision, Dump } from 'patch-db-client'
-import { DataModel } from 'src/app/models/patch-db/data-model'
+import { Action, DataModel, ServerNotification, SSHFingerprint } from 'src/app/models/patch-db/data-model'
 import { ConfigService } from '../config.service'
+import { AppProperties, parsePropertiesPermissive } from 'src/app/util/properties.util'
 
 @Injectable()
 export class LiveApiService extends ApiService {
@@ -51,14 +51,14 @@ export class LiveApiService extends ApiService {
   }
 
   async updateAgentRaw (version: string): PatchPromise<Unit> {
-    const data: ReqRes.PostUpdateAgentReq = {
+    const data: ReqRes.UpdateAgentReq = {
       version: `=${version}`,
     }
     return this.http.restRequest({ method: Method.POST, url: '/update', data })
   }
 
-  async patchServerConfigRaw (attr: string, value: any): PatchPromise<Unit> {
-    const data: ReqRes.PatchServerConfigReq = {
+  async updateServerConfigRaw (attr: string, value: any): PatchPromise<Unit> {
+    const data: ReqRes.UpdateServerConfigReq = {
       value,
     }
     return this.http.restRequest({ method: Method.PATCH, url: `/${attr}`, data })
@@ -74,7 +74,7 @@ export class LiveApiService extends ApiService {
 
   // notifications
 
-  async getNotifications (page: number, perPage: number): Promise<S9Notification[]> {
+  async getNotifications (page: number, perPage: number): Promise<ServerNotification[]> {
     const params: ReqRes.GetNotificationsReq = {
       page: String(page),
       perPage: String(perPage),
@@ -123,7 +123,7 @@ export class LiveApiService extends ApiService {
 
   // patchDB
 
-  async getRevisions (since: number): Promise<Revision[]> {
+  async getRevisions (since: number): Promise<Revision[] | Dump<DataModel>> {
     return this.http.rpcRequest({ method: 'db.revisions', params: { since } })
   }
 
@@ -132,17 +132,17 @@ export class LiveApiService extends ApiService {
   }
 
   async acknowledgeOSWelcomeRaw (version: string): PatchPromise<Unit> {
-    return this.http.rpcRequest({ method: 1, params: { version } })
+    return this.http.rpcRequest({ method: 'db.put.ui', params: { pointer: '/os-welcome', value: version } })
   }
 
   // drives
 
   async getExternalDisks (): Promise<DiskInfo[]> {
-    return this.http.rpcRequest<ReqRes.GetExternalDisksRes>({ method: 1 })
+    return this.http.rpcRequest<ReqRes.GetExternalDisksRes>({ method: 'disk.list' })
   }
 
   async ejectExternalDiskRaw (logicalName: string): PatchPromise<Unit> {
-    return this.http.rpcRequest({ method: 1, params: { logicalName } })
+    return this.http.rpcRequest({ method: 'disk.eject', params: { logicalName } })
   }
 
   // apps available
@@ -177,19 +177,7 @@ export class LiveApiService extends ApiService {
 
   // apps installed
 
-  async getInstalledApps (): Promise<AppInstalledPreview[]> {
-    return this.http.rpcRequest<ReqRes.GetAppsInstalledRes>({ method: 1 })
-      .then(apps => {
-        return apps.map(app => {
-          return {
-            ...app,
-            hasUI: this.config.hasUI(app),
-            launchable: this.config.isLaunchable(app),
-          }
-        })
-      })
-  }
-
+  // @TODO delete this method and implement mapping
   async getInstalledApp (appId: string): Promise<AppInstalledFull> {
     return this.http.rpcRequest<ReqRes.GetAppInstalledRes>({ method: 1, params: { appId } })
       .then(app => {
@@ -202,24 +190,37 @@ export class LiveApiService extends ApiService {
       })
   }
 
-  async getAppMetrics (appId: string): Promise<AppMetrics> {
-    // @TODO don't need backwards compat anymore
-    return this.http.rpcRequest<ReqRes.GetAppMetricsRes>( { method: 1, params: { appId } })
-      .then(parseMetricsPermissive)
+  async getAppProperties (packageId: string): Promise<AppProperties> {
+    return this.http.rpcRequest<ReqRes.GetAppPropertiesRes>( { method: 'package.properties', params: { id: packageId } })
+      .then(parsePropertiesPermissive)
   }
 
-  async getAppLogs (appId: string, params: Omit<ReqRes.GetAppLogsReq, 'appId'> = { }): Promise<string[]> {
-    return this.http.rpcRequest<ReqRes.GetAppLogsRes>( { method: 1, params: { ...params, appId } })
+  async getAppLogs (id: string, before?: string): Promise<ReqRes.GetAppLogsRes> {
+    return this.http.rpcRequest<ReqRes.GetAppLogsRes>( { method: 'package.logs', params: { id, before } })
   }
 
-  async installAppRaw (appId: string, version: string, dryRun: boolean = false): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }> {
-    const params: ReqRes.PostInstallAppReq = {
-      appId,
+  async installAppRaw (id: string, version: string): PatchPromise<Unit> {
+    const params: ReqRes.InstallAppReq = {
+      id,
       version,
-      dryRun,
     }
-    return this.http.rpcRequest({ method: 1, params })
-      .then(({ patch, response }) => ({ patch, response: { ...response, hasFetchedFull: false }}))
+    return this.http.rpcRequest({ method: 'package.install', params })
+  }
+
+  async dryrunUpdateAppRaw (id: string, version: string): PatchPromise<ReqRes.DryrunUpdateAppRes> {
+    const params: ReqRes.DryrunUpdateAppReq = {
+      id,
+      version,
+    }
+    return this.http.rpcRequest({ method: 'package.update.dry', params })
+  }
+
+  async updateAppRaw (id: string, version: string): PatchPromise<Unit> {
+    const params: ReqRes.PostUpdateAppReq = {
+      id,
+      version,
+    }
+    return this.http.rpcRequest({ method: 'package.update', params })
   }
 
   async uninstallAppRaw (appId: string, dryRun: boolean = false): PatchPromise<{ breakages: DependentBreakage[] }> {
@@ -286,7 +287,7 @@ export class LiveApiService extends ApiService {
     return this.http.rpcRequest({ method: 1, params })
   }
 
-  async appActionRaw (appId: string, action: AppAction): PatchPromise<string> {
+  async executeActionRaw (appId: string, action: Action): PatchPromise<string> {
     return this.http.rpcRequest({ method: 1, params: { ...action, appId } })
   }
 }

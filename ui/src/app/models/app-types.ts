@@ -1,5 +1,3 @@
-import { AppStatus } from './app-model'
-
 /** APPS **/
 
 export interface BaseApp {

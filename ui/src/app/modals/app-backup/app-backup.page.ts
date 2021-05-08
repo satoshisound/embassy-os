@@ -1,9 +1,8 @@
 import { Component, Input } from '@angular/core'
 import { ModalController, AlertController, LoadingController, ToastController } from '@ionic/angular'
-import { AppModel, AppStatus } from 'src/app/models/app-model'
 import { AppInstalledFull } from 'src/app/models/app-types'
 import { ApiService } from 'src/app/services/api/api.service'
-import { DiskInfo, DiskPartition } from 'src/app/models/server-model'
+import { DiskInfo, PartitionInfo } from 'src/app/models/server-types'
 import { pauseFor } from 'src/app/util/misc.util'
 import { concatMap } from 'rxjs/operators'
 import { AppBackupConfirmationComponent } from 'src/app/components/app-backup-confirmation/app-backup-confirmation.component'
@@ -27,7 +26,6 @@ export class AppBackupPage {
     private readonly alertCtrl: AlertController,
     private readonly loadingCtrl: LoadingController,
     private readonly apiService: ApiService,
-    private readonly appModel: AppModel,
     private readonly toastCtrl: ToastController,
   ) { }
 
@@ -39,7 +37,7 @@ export class AppBackupPage {
   async getExternalDisks (): Promise<void> {
     try {
       this.disks = await this.apiService.getExternalDisks()
-      this.allPartitionsMounted = this.disks.every(d => d.partitions.every(p => p.isMounted))
+      this.allPartitionsMounted = this.disks.every(d => d.partitions.every(p => p['is-mounted']))
     } catch (e) {
       console.error(e)
       this.error = e.message
@@ -78,7 +76,7 @@ export class AppBackupPage {
     await alert.present()
   }
 
-  async presentAlert (disk: DiskInfo, partition: DiskPartition): Promise<void> {
+  async presentAlert (disk: DiskInfo, partition: PartitionInfo): Promise<void> {
     if (this.type === 'create') {
       this.presentAlertCreateEncrypted(disk, partition)
     } else {
@@ -86,7 +84,7 @@ export class AppBackupPage {
     }
   }
 
-  private async presentAlertCreateEncrypted (disk: DiskInfo, partition: DiskPartition): Promise<void> {
+  private async presentAlertCreateEncrypted (disk: DiskInfo, partition: PartitionInfo): Promise<void> {
     const m = await this.modalCtrl.create({
       componentProps: {
         app: this.app,
@@ -107,7 +105,7 @@ export class AppBackupPage {
     return await m.present()
   }
 
-  private async presentAlertWarn (partition: DiskPartition): Promise<void> {
+  private async presentAlertWarn (partition: PartitionInfo): Promise<void> {
     const alert = await this.alertCtrl.create({
       backdropDismiss: false,
       header: `Warning`,
@@ -127,7 +125,7 @@ export class AppBackupPage {
     await alert.present()
   }
 
-  private async presentAlertRestore (partition: DiskPartition): Promise<void> {
+  private async presentAlertRestore (partition: PartitionInfo): Promise<void> {
     const alert = await this.alertCtrl.create({
       backdropDismiss: false,
       header: `Decrypt Backup`,
@@ -154,7 +152,7 @@ export class AppBackupPage {
     await alert.present()
   }
 
-  private async restore (partition: DiskPartition, password?: string): Promise<void> {
+  private async restore (partition: PartitionInfo, password?: string): Promise<void> {
     this.error = ''
 
     const loader = await this.loadingCtrl.create({
@@ -165,7 +163,6 @@ export class AppBackupPage {
 
     try {
       await this.apiService.restoreAppBackup(this.app.id, partition.logicalname, password)
-      this.appModel.update({ id: this.app.id, status: AppStatus.RESTORING_BACKUP })
       await this.dismiss()
     } catch (e) {
       console.error(e)
@@ -175,7 +172,7 @@ export class AppBackupPage {
     }
   }
 
-  private async create (disk: DiskInfo, partition: DiskPartition, password: string, eject: boolean): Promise<void> {
+  private async create (disk: DiskInfo, partition: PartitionInfo, password: string, eject: boolean): Promise<void> {
     this.error = ''
 
     const loader = await this.loadingCtrl.create({
@@ -186,7 +183,6 @@ export class AppBackupPage {
 
     try {
       await this.apiService.createAppBackup(this.app.id, partition.logicalname, password)
-      this.appModel.update({ id: this.app.id, status: AppStatus.CREATING_BACKUP })
       if (eject) {
         this.appModel.watchForBackup(this.app.id).pipe(concatMap(
           () => this.apiService.ejectExternalDisk(disk.logicalname),

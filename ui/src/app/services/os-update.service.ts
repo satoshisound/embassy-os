@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core'
 import { NavController } from '@ionic/angular'
 import { BehaviorSubject, forkJoin, Observable, of } from 'rxjs'
 import { catchError, concatMap, distinctUntilChanged, map, take, tap } from 'rxjs/operators'
-import { ServerModel, ServerStatus } from '../models/server-model'
+import { ServerModel, ServerStatus } from '../models/server-types'
 import { ApiService } from './api/api.service'
 import { Emver } from './emver.service'
 

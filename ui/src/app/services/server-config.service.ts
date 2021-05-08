@@ -3,7 +3,7 @@ import { ModalController } from '@ionic/angular'
 import { AppConfigValuePage } from '../modals/app-config-value/app-config-value.page'
 import { ApiService } from './api/api.service'
 import { PropertySubject } from '../util/property-subject.util'
-import { S9Server, ServerModel } from '../models/server-model'
+import { S9Server, ServerModel } from '../models/server-types'
 import { ConfigSpec } from '../app-config/config-types'
 import { ConfigCursor } from '../app-config/config-cursor'
 

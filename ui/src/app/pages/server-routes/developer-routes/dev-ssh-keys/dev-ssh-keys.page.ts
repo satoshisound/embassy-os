@@ -1,11 +1,11 @@
 import { Component } from '@angular/core'
-import { SSHFingerprint } from 'src/app/models/server-model'
 import { ApiService } from 'src/app/services/api/api.service'
 import { ServerConfigService } from 'src/app/services/server-config.service'
 import { AlertController } from '@ionic/angular'
 import { BehaviorSubject } from 'rxjs'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { PatchOp, Operation } from 'patch-db-client'
+import { SSHFingerprint } from 'src/app/models/patch-db/data-model'
 
 @Component({
   selector: 'dev-ssh-keys',

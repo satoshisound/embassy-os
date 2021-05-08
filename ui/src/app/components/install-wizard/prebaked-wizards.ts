@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core'
-import { AppModel, AppStatus } from 'src/app/models/app-model'
 import { OsUpdateService } from 'src/app/services/os-update.service'
 import { exists } from 'src/app/util/misc.util'
 import { AppDependency, DependentBreakage, AppInstalledPreview } from '../../models/app-types'
@@ -12,7 +11,6 @@ export class WizardBaker {
   constructor (
     private readonly apiService: ApiService,
     private readonly updateService: OsUpdateService,
-    private readonly appModel: AppModel,
   ) { }
 
   install (values: {
@@ -55,7 +53,7 @@ export class WizardBaker {
             action,
             verb: 'beginning installation for',
             title,
-            executeAction: () => this.apiService.installApp(id, version).then(app => { this.appModel.add({ ...app, status: AppStatus.INSTALLING })}),
+            executeAction: () => this.apiService.installApp(id, version),
           },
         },
         bottomBar: {
@@ -103,7 +101,11 @@ export class WizardBaker {
       { slide: {
           selector: 'dependents',
           params: {
-            skipConfirmationDialogue: true, action, verb: 'updating', title, fetchBreakages: () => this.apiService.installApp(id, version, true).then( ({ breakages }) => breakages ),
+            skipConfirmationDialogue: true,
+            action,
+            verb: 'updating',
+            title,
+            fetchBreakages: () => this.apiService.dryrunUpdateApp(id, version).then( ({ breakages }) => breakages ),
           },
         },
         bottomBar: {
@@ -114,9 +116,10 @@ export class WizardBaker {
       { slide: {
           selector: 'complete',
           params: {
-            action, verb: 'beginning update for', title, executeAction: () => this.apiService.installApp(id, version).then(app => {
-              this.appModel.update({ id: app.id, status: AppStatus.INSTALLING })
-            }),
+            action,
+            verb: 'beginning update for',
+            title,
+            executeAction: () => this.apiService.updateApp(id, version),
           },
         },
         bottomBar: {
@@ -194,7 +197,11 @@ export class WizardBaker {
       { slide: {
           selector: 'dependents',
           params: {
-            skipConfirmationDialogue: true, action, verb: 'downgrading', title, fetchBreakages: () => this.apiService.installApp(id, version, true).then( ({ breakages }) => breakages ),
+            skipConfirmationDialogue: true,
+            action,
+            verb: 'downgrading',
+            title,
+            fetchBreakages: () => this.apiService.dryrunUpdateApp(id, version).then( ({ breakages }) => breakages ),
           },
         },
         bottomBar: {
@@ -204,9 +211,10 @@ export class WizardBaker {
       { slide: {
           selector: 'complete',
           params: {
-            action, verb: 'beginning downgrade for', title, executeAction: () => this.apiService.installApp(id, version).then(app => {
-              this.appModel.update({ id: app.id, status: AppStatus.INSTALLING })
-            }),
+            action,
+            verb: 'beginning downgrade for',
+            title,
+            executeAction: () => this.apiService.updateApp(id, version),
           },
         },
         bottomBar: {
@@ -252,7 +260,10 @@ export class WizardBaker {
       { slide: {
           selector: 'complete',
           params: {
-            action, verb: 'uninstalling', title, executeAction: () => this.apiService.uninstallApp(id).then(() => this.appModel.delete(id)),
+            action,
+            verb: 'uninstalling',
+            title,
+            executeAction: () => this.apiService.uninstallApp(id),
           },
         },
         bottomBar: { finish: 'Dismiss', cancel: { whileLoading: { } } },

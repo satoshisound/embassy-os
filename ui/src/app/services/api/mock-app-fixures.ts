@@ -1,8 +1,6 @@
 import { AppStatus } from '../../models/app-model'
 import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppDependency, BaseApp, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo } from '../../models/app-types'
 import { modulateTime } from 'src/app/util/misc.util'
-import { S9Server, ServerStatus } from 'src/app/models/server-model'
-import { ApiAppInstalledFull } from './api-types'
 
 export function toAvailablePreview (f: AppAvailableFull): AppAvailablePreview {
   return {

@@ -1,6 +1,5 @@
 import { Component, Input } from '@angular/core'
 import { ModalController } from '@ionic/angular'
-import { ServerModel } from 'src/app/models/server-model'
 import { ApiService } from 'src/app/services/api/api.service'
 import { ConfigService } from 'src/app/services/config.service'
 

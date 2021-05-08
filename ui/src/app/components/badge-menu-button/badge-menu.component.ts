@@ -1,5 +1,5 @@
 import { Component } from '@angular/core'
-import { ServerModel } from '../../models/server-model'
+import { ServerModel } from '../../models/server-types'
 import { Observable } from 'rxjs'
 import { map } from 'rxjs/operators'
 import { SplitPaneTracker } from 'src/app/services/split-pane.service'

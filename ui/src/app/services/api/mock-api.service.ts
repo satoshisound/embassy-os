@@ -1,15 +1,14 @@
 import { Injectable } from '@angular/core'
-import { AppStatus } from '../../models/app-model'
 import { AppAvailablePreview, AppAvailableFull, AppInstalledPreview, AppInstalledFull, DependentBreakage, AppAvailableVersionSpecificInfo, AppAction } from '../../models/app-types'
-import { S9Notification, SSHFingerprint, ServerStatus, DiskInfo } from '../../models/server-model'
+import { DiskInfo } from '../../models/server-types'
 import { pauseFor } from '../../util/misc.util'
 import { ApiService, PatchPromise } from './api.service'
-import { ApiAppInstalledFull, ApiAppInstalledPreview, ReqRes, Unit } from './api-types'
+import { ReqRes, Unit } from './api-types'
 import { AppMetrics, AppMetricsVersioned, parseMetricsPermissive } from 'src/app/util/metrics.util'
 import { mockApiAppAvailableFull, mockApiAppAvailableVersionInfo, mockApiAppsInstalledFull, mockAppDependentBreakages, mockServer, toInstalledPreview } from './mock-app-fixures'
 import { Observable } from 'rxjs'
-import { PatchOp, Dump, Update, UpdateReal } from 'patch-db-client'
-import { DataModel } from 'src/app/models/patch-db/data-model'
+import { PatchOp, Dump, Update, Revision } from 'patch-db-client'
+import { DataModel, ServerNotification } from 'src/app/models/patch-db/data-model'
 import { ConfigService } from '../config.service'
 
 @Injectable()
@@ -84,7 +83,7 @@ export class MockApiService extends ApiService {
 
   // notifications
 
-  async getNotifications (page: number, perPage: number): Promise<S9Notification[]> {
+  async getNotifications (page: number, perPage: number): Promise<ServerNotification[]> {
     return mockGetNotifications()
   }
 
@@ -151,10 +150,10 @@ export class MockApiService extends ApiService {
 
   // patchDB
 
-  async getRevisions (startSequence: number, finishSequence?: number): Promise<UpdateReal<DataModel>[]> {
-    console.log('getting revisions: ', startSequence, finishSequence)
+  async getRevisions (since: number): Promise<Revision[] | Dump<DataModel>> {
+    console.log('getting revisions: ', since)
     const data = await this.getDump()
-    return [data]
+    return data
   }
 
   async getDump (): Promise<Dump<DataModel>> {
@@ -256,26 +255,19 @@ export class MockApiService extends ApiService {
     return mockGetAppMetrics().then(parseMetricsPermissive)
   }
 
-  async getAppLogs (appId: string, params: Omit<ReqRes.GetAppLogsReq, 'appId'> = { }): Promise<string[]> {
+  async getAppLogs (appId: string, before: string): Promise<ReqRes.GetAppLogsRes> {
     return mockGetAppLogs()
   }
 
-  async installAppRaw (appId: string, version: string, dryRun: boolean): PatchPromise<AppInstalledFull & { breakages: DependentBreakage[] }> {
+  async installAppRaw (appId: string, version: string): PatchPromise<Unit> {
     await pauseFor(1000)
     const app = mockApiAppsInstalledFull[appId]
-    const response = {
-      ...app,
-      hasFetchedFull: true,
-      hasUI: this.config.hasUI(app),
-      launchable: this.config.isLaunchable(app),
-      ...mockAppDependentBreakages,
-    }
     const revision: Update<DataModel> = {
       id: this.nextSequence(),
-      patch: [{ op: PatchOp.ADD, path: `/apps/${appId}`, value: response }],
+      patch: [{ op: PatchOp.ADD, path: `/apps/${appId}`, value: app }],
       expireId: null,
     }
-    return { response, revision }
+    return { response: { }, revision }
   }
 
   async uninstallAppRaw (appId: string, dryRun: boolean): PatchPromise<{ breakages: DependentBreakage[] }> {
@@ -567,7 +559,7 @@ const mockApiExternalDisks: DiskInfo[] = [
       {
         logicalname: 'sdba2',
         size: null,
-        isMounted: false,
+        'is-mounted': false,
         label: 'Matt Stuff',
       },
     ],
@@ -580,7 +572,7 @@ const mockApiExternalDisks: DiskInfo[] = [
       {
         logicalname: 'sdba2',
         size: '16GB',
-        isMounted: true,
+        'is-mounted': true,
         label: null,
       },
     ],
@@ -593,13 +585,13 @@ const mockApiExternalDisks: DiskInfo[] = [
       {
         logicalname: 'sdba1',
         size: '32GB',
-        isMounted: false,
+        'is-mounted': false,
         label: 'Partition 1',
       },
       {
         logicalname: 'sdba2',
         size: null,
-        isMounted: true,
+        'is-mounted': true,
         label: 'Partition 2',
       },
     ],

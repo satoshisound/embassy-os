@@ -35,10 +35,11 @@ export class HttpService {
   }
 
   async rpcRequest<T> (options: RPCOptions): Promise<T> {
+    const { url, version } = this.config.api
     options.params = options.params || { }
     const httpOpts = {
       method: Method.POST,
-      url: this.config.api.url,
+      url: `${url}${version}/rpc`,
       data: options,
     }
 
@@ -79,9 +80,10 @@ function handleSlashes (url: string): string {
 }
 
 function RpcError (e: RPCError['error']): void {
-  const { code, message, data } = e
+  const { code, message } = e
   this.status = code
   this.message = message
+  const data = e.data || { message: 'unknown RPC error', revision: null }
   this.data = { ...data, code }
 }
 
@@ -140,9 +142,9 @@ export interface RPCError extends RPCBase {
   error: {
     code: number,
     message: string
-    data: {
+    data?: {
       message: string
-      revision: Revision
+      revision: Revision | null
     }
   }
 }

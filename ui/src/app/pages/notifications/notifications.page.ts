@@ -1,8 +1,8 @@
 import { Component } from '@angular/core'
-import { ServerModel, S9Notification } from 'src/app/models/server-model'
 import { ApiService } from 'src/app/services/api/api.service'
 import { pauseFor } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
+import { ServerNotification } from 'src/app/models/patch-db/data-model'
 
 @Component({
   selector: 'notifications',
@@ -12,13 +12,12 @@ import { LoaderService } from 'src/app/services/loader.service'
 export class NotificationsPage {
   error = ''
   loading = true
-  notifications: S9Notification[] = []
+  notifications: ServerNotification[] = []
   page = 1
   needInfinite = false
   readonly perPage = 20
 
   constructor (
-    private readonly serverModel: ServerModel,
     private readonly apiService: ApiService,
     private readonly loader: LoaderService,
   ) { }
