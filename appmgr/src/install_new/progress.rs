@@ -46,7 +46,12 @@ impl InstallProgress {
     ) -> (Db, Result<(), Error>) {
         while !self.download_complete.load(Ordering::SeqCst) {
             if let Err(e) = model
-                .put(&mut db, &PackageDataEntry::Installing(self.clone()))
+                .put(
+                    &mut db,
+                    &PackageDataEntry::Installing {
+                        install_progress: self.clone(),
+                    },
+                )
                 .await
             {
                 return (db, Err(e.into()));
@@ -54,7 +59,12 @@ impl InstallProgress {
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
         if let Err(e) = model
-            .put(&mut db, &PackageDataEntry::Installing(self.clone()))
+            .put(
+                &mut db,
+                &PackageDataEntry::Installing {
+                    install_progress: self.clone(),
+                },
+            )
             .await
         {
             (db, Err(e.into()))
@@ -90,7 +100,12 @@ impl InstallProgress {
     ) -> (Db, Result<(), Error>) {
         while !complete.load(Ordering::SeqCst) {
             if let Err(e) = model
-                .put(&mut db, &PackageDataEntry::Installing(self.clone()))
+                .put(
+                    &mut db,
+                    &PackageDataEntry::Installing {
+                        install_progress: self.clone(),
+                    },
+                )
                 .await
             {
                 return (db, Err(e.into()));

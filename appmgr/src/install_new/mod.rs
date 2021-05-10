@@ -25,7 +25,7 @@ use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
 use self::progress::{InstallProgress, InstallProgressTracker};
 use crate::context::RpcContext;
-use crate::db::{PackageDataEntry, VersionedPackageData};
+use crate::db::PackageDataEntry;
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::s9pk::reader::S9pkReader;
 use crate::util::{AsyncFileExt, Version};
@@ -48,25 +48,9 @@ pub async fn download_install_s9pk(
     tokio::fs::create_dir_all(&pkg_cache_dir).await?;
     let pkg_cache = AsRef::<Path>::as_ref(pkg_id).with_extension("s9pk");
 
-    let ver_pkg_data = crate::db::DatabaseModel::new()
+    let pkg_data_entry = crate::db::DatabaseModel::new()
         .package_data()
         .idx_model(pkg_id);
-    if !ver_pkg_data.exists(&mut db).await? {
-        ver_pkg_data
-            .put(&mut db, &VersionedPackageData::default())
-            .await?;
-    }
-    let pkg_data_entry = ver_pkg_data
-        .check(&mut db)
-        .await?
-        .ok_or_else(|| {
-            Error::new(
-                anyhow!("VersionedPackageData does not exist"),
-                crate::ErrorKind::Database,
-            )
-        })?
-        .versions()
-        .idx_model(&version);
 
     let res = (|| async {
         let progress = InstallProgress::new(s9pk.content_length());
@@ -182,15 +166,19 @@ pub async fn download_install_s9pk(
     .await;
 
     if let Err(e) = res {
-        pkg_data_entry
-            .put(&mut db, &PackageDataEntry::InstallFailed)
+        let mut broken = crate::db::DatabaseModel::new()
+            .broken_packages()
+            .get_mut(&mut db)
             .await?;
+        broken.push(pkg_id.clone());
+        broken.save(&mut db).await?;
         Err(e)
     } else {
         Ok(())
     }
 }
 
+// TODO: Generic over updating
 pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
     ctx: &RpcContext,
     db: &mut PatchDbHandle,
@@ -201,18 +189,9 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
 ) -> Result<(), Error> {
     rdr.validate().await?;
     rdr.validated();
-    let pkg_entry = crate::db::DatabaseModel::new()
+    let option_model = crate::db::DatabaseModel::new()
         .package_data()
-        .idx_model(pkg_id)
-        .check(db)
-        .await?
-        .ok_or_else(|| {
-            Error::new(
-                anyhow!("VersionedPackageData does not exist"),
-                crate::ErrorKind::Database,
-            )
-        })?;
-    let option_model = pkg_entry.clone().versions().idx_model(&version);
+        .idx_model(pkg_id);
     let model = option_model.clone().check(db).await?.ok_or_else(|| {
         Error::new(
             anyhow!("PackageDataEntry does not exist"),
@@ -346,7 +325,12 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
 
     let mut tx = db.begin().await?;
     model
-        .put(&mut tx, &PackageDataEntry::Installing(progress.clone()))
+        .put(
+            &mut tx,
+            &PackageDataEntry::Installing {
+                install_progress: progress.clone(),
+            },
+        )
         .await?;
 
     let mut ip_pool = crate::db::DatabaseModel::new()
@@ -377,10 +361,11 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
 
     log::info!("Install {}@{}: Complete", pkg_id, version.as_str());
 
-    pkg_entry
-        .selected()
-        .put(&mut tx, &Some(manifest.version.clone()))
+    model
+        .put(&mut tx, &PackageDataEntry::Installed { installed: todo!() })
         .await?;
+
+    tx.commit(None).await?;
 
     Ok(())
 }

@@ -2,15 +2,20 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use emver::{Version, VersionRange};
+use hashlink::LinkedHashMap;
 use linear_map::LinearMap;
 use rand::SeedableRng;
+use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, ConfigRuleEntryWithSuggestions, ConfigSpec};
+use crate::id::InterfaceId;
 use crate::manifest::ManifestLatest;
+use crate::status::health_check::HealthCheckResult;
 use crate::{Error, ResultExt as _};
 
-#[derive(Clone, Debug, thiserror::Error, serde::Serialize)]
+#[derive(Clone, Debug, thiserror::Error, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(tag = "type")]
 pub enum DependencyError {
     NotInstalled, // "not-installed"
     NotRunning,   // "not-running"
@@ -18,9 +23,15 @@ pub enum DependencyError {
         expected: VersionRange,
         received: Version,
     }, // { "incorrect-version": { "expected": "0.1.0", "received": "^0.2.0" } }
-    ConfigUnsatisfied(Vec<String>), // { "config-unsatisfied": ["Bitcoin Core must have pruning set to manual."] }
-    PointerUpdateError(String), // { "pointer-update-error": "Bitcoin Core RPC Port must not be 18332" }
-    Other(String),              // { "other": "Well fuck." }
+    ConfigUnsatisfied {
+        errors: Vec<String>,
+    }, // { "config-unsatisfied": ["Bitcoin Core must have pruning set to manual."] }
+    HealthCheckFailed {
+        check: HealthCheckResult,
+    },
+    InterfaceHealthChecksFailed {
+        failures: LinkedHashMap<InterfaceId, HealthCheckResult>,
+    },
 }
 impl std::fmt::Display for DependencyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -33,11 +44,25 @@ impl std::fmt::Display for DependencyError {
                 "Incorrect Version: Expected {}, Received {}",
                 expected, received
             ),
-            ConfigUnsatisfied(rules) => {
-                write!(f, "Configuration Rule(s) Violated: {}", rules.join(", "))
+            ConfigUnsatisfied { errors } => {
+                write!(f, "Configuration Rule(s) Violated: {}", errors.join(", "))
             }
-            PointerUpdateError(e) => write!(f, "Pointer Update Caused {}", e),
-            Other(e) => write!(f, "System Error: {}", e),
+            HealthCheckFailed { check } => {
+                write!(f, "Health Check @ {} {}", check.time, check.result)
+            }
+            InterfaceHealthChecksFailed { failures } => {
+                write!(f, "Interface(s) Failed Health Check: ")?;
+                let mut comma = false;
+                for (iface, res) in failures {
+                    if !comma {
+                        comma = true;
+                    } else {
+                        write!(f, ", ");
+                    }
+                    write!(f, "{} @ {} {}", iface, res.time, res.result)?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -112,7 +137,7 @@ impl DepInfo {
             }
         }
         if !errors.is_empty() {
-            return Ok(Err(DependencyError::ConfigUnsatisfied(errors)));
+            return Ok(Err(DependencyError::ConfigUnsatisfied { errors }));
         }
         if crate::apps::status(dependency_id, false).await?.status
             != crate::apps::DockerStatus::Running

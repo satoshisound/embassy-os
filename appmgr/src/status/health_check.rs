@@ -31,18 +31,27 @@ impl HealthCheck {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HealthCheckResult {
     pub time: DateTime<Utc>,
     #[serde(flatten)]
     pub result: HealthCheckResultVariant,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "result")]
 pub enum HealthCheckResultVariant {
     Disabled,
     Success,
     Failure { error: String },
+}
+impl std::fmt::Display for HealthCheckResultVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HealthCheckResultVariant::Disabled => write!(f, "Disabled"),
+            HealthCheckResultVariant::Success => write!(f, "Succeeded"),
+            HealthCheckResultVariant::Failure { error } => write!(f, "Failed ({})", error),
+        }
+    }
 }

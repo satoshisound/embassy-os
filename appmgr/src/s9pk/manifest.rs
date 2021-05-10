@@ -14,6 +14,7 @@ use crate::dependencies::Dependencies;
 use crate::id::{Id, InterfaceId, SYSTEM_ID};
 use crate::migration::Migrations;
 use crate::status::health_check::{HealthCheck, HealthCheckResult};
+use crate::tor::HiddenServiceVersion;
 use crate::util::Version;
 use crate::volume::Volumes;
 use crate::Error;
@@ -86,8 +87,10 @@ pub struct Manifest {
     pub license: String, // type of license
     pub wrapper_repo: Url,
     pub upstream_repo: Url,
-    pub support_page: Option<Url>,
-    pub marketing_page: Option<Url>,
+    pub support_site: Option<Url>,
+    pub marketing_site: Option<Url>,
+    #[serde(default)]
+    pub alerts: Alerts,
     #[model]
     pub main: ActionImplementation,
     pub health_check: HealthCheck,
@@ -95,8 +98,6 @@ pub struct Manifest {
     pub config: Option<ConfigActions>,
     #[model]
     pub volumes: Volumes,
-    #[serde(default)]
-    pub alerts: Alerts,
     // #[serde(default = "current_version")]
     pub min_os_version: Version,
     // #[serde(default)]
@@ -116,7 +117,8 @@ pub struct Manifest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum Interfaces {} // TODO
+#[serde(rename_all = "kebab-case")]
+pub struct Interfaces(LinkedHashMap<InterfaceId, Interface>); // TODO
 impl Interfaces {
     pub async fn install(&self, ip: &Ipv4Addr) -> Result<(), Error> {
         todo!()
@@ -130,6 +132,31 @@ impl Interfaces {
         todo!()
     }
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Interface {
+    tor_config: Option<TorConfig>,
+    lan_config: Option<LinkedHashMap<u16, LanPortConfig>>,
+    ui: bool,
+    protocols: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct TorConfig {
+    #[serde(default)]
+    hidden_service_version: HiddenServiceVersion,
+    port_mapping: LinkedHashMap<u16, u16>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct LanPortConfig {
+    ssl: bool,
+    mapping: u16,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Actions {} // TODO
 #[derive(Debug, Deserialize, Serialize)]
@@ -193,4 +220,5 @@ pub struct Alerts {
     pub uninstall: Option<String>,
     pub restore: Option<String>,
     pub start: Option<String>,
+    pub stop: Option<String>,
 }

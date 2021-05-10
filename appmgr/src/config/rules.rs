@@ -244,14 +244,15 @@ impl serde::ser::Serialize for SuggestionVariant {
         S: serde::ser::Serializer,
     {
         #[derive(serde::Serialize)]
+        #[serde(rename_all = "kebab-case")]
         enum _SuggestionVariant<'a> {
-            SET {
+            Set {
                 var: &'a str,
                 #[serde(flatten)]
                 to: &'a SetVariant,
             },
-            DELETE(&'a str),
-            PUSH {
+            Delete(&'a str),
+            Push {
                 to: &'a str,
                 value: &'a Value,
             },
@@ -259,14 +260,14 @@ impl serde::ser::Serialize for SuggestionVariant {
         match self {
             SuggestionVariant::Set {
                 ref var, ref to, ..
-            } => serde::ser::Serialize::serialize(&_SuggestionVariant::SET { var, to }, serializer),
+            } => serde::ser::Serialize::serialize(&_SuggestionVariant::Set { var, to }, serializer),
             SuggestionVariant::Delete { ref src, .. } => {
-                serde::ser::Serialize::serialize(&_SuggestionVariant::DELETE(src), serializer)
+                serde::ser::Serialize::serialize(&_SuggestionVariant::Delete(src), serializer)
             }
             SuggestionVariant::Push {
                 ref to, ref value, ..
             } => serde::ser::Serialize::serialize(
-                &_SuggestionVariant::PUSH { to, value },
+                &_SuggestionVariant::Push { to, value },
                 serializer,
             ),
         }

@@ -19,8 +19,8 @@ impl BackupActions {
         pkg_version: &Version,
         volumes: &Volumes,
     ) -> Result<(), Error> {
-        let mut volumes = volumes.to_read_only();
-        volumes.insert(VolumeId::Backup, Volume::Backup { read_only: false });
+        let mut volumes = volumes.to_readonly();
+        volumes.insert(VolumeId::Backup, Volume::Backup { readonly: false });
         self.create
             .execute(pkg_id, pkg_version, &volumes, None::<()>)
             .await?
@@ -36,7 +36,7 @@ impl BackupActions {
         volumes: &Volumes,
     ) -> Result<(), Error> {
         let mut volumes = volumes.clone();
-        volumes.insert(VolumeId::Backup, Volume::Backup { read_only: true });
+        volumes.insert(VolumeId::Backup, Volume::Backup { readonly: true });
         self.restore
             .execute(pkg_id, pkg_version, &volumes, None::<()>)
             .await?

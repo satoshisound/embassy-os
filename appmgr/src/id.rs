@@ -169,6 +169,11 @@ impl<S: AsRef<str>> std::fmt::Display for InterfaceId<S> {
         write!(f, "{}", &self.0)
     }
 }
+impl<S: AsRef<str>> AsRef<str> for InterfaceId<S> {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
 impl<'de, S> Deserialize<'de> for InterfaceId<S>
 where
     S: AsRef<str>,

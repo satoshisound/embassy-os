@@ -73,13 +73,13 @@ impl Volumes {
             .get(volume_id)
             .map(|volume| volume.path_for(pkg_id, volume_id))
     }
-    pub fn to_read_only(&self) -> Self {
+    pub fn to_readonly(&self) -> Self {
         Volumes(
             self.0
                 .iter()
                 .map(|(id, volume)| {
                     let mut volume = volume.clone();
-                    volume.set_read_only();
+                    volume.set_readonly();
                     (id.clone(), volume)
                 })
                 .collect(),
@@ -115,25 +115,22 @@ pub enum Volume {
     #[serde(rename_all = "kebab-case")]
     Data {
         #[serde(skip)]
-        read_only: bool,
+        readonly: bool,
     },
     #[serde(rename_all = "kebab-case")]
     Pointer {
         package_id: PackageId,
         volume_id: VolumeId,
         path: PathBuf,
-        read_only: bool,
+        readonly: bool,
     },
-    Certificate {
-        interface_id: InterfaceId,
-    },
-    HiddenService {
-        interface_id: InterfaceId,
-    },
+    #[serde(rename_all = "kebab-case")]
+    Certificate { interface_id: InterfaceId },
+    #[serde(rename_all = "kebab-case")]
+    HiddenService { interface_id: InterfaceId },
+    #[serde(rename_all = "kebab-case")]
     #[serde(skip)]
-    Backup {
-        read_only: bool,
-    },
+    Backup { readonly: bool },
 }
 impl Volume {
     pub fn path_for(&self, pkg_id: &PackageId, volume_id: &VolumeId) -> PathBuf {
@@ -163,27 +160,27 @@ impl Volume {
             Volume::Backup { .. } => Path::new(BACKUP_DIR).join(pkg_id),
         }
     }
-    pub fn set_read_only(&mut self) {
+    pub fn set_readonly(&mut self) {
         match self {
-            Volume::Data { read_only } => {
-                *read_only = true;
+            Volume::Data { readonly } => {
+                *readonly = true;
             }
-            Volume::Pointer { read_only, .. } => {
-                *read_only = true;
+            Volume::Pointer { readonly, .. } => {
+                *readonly = true;
             }
-            Volume::Backup { read_only } => {
-                *read_only = true;
+            Volume::Backup { readonly } => {
+                *readonly = true;
             }
             _ => (),
         }
     }
-    pub fn read_only(&self) -> bool {
+    pub fn readonly(&self) -> bool {
         match self {
-            Volume::Data { read_only } => *read_only,
-            Volume::Pointer { read_only, .. } => *read_only,
+            Volume::Data { readonly } => *readonly,
+            Volume::Pointer { readonly, .. } => *readonly,
             Volume::Certificate { .. } => true,
             Volume::HiddenService { .. } => true,
-            Volume::Backup { read_only } => *read_only,
+            Volume::Backup { readonly } => *readonly,
         }
     }
 }

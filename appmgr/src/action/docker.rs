@@ -69,6 +69,7 @@ impl DockerIOFormat {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct DockerAction {
     pub image: ImageId,
     #[serde(default)]

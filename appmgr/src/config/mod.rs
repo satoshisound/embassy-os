@@ -238,23 +238,9 @@ pub async fn configure(
                             if !dry_run {
                                 crate::apps::set_configured(&dependent, false).await?;
                             }
-                            handle_broken_dependent(
-                                name,
-                                dependent,
-                                dry_run,
-                                res,
-                                DependencyError::PointerUpdateError(format!("{}", e)),
-                            )
-                            .await?;
+                            handle_broken_dependent(name, dependent, dry_run, res, todo!()).await?;
                         } else {
-                            handle_broken_dependent(
-                                name,
-                                dependent,
-                                dry_run,
-                                res,
-                                DependencyError::Other(format!("{}", e)),
-                            )
-                            .await?;
+                            return Err(e);
                         }
                     }
                 }

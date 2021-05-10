@@ -6,13 +6,13 @@ use bollard::models::{ContainerStateStatusEnum, ContainerSummaryInner};
 use bollard::Docker;
 use futures::StreamExt;
 use hashlink::LinkedHashMap;
-use patch_db::DbHandle;
+use patch_db::{DbHandle, HasModel, Map, MapModel};
 use serde::{Deserialize, Serialize};
 
-use self::health_check::{HealthCheck, HealthCheckResult};
+use self::health_check::HealthCheckResult;
 use crate::action::docker::DockerAction;
 use crate::context::RpcContext;
-use crate::db::PackageDataEntryModelKnown;
+use crate::dependencies::DependencyError;
 use crate::id::InterfaceId;
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::util::Invoke;
@@ -29,16 +29,17 @@ pub async fn synchronize_all(ctx: &RpcContext) -> Result<(), Error> {
         .await?;
     let mut container_names = Vec::with_capacity(pkg_ids.len());
     for id in pkg_ids.clone().into_iter() {
-        if let Some(selected) = &*crate::db::DatabaseModel::new()
+        if let Some(version) = &*crate::db::DatabaseModel::new()
             .package_data()
             .idx_model(&id)
             .expect(&mut db)
             .await?
-            .selected()
+            .installed()
+            .map(|i| i.manifest().version())
             .get(&mut db)
             .await?
         {
-            container_names.push(DockerAction::container_name(id.as_ref(), selected));
+            container_names.push(DockerAction::container_name(id.as_ref(), version));
         } else {
             pkg_ids.remove(&id);
         }
@@ -80,28 +81,14 @@ pub async fn synchronize_all(ctx: &RpcContext) -> Result<(), Error> {
                         crate::ErrorKind::Database,
                     )
                 })?;
-            let (status, manifest) = match pkg_data
-                .selected_version(db)
-                .await?
-                .ok_or_else(|| {
-                    Error::new(
-                        anyhow!("Selected Package Version is not installed"),
-                        crate::ErrorKind::Database,
-                    )
-                })?
-                .check(db)
-                .await?
+            let (status, manifest) = if let Some(installed) = pkg_data.installed().check(db).await?
             {
-                PackageDataEntryModelKnown::Installed(data) => (
-                    data.clone().status().get(db).await?,
-                    data.manifest().get(db).await?,
-                ),
-                _ => {
-                    return Err(Error::new(
-                        anyhow!("Selected Package Version is not installed"),
-                        crate::ErrorKind::Database,
-                    ))
-                }
+                (
+                    installed.clone().status().get(db).await?,
+                    installed.manifest().get(db).await?,
+                )
+            } else {
+                return Ok(false);
             };
 
             status.main.synchronize(docker, &*manifest, summary).await
@@ -133,7 +120,7 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
         .package_data()
         .keys(&mut db)
         .await?;
-    async fn status<Db: DbHandle>(id: PackageId, mut db: Db) -> Result<(), Error> {
+    async fn main_status<Db: DbHandle>(id: PackageId, mut db: Db) -> Result<(), Error> {
         let pkg_data = crate::db::DatabaseModel::new()
             .package_data()
             .idx_model(&id)
@@ -145,39 +132,26 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
                     crate::ErrorKind::Database,
                 )
             })?;
-        let (mut status, manifest) = match pkg_data
-            .selected_version(&mut db)
-            .await?
-            .ok_or_else(|| {
-                Error::new(
-                    anyhow!("Selected Package Version is not installed"),
-                    crate::ErrorKind::Database,
+        let (mut status, manifest) =
+            if let Some(installed) = pkg_data.installed().check(&mut db).await? {
+                (
+                    installed.clone().status().get_mut(&mut db).await?,
+                    installed.manifest().get(&mut db).await?,
                 )
-            })?
-            .check(&mut db)
-            .await?
-        {
-            PackageDataEntryModelKnown::Installed(data) => (
-                data.clone().status().get_mut(&mut db).await?,
-                data.manifest().get(&mut db).await?,
-            ),
-            _ => {
-                return Err(Error::new(
-                    anyhow!("Selected Package Version is not installed"),
-                    crate::ErrorKind::Database,
-                ))
-            }
-        };
+            } else {
+                return Ok(());
+            };
 
-        status.check(&*manifest).await?;
+        status.main.check(&*manifest).await?;
 
         status.save(&mut db).await?;
 
         Ok(())
     }
+    drop(db);
     futures::stream::iter(pkg_ids)
         .for_each_concurrent(None, |id| async move {
-            if let Err(e) = tokio::spawn(status(id.clone(), ctx.db.handle()))
+            if let Err(e) = tokio::spawn(main_status(id.clone(), ctx.db.handle()))
                 .await
                 .unwrap()
             {
@@ -187,6 +161,8 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
         })
         .await;
 
+    // TODO: dependencies
+
     Ok(())
 }
 
@@ -194,13 +170,7 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
 pub struct Status {
     pub configured: bool,
     pub main: MainStatus,
-    pub dependencies: DependencyStatuses,
-}
-impl Status {
-    pub async fn check(&mut self, manifest: &Manifest) -> Result<(), Error> {
-        tokio::try_join!(self.main.check(manifest), self.dependencies.check())?;
-        Ok(())
-    }
+    pub dependencies: DependencyErrors,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -309,14 +279,14 @@ impl MainStatus {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct DependencyStatuses(LinkedHashMap<PackageId, DependencyStatus>);
-impl DependencyStatuses {
-    pub async fn check(&mut self) -> Result<(), Error> {
-        todo!()
+pub struct DependencyErrors(LinkedHashMap<PackageId, DependencyError>);
+impl Map for DependencyErrors {
+    type Key = PackageId;
+    type Value = DependencyError;
+    fn get(&self, key: &Self::Key) -> Option<&Self::Value> {
+        self.0.get(key)
     }
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct DependencyStatus {
-    required: bool,
+impl HasModel for DependencyErrors {
+    type Model = MapModel<Self>;
 }

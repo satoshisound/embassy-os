@@ -703,6 +703,7 @@ impl IpPool {
 #[derive(Debug, Serialize)]
 pub enum ValuePrimative {
     Null,
+    Boolean(bool), // TODO
     String(String),
     Number(serde_json::Number),
 }
