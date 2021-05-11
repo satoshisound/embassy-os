@@ -197,21 +197,26 @@ export interface Status {
   dependencies: { [id: string]: DependencyError }
 }
 
-export type MainStatus = MainStatusStopped | MainStatusRunning | MainStatusBackingUp | MainStatusRestoring
+export type MainStatus = MainStatusStopped | MainStatusStopping | MainStatusRunning | MainStatusBackingUp | MainStatusRestoring
 
 export interface MainStatusStopped {
   status: PackageMainStatus.Stopped
 }
 
+export interface MainStatusStopping {
+  status: PackageMainStatus.Stopping
+}
+
 export interface MainStatusRunning {
   status: PackageMainStatus.Running
+  started: string // UTC date string
   main: HealthCheckResult
   interfaces: { [id: string]: HealthCheckResult }
 }
 
 export interface MainStatusBackingUp {
   status: PackageMainStatus.BackingUp
-  running: boolean
+  started: string | null // UTC date string
 }
 
 export interface MainStatusRestoring {
@@ -227,7 +232,12 @@ export enum PackageMainStatus {
   Restoring = 'restoring',
 }
 
-export type HealthCheckResult = HealthCheckResultDisabled | HealthCheckResultSuccess | HealthCheckResultFailure
+export type HealthCheckResult = HealthCheckResultWarmingUp | HealthCheckResultDisabled | HealthCheckResultSuccess | HealthCheckResultFailure
+
+export interface HealthCheckResultWarmingUp {
+  time: string // UTC date string
+  result: 'warming-up'
+}
 
 export interface HealthCheckResultDisabled {
   time: string // UTC date string
