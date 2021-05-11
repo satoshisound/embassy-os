@@ -158,7 +158,7 @@ export class AppComponent {
 
   private async logout () {
     this.loader.of(LoadingSpinner('Logging out...'))
-    .displayDuringP(this.api.logout())
+    .displayDuringP(this.api.logout({ }))
     .then(() => this.authService.setAuthStateUnverified())
     .catch(e => this.setError(e))
   }

@@ -39,7 +39,7 @@ export class HttpService {
     options.params = options.params || { }
     const httpOpts = {
       method: Method.POST,
-      url: `${url}${version}/rpc`,
+      url: `${url}${version}`,
       data: options,
     }
 
@@ -83,6 +83,9 @@ function RpcError (e: RPCError['error']): void {
   const { code, message } = e
   this.status = code
   this.message = message
+  if (typeof e.data === 'string') {
+    throw new Error(`unexpected response for RPC Error data: ${e.data}`)
+  }
   const data = e.data || { message: 'unknown RPC error', revision: null }
   this.data = { ...data, code }
 }
@@ -145,7 +148,7 @@ export interface RPCError extends RPCBase {
     data?: {
       message: string
       revision: Revision | null
-    }
+    } | string
   }
 }
 

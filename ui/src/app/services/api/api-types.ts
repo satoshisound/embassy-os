@@ -1,90 +1,190 @@
-import { Operation } from 'patch-db-client'
-import { AppAvailablePreview, AppAvailableVersionSpecificInfo } from 'src/app/models/app-types'
-import { AppPropertiesVersioned } from 'src/app/util/properties.util'
+import { Dump, Operation, Revision } from 'patch-db-client'
+import { PackagePropertiesVersioned } from 'src/app/util/properties.util'
+import { ConfigSpec } from 'src/app/app-config/config-types'
+import { DataModel, DependencyError } from 'src/app/models/patch-db/data-model'
 
-export type Unit = { never?: never; } // hack for the unit typ
+export module RR {
 
-export module ReqRes {
-  // ** REST **
+  // DB
 
-  export type LoginReq = { password: string }
-  export type LoginRes = Unit
+  export type GetRevisionsRes = Revision[] | Dump<DataModel>
 
-  export type LogoutReq = { }
-  export type LogoutRes = Unit
+  export type GetDumpRes = Dump<DataModel>
+
+  export type SetDBValueReq = { pointer: string, value: any } // db.put.ui
+  export type SetDBValueRes = WithRevision<null>
+
+  // auth
+
+  export type LoginReq = { password: string } // auth.login - unauthed
+  export type LoginRes = null
+
+  export type LogoutReq = { } // auth.logout
+  export type LogoutRes = null
 
   // server
 
-  export type GetVersionReq = { }
-  export type GetVersionRes = { version: string }
+  export type GetServerLogsReq = { before?: string } // server.logs
+  export type GetServerLogsRes = Log[]
 
-  export type GetServerLogsReq = { }
-  export type GetServerLogsRes = string[]
-
-  export type GetServerMetricsReq = { }
+  export type GetServerMetricsReq = { } // server.metrics
   export type GetServerMetricsRes = ServerMetrics
 
-  export type RefreshLanReq = { }
-  export type RefreshLanRes = Unit
+  export type UpdateServerReq = { } // server.update
+  export type UpdateServerRes = WithRevision<null>
 
-  export type UpdateAgentReq = { version: string }
-  export type UpdateAgentRes = Unit
+  export type RestartServerReq = { } // server.restart
+  export type RestartServerRes = null
 
-  export type UpdateServerConfigReq = { value: string }
-  export type UpdateServerConfigRes = Unit
+  export type ShutdownServerReq = { } // server.shutdown
+  export type ShutdownServerRes = null
 
-  export type RestartServerReq = { }
-  export type RestartServerRes = Unit
+  // network
 
-  export type ShutdownServerReq = { }
-  export type ShutdownServerRes = Unit
+  export type RefreshLanReq = { } // network.lan.refresh
+  export type RefreshLanRes = null
 
-  // ** RPC **
+  // notification
 
-  export type GetAppPropertiesReq = { id: string }
-  export type GetAppPropertiesRes = AppPropertiesVersioned<number>
+  export type GetNotificationsReq = { page: string, perPage: string } // notification.list
+  export type GetNotificationsRes = ServerNotification[]
 
-  export type GetAppLogsReq = { id: string, before?: string }
-  export type GetAppLogsRes = Log[]
+  export type DeleteNotificationReq = { id: string } // notification.delete
+  export type DeleteNotificationRes = null
 
-  export type InstallAppReq = { id: string, version: string }
-  export type InstallAppRes = Unit
+  // wifi
 
-  export type DryrunUpdateAppReq = { id: string, version: string }
-  export type DryrunUpdateAppRes = { patch: Operation[], breakages: string[] }
+  export type GetWifiReq = { } // wifi.get
+  export type GetWifiRes = WiFiInfo
 
-  export type PostUpdateAppReq = { id: string, version: string }
-  export type PostUpdateAppRes = Unit
+  export type AddWifiReq = { // wifi.add
+    ssid: string
+    password: string
+    country: string
+    priority: number
+    connect: boolean
+  }
+  export type AddWifiRes = null
 
-  export type AppActionRequest = { id: string }
-  export type AppActionResponse = string
+  export type ConnectWifiReq = { ssid: string } // wifi.connect
+  export type ConnectWifiRes = WithRevision<null>
 
-  export type GetVersionLatestRes = { versionLatest: string, releaseNotes: string }
-  export type GetAppAvailableRes = ApiAppAvailableFull
-  export type GetAppAvailableVersionInfoRes = AppAvailableVersionSpecificInfo
-  export type GetAppsAvailableRes = AppAvailablePreview[]
-  export type GetExternalDisksRes = DiskInfo[]
-  export type GetAppInstalledRes = ApiAppInstalledFull
-  export type GetAppConfigRes = ApiAppConfig
-  export type GetNotificationsReq = { page: string, perPage: string }
-  export type GetNotificationsRes = S9Notification[]
-  export type GetAppsInstalledRes = ApiAppInstalledPreview[]
+  export type DeleteWifiReq = { ssid: string } // wifi.delete
+  export type DeleteWifiRes = WithRevision<null>
 
-  export type PostAppBackupCreateReq = { appId: string, logicalname: string, password: string }
-  export type PostAppBackupCreateRes = Unit
-  export type PostAppBackupRestoreReq = { appId: string, logicalname: string, password: string }
-  export type PostAppBackupRestoreRes = Unit
-  export type PostAppBackupStopRes = Unit
-  export type PatchAppConfigReq = { appId: string, config: object, dryRun: boolean }
-  export type PostAddWifiReq = { ssid: string, password: string, country: string, skipConnect: boolean }
-  export type PostConnectWifiReq = { country: string }
-  export type PostAddSSHKeyReq = { sshKey: string }
-  export type PostAddSSHKeyRes = SSHFingerprint
+  // ssh
+
+  export type GetSSHKeysReq = { } // ssh.get
+  export type GetSSHKeysRes = SSHKeys
+
+  export type AddSSHKeyReq = { key: string } // ssh.add
+  export type AddSSHKeyRes = SSHKeys
+
+  export type DeleteSSHKeyReq = { hash: string } // ssh.delete
+  export type DeleteSSHKeyRes = null
+
+  // backup
+
+  export type CreateBackupReq = { logicalname: string, password: string } // backup.create
+  export type CreateBackupRes = WithRevision<null>
+
+  export type RestoreBackupReq = { logicalname: string, password: string } // backup.restore - unauthed
+  export type RestoreBackupRes = null
+
+  // disk
+
+  export type GetDisksReq = { } // disk.list
+  export type GetDisksRes = DiskInfo
+
+  export type EjectDisksReq = { logicalname: string } // disk.eject
+  export type EjectDisksRes = null
+
+  // package
+
+  export type GetPackageInstructionsReq = { id: string } // package.instructions
+  export type GetPackageInstructionsRes = string
+
+  export type GetPackagePropertiesReq = { id: string } // package.properties
+  export type GetPackagePropertiesRes = PackagePropertiesVersioned<number>
+
+  export type GetPackageLogsReq = { id: string, before?: string } // package.logs
+  export type GetPackageLogsRes = Log[]
+
+  export type InstallPackageReq = { id: string, version: string } // package.install
+  export type InstallPackageRes = WithRevision<null>
+
+  export type DryUpdatePackageReq = UpdatePackageReq // package.update.dry
+  export type DryUpdatePackageRes = BreakageRes
+
+  export type UpdatePackageReq = { id: string, version: string } // package.update
+  export type UpdatePackageRes = WithRevision<null>
+
+  export type GetPackageConfigReq = { id: string } // package.config.get
+  export type GetPackageConfigRes = { spec: ConfigSpec, config: object }
+
+  export type DrySetPackageConfigReq = SetPackageConfigReq // package.config.set.dry
+  export type DrySetPackageConfigRes = BreakageRes
+
+  export type SetPackageConfigReq = { id: string, config: object } // package.config.set
+  export type SetPackageConfigRes = WithRevision<null>
+
+  export type RestorePackageReq = { id: string, logicalname: string, password: string } // package.backup.restore
+  export type RestorePackageRes = WithRevision<null>
+
+  export type ExecutePackageActionReq = { id: string, input?: object } // package.action
+  export type ExecutePackageActionRes = ActionResponse
+
+  export type StartPackageReq = { id: string } // package.start
+  export type StartPackageRes = WithRevision<null>
+
+  export type DryStopPackageReq = StopPackageReq // package.stop.dry
+  export type DryStopPackageRes = BreakageRes
+
+  export type StopPackageReq = { id: string } // package.stop
+  export type StopPackageRes = WithRevision<null>
+
+  export type DryRemovePackageReq = RemovePackageReq // package.remove.dry
+  export type DryRemovePackageRes = BreakageRes
+
+  export type RemovePackageReq = { id: string } // package.remove
+  export type RemovePackageRes = WithRevision<null>
+
+  export type DryConfigureDependencyReq = { id: string } // package.dependency.configure.dry
+  export type DryConfigureDependencyRes = object
+
+
+  // marketplace @TODO
+
+  // export type GetVersionLatestReq = { }
+  // export type GetVersionLatestRes = { versionLatest: string, releaseNotes: string }
+
+  // export type GetAppAvailableReq = { }
+  // export type GetAppAvailableRes = ApiAppAvailableFull
+
+  // export type GetAppAvailableVersionInfoRes = AppAvailableVersionSpecificInfo
+  // export type GetAppsAvailableRes = AppAvailablePreview[]
+}
+
+export type WithRevision<T> = { response: T, revision?: Revision }
+
+export interface BreakageRes {
+  patch: Operation[],
+  breakages: { [id: string]: DependencyError }
 }
 
 export interface Log {
   timestamp: string
   log: string
+}
+
+export interface ActionResponse {
+  ok?: {
+    message: string
+    value: string | number | boolean | null
+    copyable: boolean
+    qr: boolean
+  }
+  err?: string
 }
 
 export interface ServerMetrics {
@@ -94,4 +194,46 @@ export interface ServerMetrics {
       unit?: string
     }
   }
+}
+
+export interface DiskInfo {
+  [logicalname: string]: {
+    size: string
+    description: string | null
+    partitions: PartitionInfo
+  }
+}
+
+export interface PartitionInfo {
+  [logicalname: string]: {
+    'is-mounted': boolean // We do not allow backups to mounted partitions
+    size: string | null
+    label: string | null
+  }
+}
+
+export interface ServerSpecs {
+  [key: string]: string | number
+}
+
+export interface WiFiInfo {
+  ssids: string[]
+  current: string | null
+}
+
+export interface SSHKeys {
+  [hash: string]: {
+    alg: string
+    hostname: string
+    pubkey: string
+  }
+}
+
+export interface ServerNotification {
+  id: string
+  'package-id': string | null
+  createdAt: string
+  code: string
+  title: string
+  message: string
 }

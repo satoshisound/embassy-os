@@ -133,28 +133,6 @@ export class AppInstalledShowPage {
     await modal.present()
   }
 
-  async presentAlertStopBackup (): Promise<void> {
-    const alert = await this.alertCtrl.create({
-      backdropDismiss: false,
-      header: 'Warning',
-      message: `${this.app.title} is not finished backing up. Are you sure you want stop the process?`,
-      buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel',
-        },
-        {
-          text: 'Stop',
-          cssClass: 'alert-danger',
-          handler: () => {
-            this.stopBackup()
-          },
-        },
-      ],
-    })
-    await alert.present()
-  }
-
   async uninstall () {
     const data = await wizardModal(
       this.modalCtrl,
@@ -189,15 +167,6 @@ export class AppInstalledShowPage {
     if (!el) return
     let y = el.offsetTop
     return this.content.scrollToPoint(0, y, 1000)
-  }
-
-  private async stopBackup (): Promise<void> {
-    await this.loader.of({
-      message: `Stopping backup...`,
-      spinner: 'lines',
-      cssClass: 'loader',
-    }).displayDuringP(this.apiService.stopAppBackup(this.app.id))
-    .catch (e => this.setError(e))
   }
 
   private async presentAlertStart (): Promise<void> {

@@ -5,7 +5,7 @@ import { ActionSheetButton } from '@ionic/core'
 import { WifiService } from './wifi.service'
 import { LoaderService } from 'src/app/services/loader.service'
 import { BehaviorSubject } from 'rxjs'
-import { WiFi } from 'src/app/services/api/api-types'
+import { WiFiInfo } from 'src/app/services/api/api-types'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
@@ -24,7 +24,7 @@ export class WifiListPage {
     public readonly patch: PatchDbModel,
   ) { }
 
-  async presentAction (ssid: string, wifi: WiFi) {
+  async presentAction (ssid: string, wifi: WiFiInfo) {
     const buttons: ActionSheetButton[] = [
       {
         text: 'Forget',

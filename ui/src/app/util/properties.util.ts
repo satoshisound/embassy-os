@@ -41,7 +41,7 @@ const schemaV2 = {
 const schemaV2Compiled = ajv.compile(schemaV2)
 const schemaV2CompiledWithDefaults = ajvWithDefaults.compile(schemaV2)
 
-export function parsePropertiesPermissive (properties: any, errorCallback: (err: Error) => any = console.warn): AppProperties {
+export function parsePropertiesPermissive (properties: any, errorCallback: (err: Error) => any = console.warn): PackageProperties {
   if (typeof properties !== 'object' || properties === null) {
     errorCallback(new TypeError(`${properties} is not an object`))
     return { }
@@ -71,7 +71,7 @@ export function parsePropertiesPermissive (properties: any, errorCallback: (err:
         return acc
       }, { })
   }
-  const typedProperties = properties as AppPropertiesVersioned<number>
+  const typedProperties = properties as PackagePropertiesVersioned<number>
   switch (typedProperties.version) {
     case 2:
       return parsePropertiesV2Permissive(typedProperties.data, errorCallback)
@@ -81,7 +81,7 @@ export function parsePropertiesPermissive (properties: any, errorCallback: (err:
   }
 }
 
-function parsePropertiesV2Permissive (properties: AppPropertiesV2, errorCallback: (err: Error) => any): AppProperties {
+function parsePropertiesV2Permissive (properties: PackagePropertiesV2, errorCallback: (err: Error) => any): PackageProperties {
   return Object.entries(properties).reduce((prev, [name, value], idx) => {
     schemaV2Compiled(value)
     if (schemaV2Compiled.errors) {
@@ -103,27 +103,27 @@ function parsePropertiesV2Permissive (properties: AppPropertiesV2, errorCallback
   }, { })
 }
 
-export type AppProperties = AppPropertiesV2 // change this type when updating versions
+export type PackageProperties = PackagePropertiesV2 // change this type when updating versions
 
-export type AppPropertiesVersioned<T extends number> = {
+export type PackagePropertiesVersioned<T extends number> = {
   version: T,
-  data: AppPropertiesVersionedData<T>
+  data: PackagePropertiesVersionedData<T>
 }
 
-export type AppPropertiesVersionedData<T extends number> = T extends 1 ? never :
-  T extends 2 ? AppPropertiesV2 :
+export type PackagePropertiesVersionedData<T extends number> =
+  T extends 2 ? PackagePropertiesV2 :
   never
 
-interface AppPropertiesV2 {
-  [name: string]: AppPropertyString | AppPropertyObject
+interface PackagePropertiesV2 {
+  [name: string]: PackagePropertyString | PackagePropertyObject
 }
 
-interface AppPropertyBase {
+interface PackagePropertyBase {
   type: 'string' | 'object'
   description: string | null
 }
 
-interface AppPropertyString extends AppPropertyBase {
+interface PackagePropertyString extends PackagePropertyBase {
   type: 'string'
   value: string
   copyable: boolean
@@ -131,7 +131,7 @@ interface AppPropertyString extends AppPropertyBase {
   masked: boolean
 }
 
-interface AppPropertyObject extends AppPropertyBase {
+interface PackagePropertyObject extends PackagePropertyBase {
   type: 'object'
-  value: AppPropertiesV2
+  value: PackagePropertiesV2
 }

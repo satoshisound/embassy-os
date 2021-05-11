@@ -47,9 +47,6 @@
         <ion-button *ngIf="[AppStatus.RUNNING, AppStatus.CRASHED, AppStatus.PAUSED, AppStatus.RESTARTING] | includes: app.status" expand="block" fill="outline" color="danger" (click)="stop()">
           Stop
         </ion-button>
-        <ion-button *ngIf="app.status === AppStatus.CREATING_BACKUP" expand="block" fill="outline" (click)="presentAlertStopBackup()">
-          Stop Backup
-        </ion-button>
         <ion-button *ngIf="app.status === AppStatus.DEAD" expand="block" fill="outline" (click)="uninstall()">
           Force Uninstall
         </ion-button>

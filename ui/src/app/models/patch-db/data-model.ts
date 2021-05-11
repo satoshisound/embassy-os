@@ -1,7 +1,7 @@
 import { ConfigSpec } from 'src/app/app-config/config-types'
 
 export interface DataModel {
-  server: S9Server
+  'server-info': ServerInfo
   'package-data': { [id: string]: PackageDataEntry }
   ui: {
     name: string
@@ -10,22 +10,31 @@ export interface DataModel {
   }
 }
 
-export interface S9Server {
+export interface ServerInfo {
   id: string
   version: string
-  updating: boolean
-  specs: ServerSpecs
-  'alt-registry': URL
-  wifi: WiFi
-  ssh: SSHFingerprint[]
-  disks: DiskInfo[]
-  notifications: ServerNotification[]
+  'lan-address': URL
+  'tor-address': URL
+  status: ServerStatus
+  registry: URL
+  wifi: {
+    selected: string | null
+    connected: string | null
+  }
+  'unread-notification-count': number
+}
+
+export enum ServerStatus {
+  Running = 'running',
+  Updating = 'updating',
+  BackingUp = 'backing-up',
+  Restoring = 'restoring',
 }
 
 export interface PackageDataEntry {
   state: PackageState
-  installed?: InstalledPackageDataEntry, // installed, updating, removing
-  'install-progress'?: InstallProgress, // installing, updating
+  installed?: InstalledPackageDataEntry, // exists when: installed, updating, removing
+  'install-progress'?: InstallProgress, // exists when: installing, updating
 }
 
 export interface InstallProgress {
@@ -211,8 +220,9 @@ export interface MainStatusRestoring {
 }
 
 export enum PackageMainStatus {
-  Stopped = 'stopped',
   Running = 'running',
+  Stopping = 'stopping',
+  Stopped = 'stopped',
   BackingUp = 'backing-up',
   Restoring = 'restoring',
 }
@@ -301,41 +311,3 @@ export interface InterfaceInfo {
 }
 
 export type URL = string
-
-export interface ServerSpecs {
-  [key: string]: string | number
-}
-
-export interface WiFi {
-  ssids: string[]
-  current: string | null
-}
-
-export interface SSHFingerprint {
-  alg: string
-  hash: string
-  hostname: string
-}
-
-export interface DiskInfo {
-  logicalname: string,
-  size: string,
-  description: string | null,
-  partitions: PartitionInfo[]
-}
-
-export interface PartitionInfo {
-  logicalname: string,
-  'is-mounted': boolean, // We do not allow backups to mounted partitions
-  size: string | null,
-  label: string | null,
-}
-
-export interface ServerNotification {
-  id: string
-  appId: string
-  createdAt: string
-  code: string
-  title: string
-  message: string
-}

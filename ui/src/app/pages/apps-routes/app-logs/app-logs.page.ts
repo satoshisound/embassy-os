@@ -32,7 +32,7 @@ export class AppLogsPage {
 
     try {
       const logs = await Promise.all([
-        this.apiService.getAppLogs(this.appId),
+        this.apiService.getPackageLogs({ id: this.appId }),
         pauseFor(600),
       ])
       this.logs = logs.join('\n\n')
