@@ -7,7 +7,7 @@
   >
     <ion-avatar style="position: relative; height: 5vh; width: 5vh; margin: 0px;" slot="start">
       <div *ngIf="!l.loading" class="badge" [style]="badgeStyle"></div>
-      <img [src]="dep.iconURL | iconParse" />
+      <img [src]="dep.iconURL" />
     </ion-avatar>
     <ion-label class="ion-text-wrap" style="padding: 1vh; padding-left: 2vh">
       <h4 style="font-family: 'Montserrat'">{{ dep.title }}

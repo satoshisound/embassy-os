@@ -1,5 +1,4 @@
 import { Component } from '@angular/core'
-import { ServerStatus } from './models/server-types'
 import { Storage } from '@ionic/storage'
 import { AuthService, AuthState } from './services/auth.service'
 import { ApiService } from './services/api/api.service'
@@ -14,6 +13,7 @@ import { LoadingOptions } from '@ionic/core'
 import { pauseFor } from './util/misc.util'
 import { PatchDbModel } from './models/patch-db/patch-db-model'
 import { HttpService } from './services/http.service'
+import { ServerStatus } from './models/patch-db/data-model'
 
 @Component({
   selector: 'app-root',
@@ -81,9 +81,9 @@ export class AppComponent {
     let fromFresh = true
     let authed = false
 
-    const serverStatus$ = this.patch.watch$('server', 'status')
+    const serverStatus$ = this.patch.watch$('server-info', 'status')
     .pipe(
-      tap(status => this.isUpdating = status === ServerStatus.UPDATING),
+      tap(status => this.isUpdating = status === ServerStatus.Updating),
       takeWhile(_ => !!authed),
     )
 
@@ -163,12 +163,47 @@ export class AppComponent {
     .catch(e => this.setError(e))
   }
 
-  async setError (e: Error) {
+  private async handleNotifications (server: Readonly<S9Server>) {
+    const count = server.notifications.length
+
+    if (!count) { return }
+
+    let updates = { } as any
+    updates.badge = server.badge + count
+    updates.notifications = []
+
+    const toast = await this.toastCtrl.create({
+      header: 'Embassy',
+      message: `${count} new notification${count === 1 ? '' : 's'}`,
+      position: 'bottom',
+      duration: 4000,
+      cssClass: 'notification-toast',
+      buttons: [
+        {
+          side: 'start',
+          icon: 'close',
+          handler: () => {
+            return true
+          },
+        },
+        {
+          side: 'end',
+          text: 'View',
+          handler: () => {
+            this.navCtrl.navigateForward(['/notifications'])
+          },
+        },
+      ],
+    })
+    await toast.present()
+  }
+
+  private async setError (e: Error) {
     console.error(e)
     await this.presentError(e.message)
   }
 
-  async presentError (e: string) {
+  private async presentError (e: string) {
     const alert = await this.alertCtrl.create({
       backdropDismiss: true,
       message: `Exception on logout: ${e}`,

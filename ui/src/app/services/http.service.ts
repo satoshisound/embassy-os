@@ -21,25 +21,18 @@ export class HttpService {
     return this.unauthorizedApiResponse$.asObservable()
   }
 
-  async restRequest<T> (options: HttpOptions, version = this.config.api.version, authReq = true): Promise<T> {
-    if (authReq) {
-      if (!this.authReqEnabled) throw new Error('Unauthenticated')
-      options.withCredentials = true
+  async ping (): Promise<void> {
+    const httpOpts = {
+      method: Method.GET,
+      data: { method: 'ping', params: { } },
     }
-
-    options.url = handleSlashes(`${this.config.api.url}${version}${options.url}`)
-    if (this.config.api.root && this.config.api.root !== '' ) {
-      options.url = `${this.config.api.root}${options.url}`
-    }
-    return this.httpRequest<T>(options)
+    this.httpRequest(httpOpts)
   }
 
   async rpcRequest<T> (options: RPCOptions): Promise<T> {
-    const { url, version } = this.config.api
     options.params = options.params || { }
     const httpOpts = {
       method: Method.POST,
-      url: `${url}${version}`,
       data: options,
     }
 
@@ -51,7 +44,10 @@ export class HttpService {
   }
 
   private async httpRequest<T> (httpOpts: HttpOptions): Promise<T> {
-    const { url, body, timeout, ...rest} = translateOptions(httpOpts)
+    let { url, version } = this.config.api
+    url = `${url}/${version}`
+    const { body, timeout, ...rest} = translateOptions(httpOpts)
+
     let req: Observable<{ body: T }>
     switch (httpOpts.method){
       case Method.GET:    req = this.http.get(url, rest) as any;          break
@@ -70,13 +66,6 @@ export class HttpService {
 
 export function isUnauthorized (e: HttpErrorResponse): boolean {
   return e.status == 401
-}
-
-function handleSlashes (url: string): string {
-  let toReturn = url
-  toReturn = toReturn.startsWith('/') ? toReturn : '/' + toReturn
-  toReturn = !toReturn.endsWith('/')  ? toReturn : toReturn.slice(0, -1)
-  return toReturn
 }
 
 function RpcError (e: RPCError['error']): void {
@@ -158,7 +147,6 @@ type HttpError = HttpErrorResponse & { error: { code: string, message: string } 
 
 export interface HttpOptions {
   withCredentials?: boolean
-  url: string
   method: Method
   params?: {
     [param: string]: string | string[]
@@ -182,7 +170,6 @@ export interface HttpJsonOptions {
   responseType?: 'json'
   withCredentials?: boolean
   body?: any
-  url: string
   timeout: number
 }
 
@@ -195,7 +182,6 @@ function translateOptions (httpOpts: HttpOptions): HttpJsonOptions {
     headers: httpOpts.headers,
     params: httpOpts.params,
     body: httpOpts.data || { },
-    url: httpOpts.url,
     timeout: httpOpts.readTimeout,
   }
 }

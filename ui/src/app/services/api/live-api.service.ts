@@ -94,15 +94,15 @@ export class LiveApiService extends ApiService {
 
   // ssh
 
-  async getSshKeysRaw (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes> {
+  async getSshKeys (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes> {
     return this.http.rpcRequest({ method: 'ssh.get', params })
   }
 
-  async addSshKeyRaw (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes> {
+  async addSshKey (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes> {
     return this.http.rpcRequest({ method: 'ssh.add', params })
   }
 
-  async deleteSshKeyRaw (params: RR.DeleteSSHKeyReq): Promise<RR.DeleteSSHKeyRes> {
+  async deleteSshKey (params: RR.DeleteSSHKeyReq): Promise<RR.DeleteSSHKeyRes> {
     return this.http.rpcRequest({ method: 'ssh.delete', params })
   }
 

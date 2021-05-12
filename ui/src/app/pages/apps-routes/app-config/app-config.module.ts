@@ -17,7 +17,6 @@ const routes: Routes = [
   {
     path: '',
     component: AppConfigPage,
-    // canDeactivate: [CanDeactivateGuard],
   },
 ]
 

@@ -8,11 +8,11 @@ import { concatMap } from 'rxjs/operators'
 import { AppBackupConfirmationComponent } from 'src/app/components/app-backup-confirmation/app-backup-confirmation.component'
 
 @Component({
-  selector: 'app-backup',
-  templateUrl: './app-backup.page.html',
-  styleUrls: ['./app-backup.page.scss'],
+  selector: 'backup',
+  templateUrl: './backup.page.html',
+  styleUrls: ['./backup.page.scss'],
 })
-export class AppBackupPage {
+export class BackupPage {
   @Input() app: AppInstalledFull
   @Input() type: 'create' | 'restore'
   disks: DiskInfo[]

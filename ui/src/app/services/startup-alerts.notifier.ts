@@ -10,7 +10,7 @@ import { ConfigService } from './config.service'
 import { Emver } from './emver.service'
 import { OsUpdateService } from './os-update.service'
 
-@Injectable({ providedIn: 'root' })
+@Injectable({providedIn: 'root' })
 export class StartupAlertsNotifier {
   constructor (
     private readonly alertCtrl: AlertController,

@@ -1,6 +1,6 @@
 import { Dump, Operation, Revision } from 'patch-db-client'
 import { PackagePropertiesVersioned } from 'src/app/util/properties.util'
-import { ConfigSpec } from 'src/app/app-config/config-types'
+import { ConfigSpec } from 'src/app/pkg-config/config-types'
 import { DataModel, DependencyError } from 'src/app/models/patch-db/data-model'
 
 export module RR {
@@ -77,7 +77,7 @@ export module RR {
   export type GetSSHKeysReq = { } // ssh.get
   export type GetSSHKeysRes = SSHKeys
 
-  export type AddSSHKeyReq = { key: string } // ssh.add
+  export type AddSSHKeyReq = { pubkey: string } // ssh.add
   export type AddSSHKeyRes = SSHKeys
 
   export type DeleteSSHKeyReq = { hash: string } // ssh.delete
@@ -131,7 +131,7 @@ export module RR {
   export type RestorePackageReq = { id: string, logicalname: string, password: string } // package.backup.restore
   export type RestorePackageRes = WithRevision<null>
 
-  export type ExecutePackageActionReq = { id: string, input?: object } // package.action
+  export type ExecutePackageActionReq = { id: string, 'action-id': string, input?: object } // package.action
   export type ExecutePackageActionRes = ActionResponse
 
   export type StartPackageReq = { id: string } // package.start
@@ -169,7 +169,11 @@ export type WithRevision<T> = { response: T, revision?: Revision }
 
 export interface BreakageRes {
   patch: Operation[],
-  breakages: { [id: string]: DependencyError }
+  breakages: Breakages
+}
+
+export interface Breakages {
+  [id: string]: DependencyError
 }
 
 export interface Log {

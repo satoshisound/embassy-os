@@ -75,11 +75,11 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
   // ssh
 
-  abstract getSshKeysRaw (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes>
+  abstract getSshKeys (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes>
 
-  abstract addSshKeyRaw (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes>
+  abstract addSshKey (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes>
 
-  abstract deleteSshKeyRaw (params: RR.DeleteSSHKeyReq): Promise<RR.DeleteSSHKeyRes>
+  abstract deleteSshKey (params: RR.DeleteSSHKeyReq): Promise<RR.DeleteSSHKeyRes>
 
   // backup
 

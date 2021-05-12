@@ -157,17 +157,17 @@ export class MockApiService extends ApiService {
 
   // ssh
 
-  async getSshKeysRaw (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes> {
+  async getSshKeys (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes> {
     await pauseFor(2000)
     return Mock.SshKeys
   }
 
-  async addSshKeyRaw (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes> {
+  async addSshKey (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes> {
     await pauseFor(2000)
     return null
   }
 
-  async deleteSshKeyRaw (params: RR.DeleteSSHKeyReq): Promise<RR.DeleteSSHKeyRes> {
+  async deleteSshKey (params: RR.DeleteSSHKeyReq): Promise<RR.DeleteSSHKeyRes> {
     await pauseFor(2000)
     return null
   }

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core'
-import { OsUpdateService } from 'src/app/services/os-update.service'
+import { Breakages } from 'src/app/services/api/api-types'
 import { exists } from 'src/app/util/misc.util'
-import { AppDependency, DependentBreakage, AppInstalledPreview } from '../../models/app-types'
+import { AppDependency, AppInstalledPreview } from '../../models/app-types'
 import { ApiService } from '../../services/api/api.service'
 import { InstallWizardComponent, SlideDefinition, TopbarParams } from './install-wizard.component'
 import { WizardAction } from './wizard-types'
@@ -10,7 +10,6 @@ import { WizardAction } from './wizard-types'
 export class WizardBaker {
   constructor (
     private readonly apiService: ApiService,
-    private readonly updateService: OsUpdateService,
   ) { }
 
   install (values: {
@@ -30,7 +29,11 @@ export class WizardBaker {
       installAlert ? {
         slide: {
           selector: 'notes',
-          params: { notes: installAlert, title: 'Warning', titleColor: 'warning' },
+          params: {
+            notes: installAlert,
+            title: 'Warning',
+            titleColor: 'warning',
+          },
         },
         bottomBar: {
           cancel: { afterLoading: { text: 'Cancel' } }, next: 'Next',
@@ -39,7 +42,12 @@ export class WizardBaker {
       {
         slide: {
           selector: 'dependencies',
-          params: { action, title, version, serviceRequirements },
+          params: {
+            action,
+            title,
+            version,
+            serviceRequirements,
+          },
         },
         bottomBar: {
           cancel: { afterLoading: { text: 'Cancel' } },
@@ -53,7 +61,7 @@ export class WizardBaker {
             action,
             verb: 'beginning installation for',
             title,
-            executeAction: () => this.apiService.installApp(id, version),
+            executeAction: () => this.apiService.installPackage({ id, version }),
           },
         },
         bottomBar: {
@@ -82,7 +90,11 @@ export class WizardBaker {
       installAlert ? {
         slide: {
           selector: 'notes',
-          params: { notes: installAlert, title: 'Warning', titleColor: 'warning'},
+          params: {
+            notes: installAlert,
+            title: 'Warning',
+            titleColor: 'warning',
+          },
         },
         bottomBar: {
           cancel: { afterLoading: { text: 'Cancel' } },
@@ -91,7 +103,12 @@ export class WizardBaker {
       } : undefined,
       { slide: {
           selector: 'dependencies',
-          params: { action, title, version, serviceRequirements },
+          params: {
+            action,
+            title,
+            version,
+            serviceRequirements,
+          },
         },
         bottomBar: {
           cancel: { afterLoading: { text: 'Cancel' } },
@@ -105,7 +122,7 @@ export class WizardBaker {
             action,
             verb: 'updating',
             title,
-            fetchBreakages: () => this.apiService.dryrunUpdateApp(id, version).then( ({ breakages }) => breakages ),
+            fetchBreakages: () => this.apiService.dryUpdatePackage({ id, version }).then( ({ breakages }) => breakages ),
           },
         },
         bottomBar: {
@@ -119,7 +136,7 @@ export class WizardBaker {
             action,
             verb: 'beginning update for',
             title,
-            executeAction: () => this.apiService.updateApp(id, version),
+            executeAction: () => this.apiService.updatePackage({ id, version }),
           },
         },
         bottomBar: {
@@ -143,7 +160,11 @@ export class WizardBaker {
     const slideDefinitions: SlideDefinition[] = [
       { slide : {
           selector: 'notes',
-          params: { notes: releaseNotes, title: 'Release Notes', titleColor: 'dark' },
+          params: {
+            notes: releaseNotes,
+            title: 'Release Notes',
+            titleColor: 'dark',
+          },
         },
         bottomBar: {
           cancel: { afterLoading: { text: 'Cancel' } }, next: 'Update OS',
@@ -152,7 +173,10 @@ export class WizardBaker {
       { slide: {
           selector: 'complete',
           params: {
-            action, verb: 'beginning update for', title, executeAction: () => this.updateService.updateEmbassyOS(version),
+            action,
+            verb: 'beginning update for',
+            title,
+            executeAction: () => this.apiService.updateServer({ }),
           },
         },
         bottomBar: {
@@ -181,13 +205,22 @@ export class WizardBaker {
       installAlert ? {
         slide: {
           selector: 'notes',
-          params: { notes: installAlert, title: 'Warning', titleColor: 'warning' },
+          params: {
+            notes: installAlert,
+            title: 'Warning',
+            titleColor: 'warning',
+          },
         },
         bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Next' },
       } : undefined,
       { slide: {
           selector: 'dependencies',
-          params: { action, title, version, serviceRequirements },
+          params: {
+            action,
+            title,
+            version,
+            serviceRequirements,
+          },
         },
         bottomBar: {
           cancel: { afterLoading: { text: 'Cancel' } },
@@ -201,7 +234,7 @@ export class WizardBaker {
             action,
             verb: 'downgrading',
             title,
-            fetchBreakages: () => this.apiService.dryrunUpdateApp(id, version).then( ({ breakages }) => breakages ),
+            fetchBreakages: () => this.apiService.dryUpdatePackage({ id, version }).then( ({ breakages }) => breakages ),
           },
         },
         bottomBar: {
@@ -214,7 +247,7 @@ export class WizardBaker {
             action,
             verb: 'beginning downgrade for',
             title,
-            executeAction: () => this.apiService.updateApp(id, version),
+            executeAction: () => this.apiService.updatePackage({ id, version }),
           },
         },
         bottomBar: {
@@ -252,7 +285,10 @@ export class WizardBaker {
       { slide: {
           selector: 'dependents',
           params: {
-            action, verb: 'uninstalling', title, fetchBreakages: () => this.apiService.uninstallApp(id, true).then( ({ breakages }) => breakages ),
+            action,
+            verb: 'uninstalling',
+            title,
+            fetchBreakages: () => this.apiService.dryRemovePackage({ id }).then( ({ breakages }) => breakages ),
           },
         },
         bottomBar: { cancel: { whileLoading: { }, afterLoading: { text: 'Cancel' } }, next: 'Uninstall' },
@@ -263,7 +299,7 @@ export class WizardBaker {
             action,
             verb: 'uninstalling',
             title,
-            executeAction: () => this.apiService.uninstallApp(id),
+            executeAction: () => this.apiService.removePackage({ id }),
           },
         },
         bottomBar: { finish: 'Dismiss', cancel: { whileLoading: { } } },
@@ -273,7 +309,7 @@ export class WizardBaker {
   }
 
   stop (values: {
-    breakages: DependentBreakage[], id: string, title: string, version: string
+    breakages: Breakages, id: string, title: string, version: string
   }): InstallWizardComponent['params'] {
     const { breakages, title, version } = values
 
@@ -288,7 +324,10 @@ export class WizardBaker {
       { slide: {
           selector: 'dependents',
           params: {
-            action, verb: 'stopping', title, fetchBreakages: () => Promise.resolve(breakages),
+            action,
+            verb: 'stopping',
+            title,
+            fetchBreakages: () => Promise.resolve(breakages),
           },
         },
         bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Stop Anyways' },
@@ -298,7 +337,7 @@ export class WizardBaker {
   }
 
   configure (values: {
-    breakages: DependentBreakage[], app: AppInstalledPreview
+    breakages: Breakages, app: AppInstalledPreview
   }): InstallWizardComponent['params'] {
     const { breakages, app } = values
     const { title, versionInstalled: version  } = app
@@ -309,7 +348,9 @@ export class WizardBaker {
       { slide: {
           selector: 'dependents',
           params: {
-            action, verb: 'saving config for', title, fetchBreakages: () => Promise.resolve(breakages),
+            action,
+            verb: 'saving config for',
+            title, fetchBreakages: () => Promise.resolve(breakages),
           },
         },
         bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Save Config Anyways' },

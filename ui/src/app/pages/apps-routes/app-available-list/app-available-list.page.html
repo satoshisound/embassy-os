@@ -24,7 +24,7 @@
     <ion-card *ngFor="let app of apps" style="margin: 10px 10px;" [routerLink]="[app.id]">
       <ion-item style="--inner-border-width: 0 0 .4px 0; --border-color: #525252;" *ngIf="{ installing: (app.subject.status | async) === 'INSTALLING', installComparison: app.subject | compareInstalledAndLatest | async } as l">
         <ion-avatar style="margin-top: 8px;" slot="start">
-          <img [src]="app.subject.iconURL | async | iconParse" />
+          <img [src]="app.subject.iconURL | async" />
         </ion-avatar>
         <ion-label style="margin-top: 6px; margin-bottom: 3px">
           <h1 style="font-family: 'Montserrat'; font-size: 20px; margin-bottom: 0px;">

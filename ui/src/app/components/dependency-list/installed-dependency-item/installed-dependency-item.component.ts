@@ -2,7 +2,7 @@ import { Component, Input, OnInit } from '@angular/core'
 import { NavigationExtras } from '@angular/router'
 import { AlertController, NavController } from '@ionic/angular'
 import { BehaviorSubject, Observable } from 'rxjs'
-import { AppDependency, BaseApp, DependencyViolationSeverity, getInstalledViolationSeverity, getViolationSeverity, isInstalling, isMisconfigured, isMissing, isNotRunning, isVersionMismatch } from 'src/app/models/app-types'
+import { AppDependency, BaseApp, DependencyViolationSeverity, getInstalledViolationSeverity, isInstalling, isMisconfigured, isMissing, isNotRunning, isVersionMismatch } from 'src/app/models/app-types'
 import { Recommendation } from '../../recommendation-button/recommendation-button.component'
 
 @Component({

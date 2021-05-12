@@ -30,7 +30,7 @@
     <ion-item-group>
       <ion-item lines="none">
         <ion-avatar slot="start">
-          <img [src]="vars.iconURL | iconParse" />
+          <img [src]="vars.iconURL" />
         </ion-avatar>
         <ion-label class="ion-text-wrap">
           <h1 style="font-family: 'Montserrat'">{{ vars.title }}</h1>
@@ -41,7 +41,7 @@
           </ng-container>
           <ng-container *ngIf="vars.status === 'INSTALLING'">
             <h3>
-              <status appStatus="INSTALLING" [text]="' (' + (vars.versionInstalled | displayEmver) + ')'" size="medium"></status>
+              <status appStatus="INSTALLING" size="medium"></status>
             </h3>
           </ng-container>
         </ion-label>
@@ -73,7 +73,7 @@
           <ion-label class="ion-text-wrap">
             <h2 style="display: flex; align-items: center;">
               <ion-avatar style="height: 3vh; width: 3vh; margin: 5px" slot="start">
-                <img [src]="recommendation.iconURL | iconParse" [alt]="recommendation.title"/>
+                <img [src]="recommendation.iconURL" [alt]="recommendation.title"/>
               </ion-avatar>
               <ion-text style="margin: 5px; font-family: 'Montserrat'; font-size: smaller;">{{recommendation.title}}</ion-text>
             </h2>

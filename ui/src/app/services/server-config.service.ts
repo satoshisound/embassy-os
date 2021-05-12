@@ -2,24 +2,18 @@ import { Injectable } from '@angular/core'
 import { ModalController } from '@ionic/angular'
 import { AppConfigValuePage } from '../modals/app-config-value/app-config-value.page'
 import { ApiService } from './api/api.service'
-import { PropertySubject } from '../util/property-subject.util'
-import { S9Server, ServerModel } from '../models/server-types'
-import { ConfigSpec } from '../app-config/config-types'
-import { ConfigCursor } from '../app-config/config-cursor'
+import { ConfigSpec } from '../pkg-config/config-types'
+import { ConfigCursor } from '../pkg-config/config-cursor'
 
 @Injectable({
   providedIn: 'root',
 })
 export class ServerConfigService {
-  server: PropertySubject<S9Server>
 
   constructor (
     private readonly modalCtrl: ModalController,
     private readonly apiService: ApiService,
-    private readonly serverModel: ServerModel,
-  ) {
-    this.server = this.serverModel.watch()
-  }
+  ) { }
 
   async presentModalValueEdit (key: string, current?: string) {
     const cursor = new ConfigCursor(serverConfig, { [key]: current }).seekNext(key)
@@ -38,21 +32,21 @@ export class ServerConfigService {
   }
 
   saveFns: { [key: string]: (val: any) => Promise<any> } = {
-    name: async (val: string) => {
-      return this.apiService.patchServerConfig('name', val)
+    name: async (value: string) => {
+      return this.apiService.setDbValue({ pointer: 'ui/name', value })
     },
-    autoCheckUpdates: async (val: boolean) => {
-      return this.apiService.patchServerConfig('autoCheckUpdates', val)
+    autoCheckUpdates: async (value: boolean) => {
+      return this.apiService.setDbValue({ pointer: 'ui/auto-check-updates', value })
     },
-    // password: async (val: string) => {
-    //   return this.apiService.patchServerConfig('password', val)
+    ssh: async (pubkey: string) => {
+      return this.apiService.addSshKey({ pubkey })
+    },
+    // registry: async (url: string) => {
+    //   return this.apiService.setRegistry({ url })
     // },
-    altRegistryUrl: async (val: string) => {
-      return this.apiService.patchServerConfig('altRegistryUrl', val)
-    },
-    ssh: async (val: string) => {
-      return this.apiService.addSSHKey(val)
-    },
+    // password: async (password: string) => {
+    //   return this.apiService.updatePassword({ password })
+    // },
   }
 }
 
@@ -74,6 +68,29 @@ const serverConfig: ConfigSpec = {
     description: 'On launch, EmabssyOS will automatically check for updates of itself and your installed services. Updating still requires user approval and action. No updates will ever be performed automatically.',
     default: true,
   },
+  ssh: {
+    type: 'string',
+    name: 'SSH Key',
+    description: 'Add SSH keys to your Embassy to gain root access from the command line.',
+    nullable: false,
+    // @TODO regex for SSH Key
+    // pattern: '',
+    patternDescription: 'Must be a valid SSH key',
+    masked: true,
+    copyable: true,
+  },
+  // registry: {
+  //   type: 'string',
+  //   name: 'Marketplace URL',
+  //   description: 'Used for connecting to an alternative service marketplace.',
+  //   nullable: true,
+  //   // @TODO regex for URL
+  //   // pattern: '',
+  //   patternDescription: 'Must be a valid URL',
+  //   changeWarning: 'Downloading services from an alternative marketplace could result in malicious or harmful code being installed on your device.',
+  //   masked: false,
+  //   copyable: true,
+  // },
   // password: {
   //   type: 'string',
   //   name: 'Change Password',
@@ -86,27 +103,4 @@ const serverConfig: ConfigSpec = {
   //   masked: true,
   //   copyable: true,
   // },
-  altRegistryUrl: {
-    type: 'string',
-    name: 'Marketplace URL',
-    description: 'Used for connecting to an alternative service marketplace.',
-    nullable: true,
-    // @TODO regex for URL
-    // pattern: '',
-    patternDescription: 'Must be a valid URL',
-    changeWarning: 'Downloading services from an alternative marketplace could result in malicious or harmful code being installed on your device.',
-    masked: false,
-    copyable: true,
-  },
-  ssh: {
-    type: 'string',
-    name: 'SSH Key',
-    description: 'Add SSH keys to your Embassy to gain root access from the command line.',
-    nullable: false,
-    // @TODO regex for SSH Key
-    // pattern: '',
-    patternDescription: 'Must be a valid SSH key',
-    masked: true,
-    copyable: true,
-  },
 }

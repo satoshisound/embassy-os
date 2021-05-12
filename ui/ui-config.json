@@ -14,7 +14,7 @@
   "api": {
     "mocks": true,
     "url": "/api",
-    "version": "/v1",
+    "version": "v1",
     "root": ""
   },
   "maskAs": "tor",

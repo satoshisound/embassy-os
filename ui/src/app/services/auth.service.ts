@@ -43,7 +43,7 @@ export class AuthService {
 
   async login (password: string): Promise<void> {
     try {
-      await this.api.login(password)
+      await this.api.login({ password })
       await this.storage.set(StorageKeys.LOGGED_IN_KEY, true)
       this.authState$.next(AuthState.VERIFIED)
     } catch (e) {

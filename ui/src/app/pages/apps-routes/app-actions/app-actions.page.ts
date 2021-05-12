@@ -6,7 +6,7 @@ import { LoaderService } from 'src/app/services/loader.service'
 import { HttpErrorResponse } from '@angular/common/http'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { Observable } from 'rxjs'
-import { Action, InstalledPackageDataEntry, PackageMainStatus } from 'src/app/models/patch-db/data-model'
+import { Action, InstalledPackageDataEntry, PackageDataEntry, PackageMainStatus } from 'src/app/models/patch-db/data-model'
 
 @Component({
   selector: 'app-actions',
@@ -14,7 +14,7 @@ import { Action, InstalledPackageDataEntry, PackageMainStatus } from 'src/app/mo
   styleUrls: ['./app-actions.page.scss'],
 })
 export class AppActionsPage {
-  app$: Observable<InstalledPackageDataEntry>
+  pkg$: Observable<PackageDataEntry>
 
   constructor (
     private readonly route: ActivatedRoute,
@@ -25,15 +25,15 @@ export class AppActionsPage {
   ) { }
 
   ngOnInit () {
-    const appId = this.route.snapshot.paramMap.get('appId')
-    this.app$ = this.patch.watch$('package-data', appId, 'installed')
+    const id = this.route.snapshot.paramMap.get('appId')
+    this.pkg$ = this.patch.watch$('package-data', id)
   }
 
-  async handleAction (app: InstalledPackageDataEntry, action: Action) {
-    if ((action['allowed-statuses'] as PackageMainStatus[]).includes(app.status.main.status)) {
+  async handleAction (app: InstalledPackageDataEntry, action: { key: string, value: Action }) {
+    if ((action.value['allowed-statuses'] as PackageMainStatus[]).includes(app.status.main.status)) {
       const alert = await this.alertCtrl.create({
         header: 'Confirm',
-        message: `Are you sure you want to execute action "${action.name}"? ${action.warning ? action.warning : ''}`,
+        message: `Are you sure you want to execute action "${action.value.name}"? ${action.value.warning || ''}`,
         buttons: [
           {
             text: 'Cancel',
@@ -42,7 +42,7 @@ export class AppActionsPage {
           {
             text: 'Execute',
             handler: () => {
-              this.executeAction(app.manifest.id, action)
+              this.executeAction(app.manifest.id, action.key)
             },
           },
         ],
@@ -62,7 +62,7 @@ export class AppActionsPage {
       }
       const alert = await this.alertCtrl.create({
         header: 'Forbidden',
-        message: `Action "${action.name}" can only be executed when service is ${joinStatuses(action.allowedStatuses)}`,
+        message: `Action "${action.value.name}" can only be executed when service is: ${joinStatuses(action['allowed-statuses'])}`,
         buttons: ['OK'],
         cssClass: 'alert-error-message',
       })
@@ -70,15 +70,15 @@ export class AppActionsPage {
     }
   }
 
-  private async executeAction (id: string, action: Action) {
+  private async executeAction (pkgId: string, actionId: string) {
     try {
       const res = await this.loaderService.displayDuringP(
-        this.apiService.appAction(id, action),
+        this.apiService.executePackageAction({ id: pkgId, 'action-id': actionId }),
       )
 
       const successAlert = await this.alertCtrl.create({
         header: 'Execution Complete',
-        message: res.split('\n').join('</br ></br />'),
+        message: res.ok.message.split('\n').join('</br ></br />'),
         buttons: ['OK'],
         cssClass: 'alert-success-message',
       })

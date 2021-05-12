@@ -1,8 +1,8 @@
 import { Component } from '@angular/core'
-import { AppStatus } from 'src/app/models/app-model'
 import { ConfigService } from 'src/app/services/config.service'
-import { AppInstalledPreview } from 'src/app/models/app-types'
+import { ConnectionService } from 'src/app/services/connection.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
+import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
 
 @Component({
   selector: 'app-installed-list',
@@ -10,17 +10,16 @@ import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
   styleUrls: ['./app-installed-list.page.scss'],
 })
 export class AppInstalledListPage {
-  AppStatus = AppStatus
 
   constructor (
     private readonly config: ConfigService,
-    public patch: PatchDbModel,
+    public readonly connectionService: ConnectionService,
+    public readonly patch: PatchDbModel,
   ) { }
 
-  async launchUi (app: AppInstalledPreview, event: Event) {
+  async launchUi (pkg: PackageDataEntry, event: Event) {
     event.preventDefault()
     event.stopPropagation()
-    const url = this.config.isTor() ? `http://${app.torAddress}` : `https://${app.lanAddress}`
-    return window.open(url, '_blank')
+    return window.open(this.config.launchableURL(pkg.installed), '_blank')
   }
 }

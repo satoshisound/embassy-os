@@ -1,15 +1,13 @@
-import { Component, Input, OnInit } from '@angular/core'
+import { Component, Input } from '@angular/core'
 import { ModalController } from '@ionic/angular'
 import { BehaviorSubject } from 'rxjs'
-import { AppInstalledFull } from 'src/app/models/app-types'
-import { DiskPartition } from 'src/app/models/server-types'
 
 @Component({
-  selector: 'app-backup-confirmation',
-  templateUrl: './app-backup-confirmation.component.html',
-  styleUrls: ['./app-backup-confirmation.component.scss'],
+  selector: 'backup-confirmation',
+  templateUrl: './backup-confirmation.component.html',
+  styleUrls: ['./backup-confirmation.component.scss'],
 })
-export class AppBackupConfirmationComponent implements OnInit {
+export class BackupConfirmationComponent {
   unmasked = false
   password: string
   $error$: BehaviorSubject<string> = new BehaviorSubject('')

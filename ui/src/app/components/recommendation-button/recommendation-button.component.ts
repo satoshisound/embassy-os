@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core'
+import { Component, Input } from '@angular/core'
 import { Router } from '@angular/router'
 import { PopoverController } from '@ionic/angular'
 import { filter, take } from 'rxjs/operators'
@@ -11,7 +11,7 @@ import { InformationPopoverComponent } from '../information-popover/information-
   templateUrl: './recommendation-button.component.html',
   styleUrls: ['./recommendation-button.component.scss'],
 })
-export class RecommendationButtonComponent extends Cleanup implements OnInit {
+export class RecommendationButtonComponent extends Cleanup {
   @Input() rec: Recommendation
   @Input() raise?: { id: string }
   constructor (private readonly router: Router, private readonly popoverController: PopoverController) {

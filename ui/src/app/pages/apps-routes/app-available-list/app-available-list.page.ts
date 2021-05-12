@@ -7,7 +7,6 @@ import { PropertySubjectId, initPropertySubject } from 'src/app/util/property-su
 import { Subscription, BehaviorSubject, combineLatest } from 'rxjs'
 import { take } from 'rxjs/operators'
 import { markAsLoadingDuringP } from 'src/app/services/loader.service'
-import { OsUpdateService } from 'src/app/services/os-update.service'
 
 @Component({
   selector: 'app-available-list',
@@ -25,7 +24,6 @@ export class AppAvailableListPage {
     private readonly apiService: ApiService,
     private readonly appModel: AppModel,
     private readonly zone: NgZone,
-    private readonly osUpdateService: OsUpdateService,
   ) { }
 
   async ngOnInit () {
@@ -35,8 +33,7 @@ export class AppAvailableListPage {
 
     markAsLoadingDuringP(this.$loading$, Promise.all([
       this.getApps(),
-      this.osUpdateService.checkWhenNotAvailable$().toPromise(), // checks for an os update, banner component renders conditionally
-      pauseFor(600),
+      this.getEos(),
     ]))
   }
 

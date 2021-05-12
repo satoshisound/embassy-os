@@ -1,4 +1,5 @@
-import { ConfigSpec } from 'src/app/app-config/config-types'
+import { ConfigSpec } from 'src/app/pkg-config/config-types'
+import { Breakages } from 'src/app/services/api/api-types'
 
 export interface DataModel {
   'server-info': ServerInfo
@@ -33,6 +34,10 @@ export enum ServerStatus {
 
 export interface PackageDataEntry {
   state: PackageState
+  license: URL
+  instructions: URL
+  icon: URL
+  'unverified-manifest'?: Manifest // exists when: installing, updating
   installed?: InstalledPackageDataEntry, // exists when: installed, updating, removing
   'install-progress'?: InstallProgress, // exists when: installing, updating
 }
@@ -55,9 +60,9 @@ export interface InstalledPackageDataEntry {
 
 export enum PackageState {
   Installing = 'installing',
+  Installed = 'installed',
   Updating = 'updating',
   Removing = 'removing',
-  Installed = 'installed',
 }
 
 export interface Manifest {
@@ -69,7 +74,7 @@ export interface Manifest {
     long: string
   }
   'release-notes': string
-  license: string
+  license: string // name
   'wrapper-repo': URL
   'upstream-repo': URL
   'support-site': URL
@@ -86,7 +91,7 @@ export interface Manifest {
   config: ConfigActions | null
   volumes: { [id: string]: Volume }
   'min-os-version': string
-  interfaces: InterfaceDef
+  interfaces: { [id: string]: InterfaceDef }
   backup: BackupActions
   migrations: Migrations
   actions: { [id: string]: Action }
@@ -194,7 +199,7 @@ export interface Action {
 export interface Status {
   configured: boolean
   main: MainStatus
-  dependencies: { [id: string]: DependencyError }
+  dependencies: Breakages
 }
 
 export type MainStatus = MainStatusStopped | MainStatusStopping | MainStatusRunning | MainStatusBackingUp | MainStatusRestoring

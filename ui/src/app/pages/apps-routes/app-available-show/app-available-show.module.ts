@@ -10,7 +10,6 @@ import { BadgeMenuComponentModule } from 'src/app/components/badge-menu-button/b
 import { StatusComponentModule } from 'src/app/components/status/status.component.module'
 import { RecommendationButtonComponentModule } from 'src/app/components/recommendation-button/recommendation-button.component.module'
 import { InstallWizardComponentModule } from 'src/app/components/install-wizard/install-wizard.component.module'
-import { ErrorMessageComponentModule } from 'src/app/components/error-message/error-message.component.module'
 import { InformationPopoverComponentModule } from 'src/app/components/information-popover/information-popover.component.module'
 
 const routes: Routes = [
@@ -32,7 +31,6 @@ const routes: Routes = [
     RecommendationButtonComponentModule,
     BadgeMenuComponentModule,
     InstallWizardComponentModule,
-    ErrorMessageComponentModule,
     InformationPopoverComponentModule,
   ],
   declarations: [AppAvailableShowPage],

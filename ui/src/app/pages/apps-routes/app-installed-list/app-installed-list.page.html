@@ -8,25 +8,25 @@
 </ion-header>
 
 <ion-content style="position: relative">
-  <ion-grid *ngIf="(patch.watch$('apps') | async as apps).length; else welcome">
-    <ion-row>
-      <ion-col *ngFor="let app of apps" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
-        <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', app.id]">
-          <div class="launch-container" *ngIf="app.hasUI">
-            <div class="launch-button-triangle"  (click)="launchUi(app.id, $event)" [class.disabled]="!app.launchable">
+  <ion-grid *ngIf="(patch.watch$('package-data') | async as pkgs).length; else welcome">
+    <ion-row *ngVar="connectionService.monitor$ | async as connected">
+      <ion-col *ngFor="let pkg of pkgs" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
+        <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', (pkg | manifest).id]">
+          <div class="launch-container" *ngIf="pkg | hasUi">
+            <div class="launch-button-triangle"  (click)="launchUi(pkg, $event)" [class.disabled]="!(pkg | isLaunchable)">
               <ion-icon name="rocket-outline"></ion-icon>
             </div>
           </div>
 
-          <img style="position: absolute" class="main-img" [src]="app.iconURL" [alt]="app.title" />
+          <img style="position: absolute" class="main-img" [src]="pkg.icon" [alt]="icon" />
           <img class="main-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=">
-          <img class="bulb-on"  *ngIf="app.status | displayBulb: 'green'" src="assets/img/running-bulb.png"/>
-          <img class="bulb-on"  *ngIf="app.status | displayBulb: 'red'" src="assets/img/issue-bulb.png"/>
-          <img class="bulb-on"  *ngIf="app.status | displayBulb: 'yellow'" src="assets/img/warning-bulb.png"/>
-          <img class="bulb-off" *ngIf="app.status | displayBulb: 'off'" src="assets/img/off-bulb.png"/>
+          <img class="bulb-on"  *ngIf="pkg | displayBulb: 'green' : connected" src="assets/img/running-bulb.png"/>
+          <img class="bulb-on"  *ngIf="pkg | displayBulb: 'red' : connected" src="assets/img/issue-bulb.png"/>
+          <img class="bulb-on"  *ngIf="pkg | displayBulb: 'yellow' : connected" src="assets/img/warning-bulb.png"/>
+          <img class="bulb-off" *ngIf="pkg | displayBulb: 'off' : connected" src="assets/img/off-bulb.png"/>
           <ion-card-header>
-            <status [appStatus]="app.status" size="small"></status>
-            <p>{{ app.title }}</p>
+            <status [pkg]="pkg" size="small"></status>
+            <p>{{ (pkg | manifest).title }}</p>
           </ion-card-header>
         </ion-card>
       </ion-col>
