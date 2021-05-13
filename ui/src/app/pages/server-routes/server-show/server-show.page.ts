@@ -1,9 +1,10 @@
 import { Component } from '@angular/core'
 import { LoadingOptions } from '@ionic/core'
-import { AlertController } from '@ionic/angular'
+import { AlertController, ModalController } from '@ionic/angular'
 import { ApiService } from 'src/app/services/api/api.service'
 import { LoaderService } from 'src/app/services/loader.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
+import { BackupPage } from 'src/app/modals/backup/backup.page'
 
 @Component({
   selector: 'server-show',
@@ -15,8 +16,19 @@ export class ServerShowPage {
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly apiService: ApiService,
+    private readonly modalCtrl: ModalController,
     public readonly patch: PatchDbModel,
   ) { }
+
+  async presentModalBackup () {
+    const modal = await this.modalCtrl.create({
+      backdropDismiss: false,
+      component: BackupPage,
+      presentingElement: await this.modalCtrl.getTop(),
+    })
+
+    await modal.present()
+  }
 
   async presentAlertRestart () {
     const alert = await this.alertCtrl.create({
@@ -67,7 +79,7 @@ export class ServerShowPage {
       .of(LoadingSpinner(`Restarting...`))
       .displayDuringAsync( async () => {
         // this.serverModel.markUnreachable()
-        await this.apiService.restartServer()
+        await this.apiService.restartServer({ })
       })
       .catch(e => this.setError(e))
   }
@@ -77,7 +89,7 @@ export class ServerShowPage {
       .of(LoadingSpinner(`Shutting down...`))
       .displayDuringAsync( async () => {
         // this.serverModel.markUnreachable()
-        await this.apiService.shutdownServer()
+        await this.apiService.shutdownServer({ })
       })
       .catch(e => this.setError(e))
   }

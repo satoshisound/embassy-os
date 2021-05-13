@@ -1,6 +1,6 @@
 import { ServerStatus } from 'src/app/models/patch-db/data-model'
 import { PackagePropertiesVersionedData } from 'src/app/util/properties.util'
-import { RR } from './api-types'
+import { RR, ServerNotification } from './api-types'
 
 export module Mock {
 
@@ -32,7 +32,7 @@ export module Mock {
     },
   }
 
-  export const Notifications: RR.GetNotificationsRes = [
+  export const Notifications: ServerNotification[] = [
     {
       id: '123e4567-e89b-12d3-a456-426655440000',
       'package-id': 'bitcoind',

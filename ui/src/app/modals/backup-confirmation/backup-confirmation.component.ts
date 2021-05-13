@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core'
 import { ModalController } from '@ionic/angular'
-import { BehaviorSubject } from 'rxjs'
+import { PartitionInfo } from 'src/app/services/api/api-types'
 
 @Component({
   selector: 'backup-confirmation',
@@ -8,20 +8,18 @@ import { BehaviorSubject } from 'rxjs'
   styleUrls: ['./backup-confirmation.component.scss'],
 })
 export class BackupConfirmationComponent {
+  @Input() name: string
   unmasked = false
   password: string
-  $error$: BehaviorSubject<string> = new BehaviorSubject('')
-
-  // TODO: EJECT-DISKS pass this through the modalCtrl once ejecting disks is an option in the UI.
-  eject = true
   message: string
+  error = ''
 
-  @Input() app: AppInstalledFull
-  @Input() partition: DiskPartition
+  constructor (
+    private readonly modalCtrl: ModalController,
+  ) { }
 
-  constructor (private readonly modalCtrl: ModalController) { }
   ngOnInit () {
-    this.message = `Enter your master password to create an encrypted backup of ${this.app.title} to "${this.partition.label || this.partition.logicalname}".`
+    this.message = `Enter your master password to create an encrypted backup on "${this.name}".`
   }
 
   toggleMask () {
@@ -34,7 +32,7 @@ export class BackupConfirmationComponent {
 
   submit () {
     if (!this.password || this.password.length < 12) {
-      this.$error$.next('Password must be at least 12 characters in length.')
+      this.error = 'Password must be at least 12 characters in length.'
       return
     }
     const { password } = this

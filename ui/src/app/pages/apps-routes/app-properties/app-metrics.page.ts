@@ -5,26 +5,25 @@ import { pauseFor } from 'src/app/util/misc.util'
 import { BehaviorSubject } from 'rxjs'
 import { copyToClipboard } from 'src/app/util/web.util'
 import { AlertController, NavController, PopoverController, ToastController } from '@ionic/angular'
-import { AppMetrics } from 'src/app/util/metrics.util'
+import { PackageProperties } from 'src/app/util/properties.util'
 import { QRComponent } from 'src/app/components/qr/qr.component'
-import { AppMetricStore } from './metric-store'
-import * as JSONpointer from 'json-pointer'
-import { AppInstalledFull } from 'src/app/models/app-types'
+import { PropertyStore } from './property-store'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
+import * as JSONpointer from 'json-pointer'
 
 @Component({
-  selector: 'app-metrics',
-  templateUrl: './app-metrics.page.html',
-  styleUrls: ['./app-metrics.page.scss'],
+  selector: 'app-properties',
+  templateUrl: './app-properties.page.html',
+  styleUrls: ['./app-properties.page.scss'],
 })
-export class AppMetricsPage {
+export class AppPropertiesPage {
   error = ''
-  $loading$ = new BehaviorSubject(true)
-  appId: string
+  loading$ = new BehaviorSubject(true)
+  pkgId: string
   pointer: string
   qrCode: string
-  $metrics$ = new BehaviorSubject<AppMetrics>({ })
-  $hasMetrics$ = new BehaviorSubject<boolean>(null)
+  properties$ = new BehaviorSubject<PackageProperties>({ })
+  hasProperties$ = new BehaviorSubject<boolean>(null)
   unmasked: { [key: string]: boolean } = { }
 
   constructor (
@@ -33,49 +32,49 @@ export class AppMetricsPage {
     private readonly alertCtrl: AlertController,
     private readonly toastCtrl: ToastController,
     private readonly popoverCtrl: PopoverController,
-    private readonly metricStore: AppMetricStore,
+    private readonly propertyStore: PropertyStore,
     private readonly navCtrl: NavController,
     public patch: PatchDbModel,
   ) { }
 
   ngOnInit () {
-    this.appId = this.route.snapshot.paramMap.get('appId')
+    this.pkgId = this.route.snapshot.paramMap.get('pkgId')
     this.pointer = this.route.queryParams['pointer']
 
-    this.getMetrics().then(() => this.$loading$.next(false))
+    this.getProperties().then(() => this.loading$.next(false))
 
-    this.metricStore.watch().subscribe(m => {
-      const metrics = JSONpointer.get(m, this.pointer || '')
-      this.$metrics$.next(metrics)
+    this.propertyStore.watch().subscribe(m => {
+      const properties = JSONpointer.get(m, this.pointer || '')
+      this.properties$.next(properties)
     })
-    this.$metrics$.subscribe(m => {
-      this.$hasMetrics$.next(!!Object.keys(m || { }).length)
+    this.properties$.subscribe(m => {
+      this.hasProperties$.next(!!Object.keys(m || { }).length)
     })
     this.route.queryParams.subscribe(queryParams => {
       if (queryParams['pointer'] === this.pointer) return
       this.pointer = queryParams['pointer']
-      const metrics = JSONpointer.get(this.metricStore.$metrics$.getValue(), this.pointer || '')
-      this.$metrics$.next(metrics)
+      const properties = JSONpointer.get(this.propertyStore.properties$.getValue(), this.pointer || '')
+      this.properties$.next(properties)
     })
   }
 
   async doRefresh (event: any) {
-    await this.getMetrics(),
+    await this.getProperties(),
     event.target.complete()
   }
 
-  async presentDescription (metric: { key: string, value: AppMetrics[''] }, e: Event) {
+  async presentDescription (property: { key: string, value: PackageProperties[''] }, e: Event) {
     e.stopPropagation()
 
     const alert = await this.alertCtrl.create({
-      header: metric.key,
-      message: metric.value.description,
+      header: property.key,
+      message: property.value.description,
     })
     await alert.present()
   }
 
   async goToNested (key: string): Promise<any> {
-    this.navCtrl.navigateForward(`/services/installed/${this.appId}/metrics`, {
+    this.navCtrl.navigateForward(`/services/installed/${this.pkgId}/properties`, {
       queryParams: {
         pointer: `${this.pointer || ''}/${key}/value`,
       },
@@ -115,13 +114,13 @@ export class AppMetricsPage {
     return 0
   }
 
-  private async getMetrics (): Promise<void> {
+  private async getProperties (): Promise<void> {
     try {
-      const [metrics] = await Promise.all([
-        this.apiService.getAppMetrics(this.appId),
+      const [properties] = await Promise.all([
+        this.apiService.getPackageProperties({ id: this.pkgId }),
         pauseFor(600),
       ])
-      this.metricStore.update(metrics)
+      this.propertyStore.update(properties.data)
     } catch (e) {
       console.error(e)
       this.error = e.message

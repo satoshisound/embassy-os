@@ -5,25 +5,25 @@
         <ion-icon name="arrow-back"></ion-icon>
       </ion-button>
     </ion-buttons>
-    <ion-title>{{ app['title'] | async }}</ion-title>
+    <ion-title>{{ pkg.installed.manifest.title }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding-top">
 
   <!-- loading -->
-  <div *ngIf="$loading$ | async" class="full-page-spinner">
+  <div *ngIf="loading$ | async" class="full-page-spinner">
     <ion-spinner style="justify-self: center; align-self: end;" name="lines" color="warning"></ion-spinner>
-    <ion-label style="justify-self: center;" *ngIf="($loadingText$ | async)" color="dark">
-      {{$loadingText$ | async}}
+    <ion-label style="justify-self: center;" *ngIf="(loadingText$ | async)" color="dark">
+      {{ loadingText$ | async }}
     </ion-label>
   </div>
 
   <!-- not loading  -->
-  <ng-container *ngIf="!($loading$ | async)">
+  <ng-container *ngIf="!(loading$ | async)">
     <ion-item *ngIf="error" class="notifier-item">
       <ion-label style="margin: 7px 5px;" class="ion-text-wrap">
-        <p style="color: var(--ion-color-danger)">{{error.text}}</p>
+        <p style="color: var(--ion-color-danger)">{{ error.text }}</p>
         <p><a style="color: var(--ion-color-danger); text-decoration: underline; font-weight: bold;" *ngIf="error.moreInfo && !openErrorMoreInfo" (click)="openErrorMoreInfo = true">{{error.moreInfo.buttonText}}</a></p>
 
         <ng-container *ngIf="openErrorMoreInfo">
@@ -33,13 +33,14 @@
         </ng-container>
 
       </ion-label>
-      <ion-button style="position: absolute; right: 0; top: 0" *ngIf="app && (app.id | async)" color="danger" fill="clear" (click)="dismissError()">
+      <ion-button style="position: absolute; right: 0; top: 0" *ngIf="pkg" color="danger" fill="clear" (click)="dismissError()">
         <ion-icon name="close-outline"></ion-icon>
       </ion-button>
     </ion-item>
 
-    <ng-container *ngIf="app && (app.id | async)">
-      <ng-container *ngIf="([AppStatus.NEEDS_CONFIG] | includes: (app.status | async)) && !edited">
+    <ng-container *ngIf="pkg">
+      <!-- @TODO make sure this is how to determine if pkg is in needs_config -->
+      <ng-container *ngIf="pkg.installed.manifest.config && !pkg.installed.status.configured && !edited">
         <ion-item class="notifier-item">
           <ion-label class="ion-text-wrap">
             <h2 style="display: flex; align-items: center; margin-bottom: 3px;">
@@ -100,7 +101,7 @@
         expand="block"
         style="margin: 10px"
         color="primary"
-        (click)="save()"
+        (click)="save(pkg)"
       >
         <ion-text color="primary" style="font-weight: bold">
           Save

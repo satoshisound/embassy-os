@@ -27,7 +27,7 @@
               >
                 <ion-icon slot="start" [name]="page.icon"></ion-icon>
                 <ion-label style="font-family: 'Montserrat';">{{ page.title }}</ion-label>
-                <ion-badge *ngIf="page.url === '/notifications' && (patch.watch$('server', 'badge') | async) as badge" color="danger" style="margin-right: 3%;" [class.selected-badge]="selectedIndex == i">{{ badge }}</ion-badge>
+                <ion-badge *ngIf="page.url === '/notifications' && (patch.watch$('server-info', 'unread-notification-count') | async) as badge" color="danger" style="margin-right: 3%;" [class.selected-badge]="selectedIndex == i">{{ badge }}</ion-badge>
               </ion-item>
             </ion-menu-toggle>
           </ion-list>
@@ -71,6 +71,7 @@
     <ion-icon name="add"></ion-icon>
     <ion-icon name="alert-outline"></ion-icon>
     <ion-icon name="alert-circle-outline"></ion-icon>
+    <ion-icon name="aperture-outline"></ion-icon>
     <ion-icon name="arrow-back"></ion-icon>
     <ion-icon name="arrow-up"></ion-icon>
     <ion-icon name="bookmark-outline"></ion-icon>

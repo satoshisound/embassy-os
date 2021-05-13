@@ -336,11 +336,9 @@ export class WizardBaker {
     return { toolbar, slideDefinitions }
   }
 
-  configure (values: {
-    breakages: Breakages, app: AppInstalledPreview
-  }): InstallWizardComponent['params'] {
-    const { breakages, app } = values
-    const { title, versionInstalled: version  } = app
+  configure (values: { breakages: Breakages, pkg: AppInstalledPreview }): InstallWizardComponent['params'] {
+    const { breakages, pkg } = values
+    const { title, versionInstalled: version  } = pkg
     const action = 'configure'
     const toolbar: TopbarParams  = { action, title, version }
 

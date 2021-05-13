@@ -6,7 +6,6 @@ import { AppAvailableListPage } from './app-available-list.page'
 import { SharingModule } from '../../../modules/sharing.module'
 import { BadgeMenuComponentModule } from 'src/app/components/badge-menu-button/badge-menu.component.module'
 import { StatusComponentModule } from 'src/app/components/status/status.component.module'
-import { UpdateOsBannerComponentModule } from 'src/app/components/update-os-banner/update-os-banner.component.module'
 
 
 const routes: Routes = [
@@ -24,7 +23,6 @@ const routes: Routes = [
     StatusComponentModule,
     SharingModule,
     BadgeMenuComponentModule,
-    UpdateOsBannerComponentModule,
   ],
   declarations: [AppAvailableListPage],
 })

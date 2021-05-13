@@ -46,8 +46,8 @@ export module RR {
 
   // notification
 
-  export type GetNotificationsReq = { page: string, perPage: string } // notification.list
-  export type GetNotificationsRes = ServerNotification[]
+  export type GetNotificationsReq = { page: number, 'per-page': number } // notification.list
+  export type GetNotificationsRes = WithRevision<ServerNotification[]>
 
   export type DeleteNotificationReq = { id: string } // notification.delete
   export type DeleteNotificationRes = null
@@ -149,7 +149,7 @@ export module RR {
   export type RemovePackageReq = { id: string } // package.remove
   export type RemovePackageRes = WithRevision<null>
 
-  export type DryConfigureDependencyReq = { id: string } // package.dependency.configure.dry
+  export type DryConfigureDependencyReq = { 'dependency-id': string, 'dependent-id': string } // package.dependency.configure.dry
   export type DryConfigureDependencyRes = object
 
 
@@ -201,19 +201,23 @@ export interface ServerMetrics {
 }
 
 export interface DiskInfo {
-  [logicalname: string]: {
-    size: string
-    description: string | null
-    partitions: PartitionInfo
-  }
+  [logicalname: string]: DiskInfoEntry
+}
+
+export interface DiskInfoEntry {
+  size: string
+  description: string | null
+  partitions: PartitionInfo
 }
 
 export interface PartitionInfo {
-  [logicalname: string]: {
-    'is-mounted': boolean // We do not allow backups to mounted partitions
-    size: string | null
-    label: string | null
-  }
+  [logicalname: string]: PartitionInfoEntry
+}
+
+export interface PartitionInfoEntry {
+  'is-mounted': boolean // We do not allow backups to mounted partitions
+  size: string | null
+  label: string | null
 }
 
 export interface ServerSpecs {

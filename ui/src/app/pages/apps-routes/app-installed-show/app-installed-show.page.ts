@@ -3,15 +3,17 @@ import { AlertController, NavController, ToastController, ModalController, IonCo
 import { ApiService } from 'src/app/services/api/api.service'
 import { ActivatedRoute } from '@angular/router'
 import { copyToClipboard } from 'src/app/util/web.util'
-import { AppInstalledFull } from 'src/app/models/app-types'
 import { chill } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
+import { BackupPage } from 'src/app/modals/backup/backup.page'
 import { Observable, of, Subscription } from 'rxjs'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
 import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
 import { InformationPopoverComponent } from 'src/app/components/information-popover/information-popover.component'
 import { ConfigService } from 'src/app/services/config.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
+import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
+import { FEStatus } from 'src/app/services/pkg-status-rendering.service'
 
 @Component({
   selector: 'app-installed-show',
@@ -20,12 +22,14 @@ import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 })
 export class AppInstalledShowPage {
   error: string
-  appSub: Subscription
-  app: AppInstalledFull = { } as AppInstalledFull
-  AppStatus = AppStatus
+  pkgId: string
+  pkg: PackageDataEntry
+  pkgSub: Subscription
   hideLAN: boolean
 
-  dependencyDefintion = () => `<span style="font-style: italic">Dependencies</span> are other services which must be installed, configured appropriately, and started in order to start ${this.app.title}`
+  FeStatus = FEStatus
+
+  dependencyDefintion = () => `<span style="font-style: italic">Dependencies</span> are other services which must be installed, configured appropriately, and started in order to start ${this.pkg.installed.manifest.title}`
 
   @ViewChild(IonContent) content: IonContent
 
@@ -44,22 +48,21 @@ export class AppInstalledShowPage {
   ) { }
 
   async ngOnInit () {
-    const appId = this.route.snapshot.paramMap.get('appId')
-    this.appSub = this.patch$.watch$('apps', appId).subscribe(app => this.app = app)
+    this.pkgId = this.route.snapshot.paramMap.get('pkgId')
+    this.pkgSub = this.patch$.watch$('package-data', this.pkgId).subscribe(pkg => this.pkg = pkg)
   }
 
   async ngOnDestroy () {
-    this.appSub.unsubscribe()
+    this.pkgSub.unsubscribe()
   }
 
-  async launchUiTab () {
-    const url = this.config.isTor() ? `http://${this.app.torAddress}` : `https://${this.app.lanAddress}`
-    return window.open(url, '_blank')
+  launchUiTab (): void {
+    window.open(this.config.launchableURL(this.pkg.installed), '_blank')
   }
 
-  async copyTor () {
+  async copyTor (): Promise<void> {
     let message = ''
-    await copyToClipboard(this.app.torAddress || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
+    await copyToClipboard(this.config.torUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
 
     const toast = await this.toastCtrl.create({
       header: message,
@@ -70,9 +73,9 @@ export class AppInstalledShowPage {
     await toast.present()
   }
 
-  async copyLAN () {
+  async copyLAN (): Promise<void> {
     let message = ''
-    await copyToClipboard(this.app.lanAddress).then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
+    await copyToClipboard(this.config.lanUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
 
     const toast = await this.toastCtrl.create({
       header: message,
@@ -84,20 +87,21 @@ export class AppInstalledShowPage {
   }
 
   async stop (): Promise<void> {
+    const { id, title, version } = this.pkg.installed.manifest
     await this.loader.of({
-      message: `Stopping ${this.app.title}...`,
+      message: `Stopping...`,
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      const { breakages } = await this.apiService.stopApp(this.app.id, true)
+      const { breakages } = await this.apiService.dryStopPackage({ id })
 
       if (breakages.length) {
         const { cancelled } = await wizardModal(
           this.modalCtrl,
           this.wizardBaker.stop({
-            id: this.app.id,
-            title: this.app.title,
-            version: this.app.versionInstalled,
+            id,
+            title,
+            version,
             breakages,
           }),
         )
@@ -105,26 +109,26 @@ export class AppInstalledShowPage {
         if (cancelled) return { }
       }
 
-      return this.apiService.stopApp(this.app.id).then(chill)
+      return this.apiService.stopPackage({ id }).then(chill)
     }).catch(e => this.setError(e))
   }
 
   async tryStart (): Promise<void> {
-    if (this.app.startAlert) {
-      this.presentAlertStart()
+    const message = this.pkg.installed.manifest.alerts.start
+    if (message) {
+      this.presentAlertStart(message)
     } else {
       this.start()
     }
   }
 
-  async presentModalBackup (type: 'create' | 'restore') {
+  async presentModalBackup () {
     const modal = await this.modalCtrl.create({
       backdropDismiss: false,
-      component: AppBackupPage,
+      component: BackupPage,
       presentingElement: await this.modalCtrl.getTop(),
       componentProps: {
-        app: this.app,
-        type,
+        pkg: this.pkg,
       },
     })
 
@@ -132,13 +136,14 @@ export class AppInstalledShowPage {
   }
 
   async uninstall () {
+    const { id, title, version, alerts } = this.pkg.installed.manifest
     const data = await wizardModal(
       this.modalCtrl,
       this.wizardBaker.uninstall({
-        id: this.app.id,
-        title: this.app.title,
-        version: this.app.versionInstalled,
-        uninstallAlert: this.app.uninstallAlert,
+        id,
+        title,
+        version,
+        uninstallAlert: alerts.uninstall,
       }),
     )
 
@@ -161,16 +166,16 @@ export class AppInstalledShowPage {
   }
 
   scrollToRequirements () {
-    const el = document.getElementById('service-requirements-' + this.app.id)
+    const el = document.getElementById('dependencies')
     if (!el) return
     let y = el.offsetTop
     return this.content.scrollToPoint(0, y, 1000)
   }
 
-  private async presentAlertStart (): Promise<void> {
+  private async presentAlertStart (message: string): Promise<void> {
     const alert = await this.alertCtrl.create({
       header: 'Warning',
-      message: this.app.startAlert,
+      message,
       buttons: [
         {
           text: 'Cancel',
@@ -189,11 +194,11 @@ export class AppInstalledShowPage {
 
   private async start (): Promise<void> {
     this.loader.of({
-      message: `Starting ${this.app.title}...`,
+      message: `Starting...`,
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringP(
-      this.apiService.startApp(this.app.id),
+      this.apiService.startPackage({ id: this.pkgId }),
     ).catch(e => this.setError(e))
   }
 

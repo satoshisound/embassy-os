@@ -5,6 +5,7 @@ import { IonicModule } from '@ionic/angular'
 import { AppInstructionsPage } from './app-instructions.page'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
 import { SharingModule } from 'src/app/modules/sharing.module'
+import { VarDirective } from 'src/app/directives/var.directive'
 
 const routes: Routes = [
   {
@@ -21,6 +22,9 @@ const routes: Routes = [
     PwaBackComponentModule,
     SharingModule,
   ],
-  declarations: [AppInstructionsPage],
+  declarations: [
+    AppInstructionsPage,
+    VarDirective,
+  ],
 })
 export class AppInstructionsPageModule { }

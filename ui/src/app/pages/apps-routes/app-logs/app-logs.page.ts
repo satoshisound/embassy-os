@@ -13,7 +13,7 @@ import { BehaviorSubject } from 'rxjs'
 })
 export class AppLogsPage {
   @ViewChild(IonContent, { static: false }) private content: IonContent
-  appId: string
+  pkgId: string
   logs = ''
   error = ''
 
@@ -23,7 +23,7 @@ export class AppLogsPage {
   ) { }
 
   ngOnInit () {
-    this.appId = this.route.snapshot.paramMap.get('appId')
+    this.pkgId = this.route.snapshot.paramMap.get('pkgId')
     this.getLogs()
   }
 
@@ -32,7 +32,7 @@ export class AppLogsPage {
 
     try {
       const logs = await Promise.all([
-        this.apiService.getPackageLogs({ id: this.appId }),
+        this.apiService.getPackageLogs({ id: this.pkgId }),
         pauseFor(600),
       ])
       this.logs = logs.join('\n\n')

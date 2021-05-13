@@ -8,14 +8,13 @@
 </ion-header>
 
 <ion-content class="ion-padding-top">
-  <ng-container *ngIf="app$ | async as app">
+  <ion-spinner *ngIf="loading; else loaded" class="center" name="lines" color="warning"></ion-spinner>
 
-    <ion-item *ngIf="!app.instructions">
-      <ion-label class="ion-text-wrap">
-        <p>No instructions for {{ app.title }} {{ app.versionInstalled }}.</p>
-      </ion-label>
+  <ng-container #loaded>
+    <ion-item *ngIf="!instructions">
+      <ion-label>No instructions.</ion-label>
     </ion-item>
 
-    <div *ngIf="app.instructions" class="instuctions-padding" [innerHTML]="app.instructions | markdown"></div>
+    <div *ngIf="instructions" class="instuctions-padding" [innerHTML]="instructions | markdown"></div>
   </ng-container>
 </ion-content>

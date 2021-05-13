@@ -11,6 +11,7 @@ import { MaskPipe } from '../pipes/mask.pipe'
 import { DisplayBulbPipe } from '../pipes/display-bulb.pipe'
 import { HasUiPipe, LaunchablePipe, ManifestPipe } from '../pipes/ui.pipe'
 import { EmptyPipe } from '../pipes/empty.pipe'
+import { StatusPipe } from '../pipes/status.pipe'
 
 @NgModule({
     declarations: [
@@ -33,6 +34,7 @@ import { EmptyPipe } from '../pipes/empty.pipe'
         LaunchablePipe,
         ManifestPipe,
         EmptyPipe,
+        StatusPipe,
     ],
     exports: [
         EmverComparesPipe,
@@ -54,6 +56,7 @@ import { EmptyPipe } from '../pipes/empty.pipe'
         LaunchablePipe,
         ManifestPipe,
         EmptyPipe,
+        StatusPipe,
     ],
 })
 export class SharingModule { }

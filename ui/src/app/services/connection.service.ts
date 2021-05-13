@@ -65,7 +65,7 @@ export class ConnectionService {
     // ping server every 10 seconds
     this.httpSubscription = timer(0, 10000)
       .pipe(
-        switchMap(() => this.http.ping()),
+        switchMap(() => this.http.rpcRequest({ method: 'ping', params: { } })),
         retryWhen(errors =>
           errors.pipe(
             tap(val => {

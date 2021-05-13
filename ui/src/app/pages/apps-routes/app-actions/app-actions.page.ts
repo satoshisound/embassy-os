@@ -25,8 +25,8 @@ export class AppActionsPage {
   ) { }
 
   ngOnInit () {
-    const id = this.route.snapshot.paramMap.get('appId')
-    this.pkg$ = this.patch.watch$('package-data', id)
+    const pkgId = this.route.snapshot.paramMap.get('pkgId')
+    this.pkg$ = this.patch.watch$('package-data', pkgId)
   }
 
   async handleAction (app: InstalledPackageDataEntry, action: { key: string, value: Action }) {

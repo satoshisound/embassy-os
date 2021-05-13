@@ -17,9 +17,9 @@ export class AppInstalledListPage {
     public readonly patch: PatchDbModel,
   ) { }
 
-  async launchUi (pkg: PackageDataEntry, event: Event) {
+  launchUi (pkg: PackageDataEntry, event: Event): void {
     event.preventDefault()
     event.stopPropagation()
-    return window.open(this.config.launchableURL(pkg.installed), '_blank')
+    window.open(this.config.launchableURL(pkg.installed), '_blank')
   }
 }

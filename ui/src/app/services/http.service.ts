@@ -11,29 +11,26 @@ import { Revision } from 'patch-db-client'
 export class HttpService {
   private unauthorizedApiResponse$ = new Subject()
   authReqEnabled: boolean = false
+  rootUrl: string
 
   constructor (
     private readonly http: HttpClient,
     private readonly config: ConfigService,
-  ) { }
+  ) {
+    const { url, version } = this.config.api
+    this.rootUrl = `${url}/${version}`
+  }
 
   watch401$ (): Observable<{ }> {
     return this.unauthorizedApiResponse$.asObservable()
   }
 
-  async ping (): Promise<void> {
-    const httpOpts = {
-      method: Method.GET,
-      data: { method: 'ping', params: { } },
-    }
-    this.httpRequest(httpOpts)
-  }
-
-  async rpcRequest<T> (options: RPCOptions): Promise<T> {
-    options.params = options.params || { }
+  async rpcRequest<T> (rpcOpts: RPCOptions): Promise<T> {
+    rpcOpts.params = rpcOpts.params || { }
     const httpOpts = {
       method: Method.POST,
-      data: options,
+      data: rpcOpts,
+      url: this.rootUrl,
     }
 
     const res = await this.httpRequest<RPCResponse<T>>(httpOpts)
@@ -43,10 +40,8 @@ export class HttpService {
     if (isRpcSuccess(res)) return res.result
   }
 
-  private async httpRequest<T> (httpOpts: HttpOptions): Promise<T> {
-    let { url, version } = this.config.api
-    url = `${url}/${version}`
-    const { body, timeout, ...rest} = translateOptions(httpOpts)
+  async httpRequest<T> (httpOpts: HttpOptions): Promise<T> {
+    const { url, body, timeout, ...rest} = translateOptions(httpOpts)
 
     let req: Observable<{ body: T }>
     switch (httpOpts.method){
@@ -155,6 +150,7 @@ export interface HttpOptions {
   headers?: {
     [key: string]: string;
   }
+  url: string
   readTimeout?: number
 }
 
@@ -170,6 +166,7 @@ export interface HttpJsonOptions {
   responseType?: 'json'
   withCredentials?: boolean
   body?: any
+  url: string
   timeout: number
 }
 
@@ -182,6 +179,7 @@ function translateOptions (httpOpts: HttpOptions): HttpJsonOptions {
     headers: httpOpts.headers,
     params: httpOpts.params,
     body: httpOpts.data || { },
+    url: httpOpts.url,
     timeout: httpOpts.readTimeout,
   }
 }

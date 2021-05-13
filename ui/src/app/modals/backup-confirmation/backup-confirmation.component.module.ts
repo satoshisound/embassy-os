@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
-import { AppBackupConfirmationComponent } from './backup-confirmation.component'
+import { BackupConfirmationComponent } from './backup-confirmation.component'
 import { IonicModule } from '@ionic/angular'
 import { RouterModule } from '@angular/router'
 import { SharingModule } from 'src/app/modules/sharing.module'
@@ -8,7 +8,7 @@ import { FormsModule } from '@angular/forms'
 
 @NgModule({
   declarations: [
-    AppBackupConfirmationComponent,
+    BackupConfirmationComponent,
   ],
   imports: [
     CommonModule,
@@ -17,6 +17,6 @@ import { FormsModule } from '@angular/forms'
     SharingModule,
     FormsModule,
   ],
-  exports: [AppBackupConfirmationComponent],
+  exports: [BackupConfirmationComponent],
 })
-export class AppBackupConfirmationComponentModule { }
+export class BackupConfirmationComponentModule { }

@@ -104,9 +104,18 @@ export class MockApiService extends ApiService {
 
   // notification
 
-  async getNotifications (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes> {
+  async getNotificationsRaw (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes> {
     await pauseFor(2000)
-    return Mock.Notifications
+    return {
+      response: Mock.Notifications,
+      revision: {
+        id: this.nextSequence(),
+        patch: [
+          { op: PatchOp.REPLACE, path: 'server-info/unread-notification-count', value: 0 },
+        ],
+        expireId: null,
+      },
+    }
   }
 
   async deleteNotification (params: RR.DeleteNotificationReq): Promise<RR.DeleteNotificationRes> {

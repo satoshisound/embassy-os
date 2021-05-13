@@ -66,7 +66,7 @@ export class LiveApiService extends ApiService {
 
   // notification
 
-  async getNotifications (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes> {
+  async getNotificationsRaw (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes> {
     return this.http.rpcRequest({ method: 'notifications.list', params })
   }
 

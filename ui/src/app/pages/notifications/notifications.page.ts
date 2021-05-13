@@ -2,7 +2,7 @@ import { Component } from '@angular/core'
 import { ApiService } from 'src/app/services/api/api.service'
 import { pauseFor } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
-import { ServerNotification } from 'src/app/models/patch-db/data-model'
+import { ServerNotification } from 'src/app/services/api/api-types'
 
 @Component({
   selector: 'notifications',
@@ -24,7 +24,6 @@ export class NotificationsPage {
 
   async ngOnInit () {
     this.notifications = await this.getNotifications()
-    this.serverModel.update({ badge: 0 })
     this.loading = false
   }
 
@@ -40,11 +39,11 @@ export class NotificationsPage {
     e.target.complete()
   }
 
-  async getNotifications (): Promise<S9Notification[]> {
-    let notifications: S9Notification[] = []
+  async getNotifications (): Promise<ServerNotification[]> {
+    let notifications: ServerNotification[] = []
     try {
       [notifications] = await Promise.all([
-        this.apiService.getNotifications(this.page, this.perPage),
+        this.apiService.getNotifications({ page: this.page, 'per-page': this.perPage}),
         pauseFor(600),
       ])
       this.needInfinite = notifications.length >= this.perPage
@@ -58,7 +57,7 @@ export class NotificationsPage {
     }
   }
 
-  getColor (notification: S9Notification): string {
+  getColor (notification: ServerNotification): string {
     const char = notification.code.charAt(0)
     switch (char) {
       case '0':
@@ -74,13 +73,13 @@ export class NotificationsPage {
     }
   }
 
-  async remove (notificationId: string, index: number): Promise<void> {
+  async remove (id: string, index: number): Promise<void> {
     this.loader.of({
       message: 'Deleting...',
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringP(
-      this.apiService.deleteNotification(notificationId).then(() => {
+      this.apiService.deleteNotification({ id }).then(() => {
         this.notifications.splice(index, 1)
         this.error = ''
       }),

@@ -8,9 +8,9 @@
 </ion-header>
 
 <ion-content class="ion-padding-top">
-  <ion-spinner *ngIf="$loading$ | async" class="center" name="lines" color="warning"></ion-spinner>
+  <ion-spinner *ngIf="loading$ | async" class="center" name="lines" color="warning"></ion-spinner>
 
-  <ng-container *ngIf="!($loading$ | async) && patch.watch$('apps', appId) as app">
+  <ng-container *ngIf="!(loading$ | async) && patch.watch$('package-data', pkgId) as pkg">
     <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
       <ion-refresher-content pullingIcon="lines" refreshingSpinner="lines"></ion-refresher-content>
     </ion-refresher>
@@ -26,16 +26,16 @@
       </ion-label>
     </ion-item>
 
-    <!-- no metrics -->
-    <ion-item *ngIf="($hasMetrics$ | async) === false">
+    <!-- no properties -->
+    <ion-item *ngIf="(hasProperties$ | async) === false">
       <ion-label class="ion-text-wrap">
         <p>No properties for {{ app.title }} {{ app.versionInstalled }}.</p>
       </ion-label>
     </ion-item>
 
-    <!-- metrics -->
-    <ion-item-group *ngIf="($hasMetrics$ | async) === true">
-      <div *ngFor="let keyval of $metrics$ | async | keyvalue: asIsOrder">
+    <!-- properties -->
+    <ion-item-group *ngIf="(hasProperties$ | async) === true">
+      <div *ngFor="let keyval of properties$ | async | keyvalue: asIsOrder">
         <!-- object -->
         <ion-item button detail="true" *ngIf="keyval.value.type === 'object'" (click)="goToNested(keyval.key)">
           <ion-button *ngIf="keyval.value.description" class="help-button" fill="clear" slot="start" (click)="presentDescription(keyval, $event)">

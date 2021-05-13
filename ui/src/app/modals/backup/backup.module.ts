@@ -1,17 +1,17 @@
 import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { IonicModule } from '@ionic/angular'
-import { AppBackupPage } from './backup.page'
-import { AppBackupConfirmationComponentModule } from 'src/app/components/backup-confirmation/app-backup-confirmation.component.module'
+import { BackupPage } from './backup.page'
+import { BackupConfirmationComponentModule } from 'src/app/modals/backup-confirmation/backup-confirmation.component.module'
 
 @NgModule({
-  declarations: [AppBackupPage],
+  declarations: [BackupPage],
   imports: [
     CommonModule,
     IonicModule,
-    AppBackupConfirmationComponentModule,
+    BackupConfirmationComponentModule,
   ],
-  entryComponents: [AppBackupPage],
-  exports: [AppBackupPage],
+  entryComponents: [BackupPage],
+  exports: [BackupPage],
 })
-export class AppBackupPageModule { }
+export class BackupPageModule { }

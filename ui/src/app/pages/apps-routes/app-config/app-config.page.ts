@@ -1,14 +1,11 @@
 import { Component } from '@angular/core'
 import { NavController, AlertController, ModalController, PopoverController } from '@ionic/angular'
 import { ActivatedRoute } from '@angular/router'
-import { AppStatus } from 'src/app/models/app-model'
-import { AppInstalledFull } from 'src/app/models/app-types'
 import { ApiService } from 'src/app/services/api/api.service'
-import { pauseFor, isEmptyObject, modulateTime } from 'src/app/util/misc.util'
-import { PropertySubject, peekProperties } from 'src/app/util/property-subject.util'
+import { pauseFor, isEmptyObject } from 'src/app/util/misc.util'
 import { LoaderService, markAsLoadingDuring$ } from 'src/app/services/loader.service'
 import { TrackingModalController } from 'src/app/services/tracking-modal-controller.service'
-import { BehaviorSubject, forkJoin, from, fromEvent, of } from 'rxjs'
+import { BehaviorSubject, forkJoin, from, fromEvent, Observable, of } from 'rxjs'
 import { catchError, concatMap, map, take, tap } from 'rxjs/operators'
 import { Recommendation } from 'src/app/components/recommendation-button/recommendation-button.component'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
@@ -16,7 +13,9 @@ import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
 import { Cleanup } from 'src/app/util/cleanup'
 import { InformationPopoverComponent } from 'src/app/components/information-popover/information-popover.component'
 import { ConfigSpec } from 'src/app/pkg-config/config-types'
-import { ConfigCursor } from 'src/app/app-config/config-cursor'
+import { ConfigCursor } from 'src/app/pkg-config/config-cursor'
+import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
   selector: 'app-config',
@@ -28,25 +27,25 @@ export class AppConfigPage extends Cleanup {
     { title: string, description: string, buttonText: string }
   }
 
-  invalid: string
-  $loading$ = new BehaviorSubject(true)
-  $loadingText$ = new BehaviorSubject(undefined)
+  loading$ = new BehaviorSubject(true)
+  loadingText$ = new BehaviorSubject(undefined)
 
-  app: PropertySubject<AppInstalledFull> = { } as any
-  appId: string
+  pkgId: string
+  pkg: PackageDataEntry
   hasConfig = false
+
+  backButtonDefense = false
 
   recommendation: Recommendation | null = null
   showRecommendation = true
   openRecommendation = false
 
+  invalid: string
   edited: boolean
   added: boolean
   rootCursor: ConfigCursor<'object'>
   spec: ConfigSpec
   config: object
-
-  AppStatus = AppStatus
 
   constructor (
     private readonly navCtrl: NavController,
@@ -58,20 +57,18 @@ export class AppConfigPage extends Cleanup {
     private readonly modalController: ModalController,
     private readonly trackingModalCtrl: TrackingModalController,
     private readonly popoverController: PopoverController,
+    private readonly patch: PatchDbModel,
   ) { super() }
 
-  backButtonDefense = false
-
   async ngOnInit () {
-    this.appId = this.route.snapshot.paramMap.get('appId') as string
-
-    this.route.params.pipe(take(1)).subscribe(params => {
-      if (params.edit) {
-        window.history.back()
-      }
-    })
+    this.pkgId = this.route.snapshot.paramMap.get('pkgId') as string
 
     this.cleanup(
+      this.route.params.pipe(take(1)).subscribe(params => {
+        if (params.edit) {
+          window.history.back()
+        }
+      }),
       fromEvent(window, 'popstate').subscribe(() => {
         this.backButtonDefense = false
         this.trackingModalCtrl.dismissAll()
@@ -89,47 +86,44 @@ export class AppConfigPage extends Cleanup {
       }),
     )
 
-    markAsLoadingDuring$(this.$loading$,
-      from(this.preload.appFull(this.appId))
-        .pipe(
-          tap(app => this.app = app),
-          tap(() => this.$loadingText$.next(`Fetching config spec...`)),
-          concatMap(() => forkJoin([this.apiService.getAppConfig(this.appId), pauseFor(600)])),
-          concatMap(([{ spec, config }]) => {
-            const rec = history.state && history.state.configRecommendation as Recommendation
-            if (rec) {
-              this.$loadingText$.next(`Setting properties to accomodate ${rec.title}...`)
-              return from(this.apiService.postConfigureDependency(this.appId, rec.appId))
-              .pipe(
-                map(res => ({
-                  spec,
-                  config,
-                  dependencyConfig: res.config,
-                })),
-                tap(() => this.recommendation = rec),
-                catchError(e => {
-                  this.error = { text: `Could not set properties to accomodate ${rec.title}: ${e.message}`, moreInfo: {
-                    title: `${rec.title} requires the following:`,
-                    description: rec.description,
-                    buttonText: 'Configure Manually',
-                  } }
-                  return of({ spec, config, dependencyConfig: null })
-                }),
-              )
-            } else {
+    this.patch.watch$('package-data', this.pkgId)
+    .pipe(
+      tap(pkg => this.pkg = pkg),
+      tap(() => this.loadingText$.next(`Fetching config spec...`)),
+      concatMap(() => forkJoin([this.apiService.getPackageConfig({ id: this.pkg.installed.manifest.id }), pauseFor(600)])),
+      concatMap(([{ spec, config }]) => {
+        const rec = history.state && history.state.configRecommendation as Recommendation
+        if (rec) {
+          this.loadingText$.next(`Setting properties to accommodate ${rec.title}...`)
+          return from(this.apiService.dryConfigureDependency({ 'dependency-id': this.pkgId, 'dependent-id': rec.appId }))
+          .pipe(
+            map(res => ({
+              spec,
+              config,
+              dependencyConfig: res,
+            })),
+            tap(() => this.recommendation = rec),
+            catchError(e => {
+              this.error = { text: `Could not set properties to accommodate ${rec.title}: ${e.message}`, moreInfo: {
+                title: `${rec.title} requires the following:`,
+                description: rec.description,
+                buttonText: 'Configure Manually',
+              } }
               return of({ spec, config, dependencyConfig: null })
-            }
-          }),
-          map(({ spec, config, dependencyConfig }) => this.setConfig(spec, config, dependencyConfig)),
-          tap(() => this.$loadingText$.next(undefined)),
-        ),
+            }),
+          )
+        } else {
+          return of({ spec, config, dependencyConfig: null })
+        }
+      }),
+      map(({ spec, config, dependencyConfig }) => this.setConfig(spec, config, dependencyConfig)),
+      tap(() => this.loadingText$.next(undefined)),
     ).subscribe({
-        error: e => {
-          console.error(e)
-          this.error = { text: e.message }
-        },
+      error: e => {
+        console.error(e.message)
+        this.error = { text: e.message }
       },
-    )
+    })
   }
 
   async presentPopover (title: string, description: string, ev: any) {
@@ -178,17 +172,13 @@ export class AppConfigPage extends Cleanup {
     }
   }
 
-  async save () {
-    const app = peekProperties(this.app)
-    const ogAppStatus = app.status
-
+  async save (pkg: PackageDataEntry) {
     return this.loader.of({
       message: `Saving config...`,
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      const config = this.config
-      const { breakages } = await this.apiService.patchAppConfig(app.id, config, true)
+      const { breakages } = await this.apiService.drySetPackageConfig({ id: this.pkgId, config: this.config })
 
       if (breakages.length) {
         const { cancelled } = await wizardModal(
@@ -201,15 +191,11 @@ export class AppConfigPage extends Cleanup {
         if (cancelled) return { skip: true }
       }
 
-      return this.apiService.patchAppConfig(app.id, config).then(
-        () => this.preload.loadInstalledApp(this.appId).then(() => ({ skip: false })),
-      )
+      return this.apiService.setPackageConfig({ id: this.pkgId, config: this.config })
+        .then(() => ({ skip: false }))
     })
     .then(({ skip }) => {
       if (skip) return
-      if (ogAppStatus === AppStatus.RUNNING) {
-        this.appModel.update({ id: this.appId, status: AppStatus.RESTARTING }, modulateTime(new Date(), 3, 'seconds'))
-      }
       this.navCtrl.back()
     })
     .catch(e => this.error = { text: e.message })

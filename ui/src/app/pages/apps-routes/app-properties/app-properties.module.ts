@@ -2,7 +2,7 @@ import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { Routes, RouterModule } from '@angular/router'
 import { IonicModule } from '@ionic/angular'
-import { AppMetricsPage } from './app-metrics.page'
+import { AppPropertiesPage } from './app-properties.page'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
 import { QRComponentModule } from 'src/app/components/qr/qr.component.module'
 import { SharingModule } from 'src/app/modules/sharing.module'
@@ -10,7 +10,7 @@ import { SharingModule } from 'src/app/modules/sharing.module'
 const routes: Routes = [
   {
     path: '',
-    component: AppMetricsPage,
+    component: AppPropertiesPage,
   },
 ]
 
@@ -23,6 +23,6 @@ const routes: Routes = [
     QRComponentModule,
     SharingModule,
   ],
-  declarations: [AppMetricsPage],
+  declarations: [AppPropertiesPage],
 })
-export class AppMetricsPageModule { }
+export class AppPropertiesPageModule { }

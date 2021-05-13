@@ -18,14 +18,14 @@
             </div>
           </div>
 
-          <img style="position: absolute" class="main-img" [src]="pkg.icon" [alt]="icon" />
+          <img style="position: absolute" class="main-img" [src]="pkg['static-files'].icon" [alt]="icon" />
           <img class="main-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=">
           <img class="bulb-on"  *ngIf="pkg | displayBulb: 'green' : connected" src="assets/img/running-bulb.png"/>
           <img class="bulb-on"  *ngIf="pkg | displayBulb: 'red' : connected" src="assets/img/issue-bulb.png"/>
           <img class="bulb-on"  *ngIf="pkg | displayBulb: 'yellow' : connected" src="assets/img/warning-bulb.png"/>
           <img class="bulb-off" *ngIf="pkg | displayBulb: 'off' : connected" src="assets/img/off-bulb.png"/>
           <ion-card-header>
-            <status [pkg]="pkg" size="small"></status>
+            <status [pkg]="pkg" [connected]="connected" size="small"></status>
             <p>{{ (pkg | manifest).title }}</p>
           </ion-card-header>
         </ion-card>

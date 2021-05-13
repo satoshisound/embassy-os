@@ -32,7 +32,7 @@ export class AppAvailableShowPage extends Cleanup {
 
   $error$ = new BehaviorSubject(undefined)
   $app$: PropertySubject<AppAvailableFull> = { } as any
-  appId: string
+  pkgId: string
 
   openRecommendation = false
   recommendation: Recommendation | null = null
@@ -55,13 +55,13 @@ export class AppAvailableShowPage extends Cleanup {
   }
 
   async ngOnInit () {
-    this.appId = this.route.snapshot.paramMap.get('appId') as string
+    this.pkgId = this.route.snapshot.paramMap.get('pkgId') as string
 
     this.cleanup(
       // new version always includes dependencies, but not vice versa
       this.$newVersionLoading$.subscribe(this.$dependenciesLoading$),
       markAsLoadingDuring$(this.$loading$,
-        from(this.apiService.getAvailableApp(this.appId)).pipe(
+        from(this.apiService.getAvailableApp(this.pkgId)).pipe(
           tap(app => this.$app$ = initPropertySubject(app)),
           concatMap(() => this.fetchRecommendation()),
         ),
@@ -95,7 +95,7 @@ export class AppAvailableShowPage extends Cleanup {
   syncVersionSpecificInfo (versionSpec?: string): Observable<any> {
     if (!this.$app$.versionViewing) return of({ })
     const specToFetch = versionSpec || `=${this.$app$.versionViewing.getValue()}`
-    return from(this.apiService.getAvailableAppVersionSpecificInfo(this.appId, specToFetch)).pipe(
+    return from(this.apiService.getAvailableAppVersionSpecificInfo(this.pkgId, specToFetch)).pipe(
       tap(versionInfo => this.mergeInfo(versionInfo)),
     )
   }

@@ -34,9 +34,11 @@ export enum ServerStatus {
 
 export interface PackageDataEntry {
   state: PackageState
-  license: URL
-  instructions: URL
-  icon: URL
+  'static-files': {
+    license: URL
+    instructions: URL
+    icon: URL
+  }
   'unverified-manifest'?: Manifest // exists when: installing, updating
   installed?: InstalledPackageDataEntry, // exists when: installed, updating, removing
   'install-progress'?: InstallProgress, // exists when: installing, updating
