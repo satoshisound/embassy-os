@@ -5,7 +5,7 @@
         <ion-icon name="arrow-back"></ion-icon>
       </ion-button>
     </ion-buttons>
-    <ion-title>{{ pkg.installed.manifest.title }}</ion-title>
+    <ion-title>{{ pkg.manifest.title }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -40,7 +40,7 @@
 
     <ng-container *ngIf="pkg">
       <!-- @TODO make sure this is how to determine if pkg is in needs_config -->
-      <ng-container *ngIf="pkg.installed.manifest.config && !pkg.installed.status.configured && !edited">
+      <ng-container *ngIf="pkg.manifest.config && !pkg.status.configured && !edited">
         <ion-item class="notifier-item">
           <ion-label class="ion-text-wrap">
             <h2 style="display: flex; align-items: center; margin-bottom: 3px;">

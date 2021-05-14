@@ -9,15 +9,15 @@
 
 <ion-content class="ion-padding-top">
 
-  <ion-item *ngIf="error$ | async as error" class="ion-margin-bottom">
+  <ion-item *ngIf="error" class="ion-margin-bottom">
     <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
   </ion-item>
 
   <ion-item-group>
     <ion-item-divider>Saved Keys</ion-item-divider>
-    <ion-item *ngFor="let fingerprint of patch.watch$('server', 'ssh') | async; let i = index">
+    <ion-item *ngFor="let ssh of sshKeys | keyvalue | asIsOrder">
       <ion-label class="ion-text-wrap">
-        {{ fingerprint.alg }} {{ fingerprint.hash }} {{ fingerprint.hostname }}
+        {{ ssh.value.alg }} {{ ssh.value.hash }} {{ ssh.value.hostname }}
       </ion-label>
       <ion-button slot="end" fill="clear" (click)="presentAlertDelete(fingerprint, i)">
         <ion-icon slot="icon-only" name="close-outline" color="medium"></ion-icon>

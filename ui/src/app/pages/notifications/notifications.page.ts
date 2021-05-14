@@ -42,10 +42,8 @@ export class NotificationsPage {
   async getNotifications (): Promise<ServerNotification[]> {
     let notifications: ServerNotification[] = []
     try {
-      [notifications] = await Promise.all([
-        this.apiService.getNotifications({ page: this.page, 'per-page': this.perPage}),
-        pauseFor(600),
-      ])
+      // @TODO uncomment
+      // notifications = await this.apiService.getNotifications({ page: this.page, 'per-page': this.perPage})
       this.needInfinite = notifications.length >= this.perPage
       this.page++
       this.error = ''

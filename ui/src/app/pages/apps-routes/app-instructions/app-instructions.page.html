@@ -10,11 +10,11 @@
 <ion-content class="ion-padding-top">
   <ion-spinner *ngIf="loading; else loaded" class="center" name="lines" color="warning"></ion-spinner>
 
-  <ng-container #loaded>
+  <ng-template #loaded>
     <ion-item *ngIf="!instructions">
       <ion-label>No instructions.</ion-label>
     </ion-item>
 
     <div *ngIf="instructions" class="instuctions-padding" [innerHTML]="instructions | markdown"></div>
-  </ng-container>
+  </ng-template>
 </ion-content>

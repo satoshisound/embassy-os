@@ -24,21 +24,26 @@ export class MockApiService extends ApiService {
     return super.watch$()
   }
 
+  async ping (): Promise<void> {
+    console.log('pinging server')
+    return
+  }
+
   // db
 
   async getRevisions (since: number): Promise<RR.GetRevisionsRes> {
     await pauseFor(2000)
     return {
-      id: this.nextSequence(),
       ...Mock.DbDump,
+      id: this.nextSequence(),
     }
   }
 
   async getDump (): Promise<RR.GetDumpRes> {
     await pauseFor(2000)
     return {
-      id: this.nextSequence(),
       ...Mock.DbDump,
+      id: this.nextSequence(),
     }
   }
 
@@ -125,11 +130,6 @@ export class MockApiService extends ApiService {
 
   // wifi
 
-  async getWifi (params: RR.GetWifiReq): Promise<RR.GetWifiRes> {
-    await pauseFor(2000)
-    return Mock.WiFi
-  }
-
   async addWifi (params: RR.AddWifiReq): Promise<RR.AddWifiRes> {
     await pauseFor(2000)
     return null
@@ -168,7 +168,7 @@ export class MockApiService extends ApiService {
 
   async getSshKeys (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes> {
     await pauseFor(2000)
-    return Mock.SshKeys
+    return Mock.SshInfo
   }
 
   async addSshKey (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes> {
@@ -217,12 +217,13 @@ export class MockApiService extends ApiService {
   // package
 
   async getPackageInstructions (params: RR.GetPackageInstructionsReq): Promise<RR.GetPackageInstructionsRes> {
-    return require('./md-sample.md')
+    // return require('./md-sample.md')
+    return '**testing markdown**'
   }
 
   async getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes> {
     await pauseFor(2000)
-    return parsePropertiesPermissive(Mock.PackageProperties)
+    return parsePropertiesPermissive(Mock.PackageProperties) as any // @TODO why is any needed?
   }
 
   async getPackageLogs (params: RR.GetPackageLogsReq): Promise<RR.GetPackageLogsRes> {

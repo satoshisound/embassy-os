@@ -13,7 +13,11 @@ export class ServerSpecsPage {
   constructor (
     private readonly toastCtrl: ToastController,
     public readonly patch: PatchDbModel,
-  ) { }
+  ) {
+    this.patch.watch$('server-info').subscribe(info => {
+      console.log('INFO', info)
+    })
+  }
 
   async copyTor (address: string) {
     let message = ''

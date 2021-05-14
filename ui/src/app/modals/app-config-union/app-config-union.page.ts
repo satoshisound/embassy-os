@@ -1,6 +1,6 @@
 import { Component, Input, ViewChild } from '@angular/core'
 import { ModalController } from '@ionic/angular'
-import { ConfigCursor } from 'src/app/app-config/config-cursor'
+import { ConfigCursor } from 'src/app/pkg-config/config-cursor'
 import { ValueSpecUnion } from 'src/app/pkg-config/config-types'
 import { ObjectConfigComponent } from 'src/app/components/object-config/object-config.component'
 import { mapUnionSpec } from '../../pkg-config/config-utilities'

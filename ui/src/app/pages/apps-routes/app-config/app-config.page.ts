@@ -3,9 +3,9 @@ import { NavController, AlertController, ModalController, PopoverController } fr
 import { ActivatedRoute } from '@angular/router'
 import { ApiService } from 'src/app/services/api/api.service'
 import { pauseFor, isEmptyObject } from 'src/app/util/misc.util'
-import { LoaderService, markAsLoadingDuring$ } from 'src/app/services/loader.service'
+import { LoaderService } from 'src/app/services/loader.service'
 import { TrackingModalController } from 'src/app/services/tracking-modal-controller.service'
-import { BehaviorSubject, forkJoin, from, fromEvent, Observable, of } from 'rxjs'
+import { BehaviorSubject, forkJoin, from, fromEvent, of } from 'rxjs'
 import { catchError, concatMap, map, take, tap } from 'rxjs/operators'
 import { Recommendation } from 'src/app/components/recommendation-button/recommendation-button.component'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
@@ -14,7 +14,7 @@ import { Cleanup } from 'src/app/util/cleanup'
 import { InformationPopoverComponent } from 'src/app/components/information-popover/information-popover.component'
 import { ConfigSpec } from 'src/app/pkg-config/config-types'
 import { ConfigCursor } from 'src/app/pkg-config/config-cursor'
-import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
+import { InstalledPackageDataEntry } from 'src/app/models/patch-db/data-model'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
@@ -31,7 +31,7 @@ export class AppConfigPage extends Cleanup {
   loadingText$ = new BehaviorSubject(undefined)
 
   pkgId: string
-  pkg: PackageDataEntry
+  pkg: InstalledPackageDataEntry
   hasConfig = false
 
   backButtonDefense = false
@@ -86,11 +86,11 @@ export class AppConfigPage extends Cleanup {
       }),
     )
 
-    this.patch.watch$('package-data', this.pkgId)
+    this.patch.watch$('package-data', this.pkgId, 'installed')
     .pipe(
       tap(pkg => this.pkg = pkg),
       tap(() => this.loadingText$.next(`Fetching config spec...`)),
-      concatMap(() => forkJoin([this.apiService.getPackageConfig({ id: this.pkg.installed.manifest.id }), pauseFor(600)])),
+      concatMap(() => forkJoin([this.apiService.getPackageConfig({ id: this.pkg.manifest.id }), pauseFor(600)])),
       concatMap(([{ spec, config }]) => {
         const rec = history.state && history.state.configRecommendation as Recommendation
         if (rec) {
@@ -172,7 +172,7 @@ export class AppConfigPage extends Cleanup {
     }
   }
 
-  async save (pkg: PackageDataEntry) {
+  async save (pkg: InstalledPackageDataEntry) {
     return this.loader.of({
       message: `Saving config...`,
       spinner: 'lines',
@@ -184,7 +184,7 @@ export class AppConfigPage extends Cleanup {
         const { cancelled } = await wizardModal(
           this.modalController,
           this.wizardBaker.configure({
-            app,
+            pkg,
             breakages,
           }),
         )

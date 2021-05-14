@@ -6,7 +6,7 @@
     <ion-menu contentId="main-content" type="overlay">
       <ion-header *ngIf="showMenuContent$ | async" class="menu-style">
         <ion-toolbar style="--background: var(--ion-background-color);">
-          <ion-title *ngIf="patch.watch$('server', 'name') | async as name; else dots">{{ name }}</ion-title>
+          <ion-title *ngIf="patch.watch$('ui', 'name') | async as name; else dots">{{ name }}</ion-title>
           <ng-template #dots>
             <ion-title><ion-spinner name="dots" color="warning"></ion-spinner></ion-title>
           </ng-template>
@@ -45,14 +45,14 @@
           </ion-card>
         </ng-container>
       </ion-content>
-      <ion-footer style="padding-bottom: 5%; text-align: center;" class="menu-style">
+      <ion-footer style="padding-bottom: 16px; text-align: center;" class="menu-style">
         <ion-menu-toggle auto-hide="false">
-          <ion-item *ngIf="showMenuContent$ | async" button style="--background:var(--ion-background-color); margin-bottom: 10%;" fill="clear" (click)="presentAlertLogout()">
+          <ion-item *ngIf="showMenuContent$ | async" button style="--background:var(--ion-background-color); margin-bottom: 16px;" fill="clear" (click)="presentAlertLogout()">
             <ion-icon size="small" slot="start" color="dark" name="log-out-outline"></ion-icon>
             <ion-label><ion-text color="danger">Logout</ion-text></ion-label>
           </ion-item>
         </ion-menu-toggle>
-        <img style="width: 36%;" src="assets/logo-full.png">
+        <img style="width: 25%;" src="assets/img/logo.png">
       </ion-footer>
     </ion-menu>
     <ion-router-outlet id="main-content"></ion-router-outlet>

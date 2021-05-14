@@ -10,7 +10,7 @@ import { Observable, of, Subscription } from 'rxjs'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
 import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
 import { InformationPopoverComponent } from 'src/app/components/information-popover/information-popover.component'
-import { ConfigService } from 'src/app/services/config.service'
+import { ConfigService, lanUiAddress, torUiAddress } from 'src/app/services/config.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
 import { FEStatus } from 'src/app/services/pkg-status-rendering.service'
@@ -62,7 +62,7 @@ export class AppInstalledShowPage {
 
   async copyTor (): Promise<void> {
     let message = ''
-    await copyToClipboard(this.config.torUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
+    await copyToClipboard(torUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
 
     const toast = await this.toastCtrl.create({
       header: message,
@@ -75,7 +75,7 @@ export class AppInstalledShowPage {
 
   async copyLAN (): Promise<void> {
     let message = ''
-    await copyToClipboard(this.config.lanUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
+    await copyToClipboard(lanUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
 
     const toast = await this.toastCtrl.create({
       header: message,

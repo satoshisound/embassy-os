@@ -8,39 +8,43 @@
 </ion-header>
 
 <ion-content style="position: relative">
-  <ion-grid *ngIf="(patch.watch$('package-data') | async as pkgs).length; else welcome">
-    <ion-row *ngVar="connectionService.monitor$ | async as connected">
-      <ion-col *ngFor="let pkg of pkgs" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
-        <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', (pkg | manifest).id]">
-          <div class="launch-container" *ngIf="pkg | hasUi">
-            <div class="launch-button-triangle"  (click)="launchUi(pkg, $event)" [class.disabled]="!(pkg | isLaunchable)">
-              <ion-icon name="rocket-outline"></ion-icon>
+  <ng-container *ngVar="patch.watch$('package-data') | async as pkgs">
+    <ion-grid *ngIf="pkgs.length; else welcome">
+      <ion-row *ngVar="connectionService.monitor$ | async as connected">
+        <ion-col *ngFor="let pkg of pkgs" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
+          <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', (pkg | manifest).id]">
+            <div class="launch-container" *ngIf="pkg | hasUi">
+              <div class="launch-button-triangle"  (click)="launchUi(pkg, $event)" [class.disabled]="!(pkg | isLaunchable)">
+                <ion-icon name="rocket-outline"></ion-icon>
+              </div>
             </div>
-          </div>
-
-          <img style="position: absolute" class="main-img" [src]="pkg['static-files'].icon" [alt]="icon" />
-          <img class="main-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=">
-          <img class="bulb-on"  *ngIf="pkg | displayBulb: 'green' : connected" src="assets/img/running-bulb.png"/>
-          <img class="bulb-on"  *ngIf="pkg | displayBulb: 'red' : connected" src="assets/img/issue-bulb.png"/>
-          <img class="bulb-on"  *ngIf="pkg | displayBulb: 'yellow' : connected" src="assets/img/warning-bulb.png"/>
-          <img class="bulb-off" *ngIf="pkg | displayBulb: 'off' : connected" src="assets/img/off-bulb.png"/>
-          <ion-card-header>
-            <status [pkg]="pkg" [connected]="connected" size="small"></status>
-            <p>{{ (pkg | manifest).title }}</p>
-          </ion-card-header>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-  </ion-grid>
-
-  <div #welcome class="ion-text-center ion-padding">
-    <div style="display: flex; flex-direction: column; justify-content: center; height: 40vh">
-      <h2>Welcome to your <span style="font-style: italic; color: var(--ion-color-start9)">Embassy</span></h2>
-      <p class="ion-text-wrap">Get started by installing your first service.</p>
-    </div>
-    <ion-button [routerLink]="['/services','marketplace']" style="width: 50%;" fill="outline">
-      <ion-icon slot="start" name="storefront-outline"></ion-icon>
-      Marketplace
-    </ion-button>
-  </div>
+  
+            <img style="position: absolute" class="main-img" [src]="pkg['static-files'].icon" [alt]="icon" />
+            <img class="main-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=">
+            <img class="bulb-on"  *ngIf="pkg | displayBulb: 'green' : connected" src="assets/img/running-bulb.png"/>
+            <img class="bulb-on"  *ngIf="pkg | displayBulb: 'red' : connected" src="assets/img/issue-bulb.png"/>
+            <img class="bulb-on"  *ngIf="pkg | displayBulb: 'yellow' : connected" src="assets/img/warning-bulb.png"/>
+            <img class="bulb-off" *ngIf="pkg | displayBulb: 'off' : connected" src="assets/img/off-bulb.png"/>
+            <ion-card-header>
+              <status [pkg]="pkg" [connected]="connected" size="small"></status>
+              <p>{{ (pkg | manifest).title }}</p>
+            </ion-card-header>
+          </ion-card>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  
+    <ng-template #welcome>
+      <div class="ion-text-center ion-padding">
+        <div style="display: flex; flex-direction: column; justify-content: center; height: 40vh">
+          <h2>Welcome to your <span style="font-style: italic; color: var(--ion-color-start9)">Embassy</span></h2>
+          <p class="ion-text-wrap">Get started by installing your first service.</p>
+        </div>
+        <ion-button [routerLink]="['/services','marketplace']" style="width: 50%;" fill="outline">
+          <ion-icon slot="start" name="storefront-outline"></ion-icon>
+          Marketplace
+        </ion-button>
+      </div>
+    </ng-template>
+  </ng-container>
 </ion-content>

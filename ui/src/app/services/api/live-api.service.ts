@@ -12,6 +12,10 @@ export class LiveApiService extends ApiService {
     private readonly config: ConfigService,
   ) { super() }
 
+  async ping (): Promise<void> {
+    return this.http.rpcRequest({ method: 'ping', params: { } })
+  }
+
   // db
 
   async getRevisions (since: number): Promise<RR.GetRevisionsRes> {
@@ -76,10 +80,6 @@ export class LiveApiService extends ApiService {
 
   // wifi
 
-  async getWifi (params: RR.GetWifiReq): Promise<RR.GetWifiRes> {
-    return this.http.rpcRequest({ method: 'wifi.get', params })
-  }
-
   async addWifi (params: RR.AddWifiReq): Promise<RR.AddWifiRes> {
     return this.http.rpcRequest({ method: 'wifi.add', params })
   }
@@ -134,7 +134,7 @@ export class LiveApiService extends ApiService {
 
   async getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes> {
     return this.http.rpcRequest({ method: 'package.properties', params })
-      .then(parsePropertiesPermissive)
+      .then(parsePropertiesPermissive) as any // @TODO why is any needed?
   }
 
   async getPackageLogs (params: RR.GetPackageLogsReq): Promise<RR.GetPackageLogsRes> {

@@ -2,7 +2,7 @@ import { Component, Input } from '@angular/core'
 import { AlertController } from '@ionic/angular'
 import { Annotations, Range } from '../../pkg-config/config-utilities'
 import { TrackingModalController } from 'src/app/services/tracking-modal-controller.service'
-import { ConfigCursor } from 'src/app/app-config/config-cursor'
+import { ConfigCursor } from 'src/app/pkg-config/config-cursor'
 import { ValueSpecList, isValueSpecListOf } from 'src/app/pkg-config/config-types'
 import { ModalPresentable } from 'src/app/pkg-config/modal-presentable'
 

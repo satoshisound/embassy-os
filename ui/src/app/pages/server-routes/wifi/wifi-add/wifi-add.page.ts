@@ -30,7 +30,13 @@ export class WifiAddPage {
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      await this.apiService.addWifi(this.ssid, this.password, this.countryCode, false)
+      await this.apiService.addWifi({
+        ssid: this.ssid,
+        password: this.password,
+        country: this.countryCode,
+        priority: 0,
+        connect: false,
+      })
       this.navCtrl.back()
     }).catch(e => {
       console.error(e)
@@ -45,13 +51,18 @@ export class WifiAddPage {
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      await this.apiService.addWifi(this.ssid, this.password, this.countryCode, true)
-      this.wifiService.confirmWifi(this.ssid).subscribe(success => {
+      await this.apiService.addWifi({
+        ssid: this.ssid,
+        password: this.password,
+        country: this.countryCode,
+        priority: 0,
+        connect: true,
+      })
+      const success = this.wifiService.confirmWifi(this.ssid)
         if (success) {
           this.navCtrl.back()
         }
-      })
-    }).catch (e => {
+      }).catch (e => {
       console.error(e)
       this.error = e.message
     })

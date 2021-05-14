@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core'
-import { InstalledPackageDataEntry, InterfaceDef, PackageDataEntry, PackageMainStatus, PackageState } from '../models/patch-db/data-model'
+import { InstalledPackageDataEntry, InterfaceDef, Manifest, PackageDataEntry, PackageMainStatus, PackageState } from '../models/patch-db/data-model'
 
 const { patchDb, maskAs, api, skipStartupAlerts } = require('../../../ui-config.json') as UiConfig
 
@@ -48,36 +48,6 @@ export class ConfigService {
     return (maskAs === 'lan') || this.origin.endsWith('.local')
   }
 
-  hasTorUi (interfaces: { [id: string]: InterfaceDef }): boolean {
-    return !!Object.values(interfaces).find(i => i.ui && i['tor-config'])
-  }
-
-  hasLanUi (interfaces: { [id: string]: InterfaceDef }): boolean {
-    return !!Object.values(interfaces).find(i => i.ui && i['lan-config'])
-  }
-
-  torUiAddress (pkg: InstalledPackageDataEntry): string {
-    const interfaces = pkg.manifest.interfaces
-    const id = Object.keys(interfaces).find(key => {
-      const val = interfaces[key]
-      return val.ui && val['tor-config']
-    })
-    return pkg['interface-info'].addresses[id]['tor-address']
-  }
-
-  lanUiAddress (pkg: InstalledPackageDataEntry): string {
-    const interfaces = pkg.manifest.interfaces
-    const id = Object.keys(interfaces).find(key => {
-      const val = interfaces[key]
-      return val.ui && val['lan-config']
-    })
-    return pkg['interface-info'].addresses[id]['lan-address']
-  }
-
-  hasUi (interfaces: { [id: string]: InterfaceDef }): boolean {
-    return this.hasTorUi(interfaces) || this.hasLanUi(interfaces)
-  }
-
   isLaunchable (pkg: PackageDataEntry): boolean {
     if (this.isConsulate || pkg.state !== PackageState.Installed) {
       return false
@@ -87,14 +57,51 @@ export class ConfigService {
 
     return installed.status.main.status === PackageMainStatus.Running &&
     (
-      (this.hasTorUi(installed.manifest.interfaces) && this.isTor()) ||
-      (this.hasLanUi(installed.manifest.interfaces) && !this.isTor())
+      (hasTorUi(installed.manifest.interfaces) && this.isTor()) ||
+      (hasLanUi(installed.manifest.interfaces) && !this.isTor())
     )
   }
 
   launchableURL (pkg: InstalledPackageDataEntry): string {
-    return this.isTor() ? `http://${this.torUiAddress(pkg)}` : `https://${this.lanUiAddress(pkg)}`
+    return this.isTor() ? `http://${torUiAddress(pkg)}` : `https://${lanUiAddress(pkg)}`
   }
+}
+
+export function hasTorUi (interfaces: { [id: string]: InterfaceDef }): boolean {
+  return !!Object.values(interfaces).find(i => i.ui && i['tor-config'])
+}
+
+export function hasLanUi (interfaces: { [id: string]: InterfaceDef }): boolean {
+  return !!Object.values(interfaces).find(i => i.ui && i['lan-config'])
+}
+
+export function torUiAddress (pkg: InstalledPackageDataEntry): string {
+  const interfaces = pkg.manifest.interfaces
+  const id = Object.keys(interfaces).find(key => {
+    const val = interfaces[key]
+    return val.ui && val['tor-config']
+  })
+  return pkg['interface-info'].addresses[id]['tor-address']
+}
+
+export function lanUiAddress (pkg: InstalledPackageDataEntry): string {
+  const interfaces = pkg.manifest.interfaces
+  const id = Object.keys(interfaces).find(key => {
+    const val = interfaces[key]
+    return val.ui && val['lan-config']
+  })
+  return pkg['interface-info'].addresses[id]['lan-address']
+}
+
+export function hasUi (interfaces: { [id: string]: InterfaceDef }): boolean {
+  return hasTorUi(interfaces) || hasLanUi(interfaces)
+}
+
+export function getManifest (pkg: PackageDataEntry): Manifest {
+  if ([PackageState.Installing, PackageState.Updating].includes(pkg.state)) {
+    return pkg['unverified-manifest']
+  }
+  return pkg.installed.manifest
 }
 
 function removeProtocol (str: string): string {

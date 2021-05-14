@@ -9,33 +9,37 @@
 
 <ion-content class="ion-padding-top">
 
-  <ion-item *ngIf="error$ | async as error">
-    <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
-  </ion-item>
+  <ion-spinner *ngIf="loading; else loaded" class="center" name="lines" color="warning"></ion-spinner>
 
-  <ion-item-group>
-    <ion-item>
-      <ion-label class="ion-text-wrap">
-        <p>About</p>
-        <h2>Embassy will automatically connect to available networks, allowing you to remove the Ethernet cable and place your Embassy anywhere.</h2>
-        <br />
-        <h2>Connecting, disconnecting, or changing WiFi networks can cause your Embassy and its services to become unreachable for up to an hour. Please be patient.</h2>
-      </ion-label>
+  <ng-template #loaded>
+    <ion-item *ngIf="error">
+      <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
     </ion-item>
 
-    <ion-item-divider>Saved Networks</ion-item-divider>
-    <ng-container *ngIf="patch.watch$('server', 'wifi') | async as wifi">
-      <ion-item button detail="false" *ngFor="let ssid of wifi.ssids" (click)="presentAction(ssid, wifi)">
-        <ion-label>{{ ssid }}</ion-label>
-        <ion-icon *ngIf="ssid === wifi.current" name="wifi" color="success"></ion-icon>
+    <ion-item-group>
+      <ion-item>
+        <ion-label class="ion-text-wrap">
+          <p>About</p>
+          <h2>Embassy will automatically connect to available networks, allowing you to remove the Ethernet cable and place your Embassy anywhere.</h2>
+          <br />
+          <h2>Connecting, disconnecting, or changing WiFi networks can cause your Embassy and its services to become unreachable for up to an hour. Please be patient.</h2>
+        </ion-label>
       </ion-item>
-    </ng-container>
-  </ion-item-group>
-
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-    <ion-fab-button [routerLink]="['add']" class="fab-button">
-      <ion-icon name="add"></ion-icon>
-    </ion-fab-button>
-  </ion-fab>
+  
+      <ion-item-divider>Saved Networks</ion-item-divider>
+      <ng-container *ngIf="patch.watch$('server-info', 'wifi') | async as wifi">
+        <ion-item button detail="false" *ngFor="let ssid of wifi.ssids" (click)="presentAction(ssid, wifi)">
+          <ion-label>{{ ssid }}</ion-label>
+          <ion-icon *ngIf="ssid === wifi.connected" name="wifi" color="success"></ion-icon>
+        </ion-item>
+      </ng-container>
+    </ion-item-group>
+  
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button [routerLink]="['add']" class="fab-button">
+        <ion-icon name="add"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
+  </ng-template>
 
 </ion-content>

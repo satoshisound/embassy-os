@@ -18,11 +18,13 @@ export interface ServerInfo {
   'tor-address': URL
   status: ServerStatus
   registry: URL
-  wifi: {
-    selected: string | null
-    connected: string | null
-  }
+  wifi: WiFiInfo
   'unread-notification-count': number
+  specs: {
+    CPU: string
+    Disk: string
+    Memory: string
+  }
 }
 
 export enum ServerStatus {
@@ -30,6 +32,12 @@ export enum ServerStatus {
   Updating = 'updating',
   BackingUp = 'backing-up',
   Restoring = 'restoring',
+}
+
+export interface WiFiInfo {
+  ssids: string[]
+  selected: string | null
+  connected: string | null
 }
 
 export interface PackageDataEntry {
@@ -98,7 +106,7 @@ export interface Manifest {
   migrations: Migrations
   actions: { [id: string]: Action }
   permissions: any // @TODO
-  dependencies: { [id: string]: Dependency}
+  dependencies: DependencyInfo
 }
 
 export interface ActionImpl {
@@ -291,7 +299,11 @@ export interface DependencyErrorInterfaceHealthChecksFailed {
   failures: { [id: string]: HealthCheckResult }
 }
 
-export interface Dependency {
+export interface DependencyInfo {
+  [id: string]: DependencyEntry
+}
+
+export interface DependencyEntry {
   version: string
   optional: string | null
   description: string | null

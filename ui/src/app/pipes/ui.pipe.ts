@@ -1,17 +1,15 @@
 import { Pipe, PipeTransform } from '@angular/core'
-import { PackageDataEntry, PackageState, Manifest } from '../models/patch-db/data-model'
-import { ConfigService } from '../services/config.service'
+import { PackageDataEntry, Manifest } from '../models/patch-db/data-model'
+import { ConfigService, getManifest, hasUi } from '../services/config.service'
 
 @Pipe({
   name: 'hasUi',
 })
 export class HasUiPipe implements PipeTransform {
 
-  constructor (private configService: ConfigService) { }
-
   transform (pkg: PackageDataEntry): boolean {
     const interfaces = getManifest(pkg).interfaces
-    return this.configService.hasUi(interfaces)
+    return hasUi(interfaces)
   }
 }
 
@@ -35,11 +33,4 @@ export class ManifestPipe implements PipeTransform {
   transform (pkg: PackageDataEntry): Manifest {
     return getManifest(pkg)
   }
-}
-
-function getManifest (pkg: PackageDataEntry): Manifest {
-  if ([PackageState.Installing, PackageState.Updating].includes(pkg.state)) {
-    return pkg['unverified-manifest']
-  }
-  return pkg.installed.manifest
 }

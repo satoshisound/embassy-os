@@ -31,11 +31,8 @@ export class AppLogsPage {
     this.logs = ''
 
     try {
-      const logs = await Promise.all([
-        this.apiService.getPackageLogs({ id: this.pkgId }),
-        pauseFor(600),
-      ])
-      this.logs = logs.join('\n\n')
+      const logs = await this.apiService.getPackageLogs({ id: this.pkgId })
+      this.logs = logs.map(l => `${l.timestamp} ${l.log}`).join('\n\n')
       setTimeout(async () => await this.content.scrollToBottom(100), 200)
     } catch (e) {
       this.error = e.message

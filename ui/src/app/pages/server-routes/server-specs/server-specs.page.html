@@ -9,16 +9,39 @@
 
 <ion-content class="ion-padding-top">
 
-  <ion-item-group>
-    <ion-item *ngFor="let spec of patch.watch$('server', 'specs') | async | keyvalue : asIsOrder" [class.break-all]="spec.key === 'Tor Address'">
-      <ion-label class="ion-text-wrap">
-        <h2>{{ spec.key }}</h2>
-        <p *ngIf="spec.value | isValidEmver">{{ spec.value | displayEmver }}</p>
-        <p *ngIf="!(spec.value | isValidEmver)">{{ spec.value }}</p>
+  <ion-item-group *ngIf="patch.watch$('server-info') | async as server">
+    <ion-item>
+      <ion-label>
+        <h2>Version</h2>
+        <p>{{ server.version | displayEmver }}</p>
       </ion-label>
-      <ion-button slot="end" *ngIf="spec.key === 'Tor Address'" fill="clear" (click)="copyTor(spec.value)">
+    </ion-item>
+    <ion-item>
+      <ion-label class="break-all">
+        <h2>Tor Address</h2>
+        <p>{{ server['tor-address'] }}</p>
+      </ion-label>
+      <ion-button slot="end" fill="clear" (click)="copyTor(server['tor-address'])">
         <ion-icon slot="icon-only" name="copy-outline" color="primary"></ion-icon>
       </ion-button>
+    </ion-item>
+    <ion-item>
+      <ion-label class="break-all">
+        <h2>Local Address</h2>
+        <p>{{ server['lan-address'] }}</p>
+      </ion-label>
+      <ion-button slot="end" fill="clear" (click)="copyTor(server['lan-address'])">
+        <ion-icon slot="icon-only" name="copy-outline" color="primary"></ion-icon>
+      </ion-button>
+    </ion-item>
+
+    <ion-item-divider>Hardware Specs</ion-item-divider>
+
+    <ion-item *ngFor="let spec of server.specs | keyvalue : asIsOrder">
+      <ion-label>
+        <h2>{{ spec.key }}</h2>
+        <p>{{ spec.value }}</p>
+      </ion-label>
     </ion-item>
   </ion-item-group>
 

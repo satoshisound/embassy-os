@@ -118,13 +118,14 @@
         </ion-item>
   
         <!-- dependencies -->
-        <ng-container *ngIf="app.configuredRequirements && app.configuredRequirements.length">
+        <ng-container *ngIf="!(manifest.dependencies | empty)">
           <ion-item-divider id="dependencies">Dependencies
             <ion-button style="position: relative; right: 10px;" size="small" fill="clear" color="medium"  (click)="presentPopover(dependencyDefintion(), $event)">
               <ion-icon name="help-circle-outline"></ion-icon>
             </ion-button>
           </ion-item-divider>
-          <dependency-list [$loading$]="$loadingDependencies$" depType="installed" [hostApp]="app | peekProperties" [dependencies]="app.configuredRequirements"></dependency-list>
+          <!-- @TODO leaving off here -->
+          <dependency-list [$loading$]="$loadingDependencies$" depType="installed" [hostApp]="pkg" [dependencies]="manifest.dependencies"></dependency-list>
         </ng-container>
   
         <ion-item-divider></ion-item-divider>

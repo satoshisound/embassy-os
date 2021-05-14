@@ -1,8 +1,6 @@
 import { Component } from '@angular/core'
 import { ActivatedRoute } from '@angular/router'
-import { Observable } from 'rxjs'
-import { concatMap, map, take, tap } from 'rxjs/operators'
-import { AppInstalledFull } from 'src/app/models/app-types'
+import { concatMap, take, tap } from 'rxjs/operators'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { HttpService, Method } from 'src/app/services/http.service'
 

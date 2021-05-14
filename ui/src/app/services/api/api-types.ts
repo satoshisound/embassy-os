@@ -11,7 +11,7 @@ export module RR {
 
   export type GetDumpRes = Dump<DataModel>
 
-  export type SetDBValueReq = { pointer: string, value: any } // db.put.ui
+  export type SetDBValueReq = WithExpire<{ pointer: string, value: any }> // db.put.ui
   export type SetDBValueRes = WithRevision<null>
 
   // auth
@@ -30,7 +30,7 @@ export module RR {
   export type GetServerMetricsReq = { } // server.metrics
   export type GetServerMetricsRes = ServerMetrics
 
-  export type UpdateServerReq = { } // server.update
+  export type UpdateServerReq = WithExpire<{ }> // server.update
   export type UpdateServerRes = WithRevision<null>
 
   export type RestartServerReq = { } // server.restart
@@ -46,16 +46,13 @@ export module RR {
 
   // notification
 
-  export type GetNotificationsReq = { page: number, 'per-page': number } // notification.list
+  export type GetNotificationsReq = WithExpire<{ page: number, 'per-page': number }> // notification.list
   export type GetNotificationsRes = WithRevision<ServerNotification[]>
 
   export type DeleteNotificationReq = { id: string } // notification.delete
   export type DeleteNotificationRes = null
 
   // wifi
-
-  export type GetWifiReq = { } // wifi.get
-  export type GetWifiRes = WiFiInfo
 
   export type AddWifiReq = { // wifi.add
     ssid: string
@@ -66,10 +63,10 @@ export module RR {
   }
   export type AddWifiRes = null
 
-  export type ConnectWifiReq = { ssid: string } // wifi.connect
+  export type ConnectWifiReq = WithExpire<{ ssid: string }> // wifi.connect
   export type ConnectWifiRes = WithRevision<null>
 
-  export type DeleteWifiReq = { ssid: string } // wifi.delete
+  export type DeleteWifiReq = WithExpire<{ ssid: string }> // wifi.delete
   export type DeleteWifiRes = WithRevision<null>
 
   // ssh
@@ -85,7 +82,7 @@ export module RR {
 
   // backup
 
-  export type CreateBackupReq = { logicalname: string, password: string } // backup.create
+  export type CreateBackupReq = WithExpire<{ logicalname: string, password: string }> // backup.create
   export type CreateBackupRes = WithRevision<null>
 
   export type RestoreBackupReq = { logicalname: string, password: string } // backup.restore - unauthed
@@ -110,13 +107,13 @@ export module RR {
   export type GetPackageLogsReq = { id: string, before?: string } // package.logs
   export type GetPackageLogsRes = Log[]
 
-  export type InstallPackageReq = { id: string, version: string } // package.install
+  export type InstallPackageReq = WithExpire<{ id: string, version: string }> // package.install
   export type InstallPackageRes = WithRevision<null>
 
   export type DryUpdatePackageReq = UpdatePackageReq // package.update.dry
   export type DryUpdatePackageRes = BreakageRes
 
-  export type UpdatePackageReq = { id: string, version: string } // package.update
+  export type UpdatePackageReq = WithExpire<{ id: string, version: string }> // package.update
   export type UpdatePackageRes = WithRevision<null>
 
   export type GetPackageConfigReq = { id: string } // package.config.get
@@ -125,28 +122,28 @@ export module RR {
   export type DrySetPackageConfigReq = SetPackageConfigReq // package.config.set.dry
   export type DrySetPackageConfigRes = BreakageRes
 
-  export type SetPackageConfigReq = { id: string, config: object } // package.config.set
+  export type SetPackageConfigReq = WithExpire<{ id: string, config: object }> // package.config.set
   export type SetPackageConfigRes = WithRevision<null>
 
-  export type RestorePackageReq = { id: string, logicalname: string, password: string } // package.backup.restore
+  export type RestorePackageReq = WithExpire<{ id: string, logicalname: string, password: string }> // package.backup.restore
   export type RestorePackageRes = WithRevision<null>
 
   export type ExecutePackageActionReq = { id: string, 'action-id': string, input?: object } // package.action
   export type ExecutePackageActionRes = ActionResponse
 
-  export type StartPackageReq = { id: string } // package.start
+  export type StartPackageReq = WithExpire<{ id: string }> // package.start
   export type StartPackageRes = WithRevision<null>
 
   export type DryStopPackageReq = StopPackageReq // package.stop.dry
   export type DryStopPackageRes = BreakageRes
 
-  export type StopPackageReq = { id: string } // package.stop
+  export type StopPackageReq = WithExpire<{ id: string }> // package.stop
   export type StopPackageRes = WithRevision<null>
 
   export type DryRemovePackageReq = RemovePackageReq // package.remove.dry
   export type DryRemovePackageRes = BreakageRes
 
-  export type RemovePackageReq = { id: string } // package.remove
+  export type RemovePackageReq = WithExpire<{ id: string }> // package.remove
   export type RemovePackageRes = WithRevision<null>
 
   export type DryConfigureDependencyReq = { 'dependency-id': string, 'dependent-id': string } // package.dependency.configure.dry
@@ -165,6 +162,7 @@ export module RR {
   // export type GetAppsAvailableRes = AppAvailablePreview[]
 }
 
+export type WithExpire<T> = { expireId?: string } & T
 export type WithRevision<T> = { response: T, revision?: Revision }
 
 export interface BreakageRes {
@@ -201,7 +199,7 @@ export interface ServerMetrics {
 }
 
 export interface DiskInfo {
-  [logicalname: string]: DiskInfoEntry
+
 }
 
 export interface DiskInfoEntry {
@@ -224,17 +222,14 @@ export interface ServerSpecs {
   [key: string]: string | number
 }
 
-export interface WiFiInfo {
-  ssids: string[]
-  current: string | null
+export interface SSHKeys {
+  [hash: string]: SSHKeyEntry
 }
 
-export interface SSHKeys {
-  [hash: string]: {
-    alg: string
-    hostname: string
-    pubkey: string
-  }
+export interface SSHKeyEntry {
+  alg: string
+  hostname: string
+  pubkey: string
 }
 
 export interface ServerNotification {

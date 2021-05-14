@@ -1,5 +1,4 @@
 import { ServerStatus } from 'src/app/models/patch-db/data-model'
-import { PackagePropertiesVersionedData } from 'src/app/util/properties.util'
 import { RR, ServerNotification } from './api-types'
 
 export module Mock {
@@ -9,19 +8,23 @@ export module Mock {
     expireId: null,
     value: {
       'server-info': {
-        id: 'start9-abcdefgh',
+        id: 'start9-abcdefgmm',
         version: '1.0.0',
         status: ServerStatus.Running,
         'lan-address': 'start9-abcdefgh.local',
         'tor-address': 'myveryownspecialtoraddress.onion',
         wifi: {
+          ssids: ['Goosers', 'Goosers5G'],
           selected: 'Goosers5G',
           connected: 'Goosers5G',
         },
-
         registry: 'beta-registry.start9labs.com',
         'unread-notification-count': 4,
-
+        specs: {
+          CPU: 'Cortex-A72: 4 Cores @1500MHz',
+          Disk: '1TB SSD',
+          Memory: '8GB',
+        },
       },
       'package-data': { },
       ui: {
@@ -128,12 +131,7 @@ export module Mock {
     },
   ]
 
-  export const WiFi: RR.GetWifiRes = {
-    ssids: ['Goosers', 'Goosers5G'],
-    current: 'Goosers5G',
-  }
-
-  export const SshKeys: RR.GetSSHKeysRes = {
+  export const SshInfo: RR.GetSSHKeysRes = {
     '28:d2:7e:78:61:b4:bf:g2:de:24:15:96:4e:d4:15:53': {
       alg: 'ed25519',
       pubkey: 'VeryLongSSHPublicKey',

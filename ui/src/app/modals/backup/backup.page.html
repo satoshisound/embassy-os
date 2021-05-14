@@ -45,7 +45,9 @@
             <h2>{{ partition.value.label || partition.key }}</h2>
             <p>{{ partition.value.size || 'unknown size' }}</p>
             <p *ngIf="!partition.value['is-mounted']; else unavailable"><ion-text color="success">Available</ion-text></p>
-            <p #unavailable><ion-text color="danger">Unvailable</ion-text></p>
+            <ng-template #unavailable>
+              <p><ion-text color="danger">Unvailable</ion-text></p>
+            </ng-template>
           </ion-label>
         </ion-item>
       </ion-item-group>

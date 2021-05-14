@@ -1,5 +1,5 @@
 import { Subject, Observable } from 'rxjs'
-import { Http, Source, Update, Operation } from 'patch-db-client'
+import { Http, Source, Update, Operation, Revision } from 'patch-db-client'
 import { RR } from './api-types'
 import { DataModel } from 'src/app/models/patch-db/data-model'
 import { filter } from 'rxjs/operators'
@@ -15,6 +15,8 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
     return this.sync.asObservable().pipe(filter(() => this.syncing))
   }
 
+  abstract ping (): Promise<void>
+
   // db
 
   abstract getRevisions (since: number): Promise<RR.GetRevisionsRes>
@@ -22,6 +24,11 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   abstract getDump (): Promise<RR.GetDumpRes>
 
   protected abstract setDbValueRaw (params: RR.SetDBValueReq): Promise<RR.SetDBValueRes>
+  // async setDbValue (params: RR.SetDBValueReq): Promise<RR.SetDBValueRes['response']> {
+  //   return this.process<RR.SetDBValueRes['response']>(
+  //     () => this.setDbValueRaw(params),
+  //   )
+  // }
   setDbValue = (params: RR.SetDBValueReq) => this.syncResponse(
     () => this.setDbValueRaw(params),
   )()
@@ -61,8 +68,6 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   abstract deleteNotification (params: RR.DeleteNotificationReq): Promise<RR.DeleteNotificationRes>
 
   // wifi
-
-  abstract getWifi (params: RR.GetWifiReq): Promise<RR.GetWifiRes>
 
   abstract addWifi (params: RR.AddWifiReq): Promise<RR.AddWifiRes>
 
@@ -181,6 +186,17 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
         return response
       }) as any
     }
+  }
+
+  private async process<T, F extends (args: object) => Promise<{ response: T, revision?: Revision}>> (f: F, temps: Operation[] = []): Promise<T> {
+    let expireId = undefined
+    if (temps.length) {
+      expireId = uuid.v4()
+      this.sync.next({ patch: temps, expiredBy: expireId })
+    }
+    const { response, revision } = await f({ ...f.arguments, expireId })
+    if (revision) this.sync.next(revision)
+    return response
   }
 }
 // used for type inference in syncResponse

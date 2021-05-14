@@ -1,4 +1,4 @@
-<div *ngFor="let dep of dependenciesToDisplay; let index = i">
+<div *ngFor="let dep of depsToDisplay">
   <marketplace-dependency-item *ngIf="depType === 'available'"  style="width: 100%"
     [dep]="dep"
     [hostApp]="hostApp"

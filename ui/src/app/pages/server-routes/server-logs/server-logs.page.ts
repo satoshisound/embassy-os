@@ -31,7 +31,8 @@ export class ServerLogsPage {
     this.logs = ''
     this.$loading$.next(true)
     try {
-      this.logs = (await this.apiService.getServerLogs()).join('\n\n')
+      const logs = await this.apiService.getServerLogs({ })
+      this.logs = logs.map(l => `${l.timestamp} ${l.log}`).join('\n\n')
       this.error = ''
       setTimeout(async () => await this.content.scrollToBottom(100), 200)
     } catch (e) {

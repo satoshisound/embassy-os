@@ -2,10 +2,8 @@ import { Component } from '@angular/core'
 import { ApiService } from 'src/app/services/api/api.service'
 import { ServerConfigService } from 'src/app/services/server-config.service'
 import { AlertController } from '@ionic/angular'
-import { BehaviorSubject } from 'rxjs'
-import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
-import { PatchOp, Operation } from 'patch-db-client'
-import { SSHFingerprint } from 'src/app/models/patch-db/data-model'
+import { SSHKeys } from 'src/app/services/api/api-types'
+import { LoaderService } from 'src/app/services/loader.service'
 
 @Component({
   selector: 'dev-ssh-keys',
@@ -13,22 +11,28 @@ import { SSHFingerprint } from 'src/app/models/patch-db/data-model'
   styleUrls: ['dev-ssh-keys.page.scss'],
 })
 export class DevSSHKeysPage {
-  fingerprints$: BehaviorSubject<SSHFingerprint[]> = new BehaviorSubject([])
-  error$ = new BehaviorSubject('')
+  sshKeys: SSHKeys
+  error = ''
+  loading = true
 
   constructor (
+    private readonly loader: LoaderService,
     private readonly apiService: ApiService,
     private readonly serverConfigService: ServerConfigService,
     private readonly alertCtrl: AlertController,
-    public readonly patch: PatchDbModel,
   ) { }
+
+  ngOnInit () {
+    this.apiService.getSshKeys({ }).then(keys => {
+      this.sshKeys = keys
+    })
+  }
 
   async presentModalAdd () {
     await this.serverConfigService.presentModalValueEdit('ssh')
   }
 
-  async presentAlertDelete (fingerprint: SSHFingerprint, index: number) {
-    console.log(index)
+  async presentAlertDelete (hash: string) {
     const alert = await this.alertCtrl.create({
       backdropDismiss: false,
       header: 'Caution',
@@ -42,7 +46,7 @@ export class DevSSHKeysPage {
           text: 'Delete',
           cssClass: 'alert-danger',
           handler: () => {
-            this.delete(fingerprint, index)
+            this.delete(hash)
           },
         },
       ],
@@ -50,9 +54,22 @@ export class DevSSHKeysPage {
     await alert.present()
   }
 
-  async delete (fingerprint: SSHFingerprint, index: number) {
-    const temp: Operation = { op: PatchOp.REMOVE, path: `/server/ssh/${index}` }
-    this.apiService.deleteSSHKey(fingerprint, temp)
-    this.error$.next('')
+  async delete (hash: string): Promise<void> {
+    this.error = ''
+    this.loader.of({
+      message: 'Deleting...',
+      spinner: 'lines',
+      cssClass: 'loader',
+    }).displayDuringAsync(async () => {
+      await this.apiService.deleteSshKey({ hash })
+      this.error = ''
+    }).catch(e => {
+      console.error(e)
+      this.error = ''
+    })
+  }
+
+  asIsOrder (a: any, b: any) {
+    return 0
   }
 }

@@ -17,15 +17,16 @@
         </ion-label>
       </ion-item>
   
-  
-      <ion-item-group #actions>
-        <ion-item button *ngFor="let action of manifest.actions | keyvalue: asIsOrder" (click)="handleAction(pkg, action)" >
-          <ion-label class="ion-text-wrap">
-            <h2><ion-text color="primary">{{ action.value.name }}</ion-text><ion-icon *ngIf="!(action.value['allowed-statuses'] | includes: pkg.installed.status.main.status)" color="danger" name="close-outline"></ion-icon></h2>
-            <p><ion-text color="dark">{{ action.value.description }}</ion-text></p>
-          </ion-label>
-        </ion-item>
-      </ion-item-group>
+      <ng-template #actions>
+        <ion-item-group>
+          <ion-item button *ngFor="let action of manifest.actions | keyvalue: asIsOrder" (click)="handleAction(pkg, action)" >
+            <ion-label class="ion-text-wrap">
+              <h2><ion-text color="primary">{{ action.value.name }}</ion-text><ion-icon *ngIf="!(action.value['allowed-statuses'] | includes: pkg.installed.status.main.status)" color="danger" name="close-outline"></ion-icon></h2>
+              <p><ion-text color="dark">{{ action.value.description }}</ion-text></p>
+            </ion-label>
+          </ion-item>
+        </ion-item-group>
+      </ng-template>
     </ng-container>
   </ng-container>
 </ion-content>

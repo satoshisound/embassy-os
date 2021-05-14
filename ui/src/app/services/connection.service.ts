@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core'
 import { fromEvent, Observable, Subject, Subscription, timer } from 'rxjs'
 import { debounceTime, delay, retryWhen, startWith, switchMap, tap } from 'rxjs/operators'
-import { HttpService } from './http.service'
+import { ApiService } from './api/api.service'
 
 @Injectable({
   providedIn: 'root',
@@ -17,7 +17,7 @@ export class ConnectionService {
   private readonly stateChangeEventEmitter = new Subject<ConnectionState>()
 
   constructor (
-    private readonly http: HttpService,
+    private readonly apiService: ApiService,
   ) {
     this.checkNetworkState()
     this.checkInternetState()
@@ -65,7 +65,7 @@ export class ConnectionService {
     // ping server every 10 seconds
     this.httpSubscription = timer(0, 10000)
       .pipe(
-        switchMap(() => this.http.rpcRequest({ method: 'ping', params: { } })),
+        switchMap(() => this.apiService.ping()),
         retryWhen(errors =>
           errors.pipe(
             tap(val => {

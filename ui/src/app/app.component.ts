@@ -5,7 +5,7 @@ import { ApiService } from './services/api/api.service'
 import { Router } from '@angular/router'
 import { BehaviorSubject } from 'rxjs'
 import { filter, takeWhile, tap } from 'rxjs/operators'
-import { AlertController } from '@ionic/angular'
+import { AlertController, NavController, ToastController } from '@ionic/angular'
 import { LoaderService } from './services/loader.service'
 import { Emver } from './services/emver.service'
 import { SplitPaneTracker } from './services/split-pane.service'
@@ -13,7 +13,7 @@ import { LoadingOptions } from '@ionic/core'
 import { pauseFor } from './util/misc.util'
 import { PatchDbModel } from './models/patch-db/patch-db-model'
 import { HttpService } from './services/http.service'
-import { ServerStatus } from './models/patch-db/data-model'
+import { ServerInfo, ServerStatus } from './models/patch-db/data-model'
 
 @Component({
   selector: 'app-root',
@@ -59,6 +59,8 @@ export class AppComponent {
     private readonly loader: LoaderService,
     private readonly emver: Emver,
     private readonly patch: PatchDbModel,
+    private readonly toastCtrl: ToastController,
+    private readonly navCtrl: NavController,
     readonly splitPane: SplitPaneTracker,
   ) {
     // set dark theme
@@ -163,14 +165,10 @@ export class AppComponent {
     .catch(e => this.setError(e))
   }
 
-  private async handleNotifications (server: Readonly<S9Server>) {
-    const count = server.notifications.length
+  private async handleNotifications (server: Readonly<ServerInfo>) {
+    const count = server['unread-notification-count']
 
     if (!count) { return }
-
-    let updates = { } as any
-    updates.badge = server.badge + count
-    updates.notifications = []
 
     const toast = await this.toastCtrl.create({
       header: 'Embassy',
