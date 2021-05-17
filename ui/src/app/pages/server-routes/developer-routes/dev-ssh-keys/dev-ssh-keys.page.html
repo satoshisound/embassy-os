@@ -8,18 +8,19 @@
 </ion-header>
 
 <ion-content class="ion-padding-top">
-
   <ion-item *ngIf="error" class="ion-margin-bottom">
     <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
   </ion-item>
 
+  <ion-spinner *ngIf="loading" class="center" name="lines" color="warning"></ion-spinner>
+
   <ion-item-group>
     <ion-item-divider>Saved Keys</ion-item-divider>
-    <ion-item *ngFor="let ssh of sshKeys | keyvalue | asIsOrder">
+    <ion-item *ngFor="let ssh of sshService.watch$() | async | keyvalue : asIsOrder">
       <ion-label class="ion-text-wrap">
-        {{ ssh.value.alg }} {{ ssh.value.hash }} {{ ssh.value.hostname }}
+        {{ ssh.value.alg }} {{ ssh.key }} {{ ssh.value.hostname }}
       </ion-label>
-      <ion-button slot="end" fill="clear" (click)="presentAlertDelete(fingerprint, i)">
+      <ion-button slot="end" fill="clear" (click)="presentAlertDelete(ssh.key)">
         <ion-icon slot="icon-only" name="close-outline" color="medium"></ion-icon>
       </ion-button>
     </ion-item>

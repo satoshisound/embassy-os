@@ -78,7 +78,7 @@ export class AppActionsPage {
 
       const successAlert = await this.alertCtrl.create({
         header: 'Execution Complete',
-        message: res.ok.message.split('\n').join('</br ></br />'),
+        message: res.message.split('\n').join('</br ></br />'),
         buttons: ['OK'],
         cssClass: 'alert-success-message',
       })

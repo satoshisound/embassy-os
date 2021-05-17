@@ -68,6 +68,12 @@ export class LiveApiService extends ApiService {
     return this.http.rpcRequest({ method: 'network.lan.refresh', params })
   }
 
+  // registry
+
+  async setRegistryRaw (params: RR.SetRegistryReq): Promise<RR.SetRegistryRes> {
+    return this.http.rpcRequest({ method: 'registry.set', params })
+  }
+
   // notification
 
   async getNotificationsRaw (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes> {

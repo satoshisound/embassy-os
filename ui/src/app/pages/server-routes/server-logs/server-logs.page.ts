@@ -12,7 +12,7 @@ import { BehaviorSubject } from 'rxjs'
 })
 export class ServerLogsPage {
   @ViewChild(IonContent, { static: false }) private content: IonContent
-  $loading$ = new BehaviorSubject(true)
+  loading = true
   error = ''
   logs: string
 
@@ -20,16 +20,13 @@ export class ServerLogsPage {
     private readonly apiService: ApiService,
   ) { }
 
-  async ngOnInit () {
-    markAsLoadingDuringP(this.$loading$, Promise.all([
-      this.getLogs(),
-      pauseFor(600),
-    ]))
+  ngOnInit () {
+    this.getLogs()
   }
 
   async getLogs () {
     this.logs = ''
-    this.$loading$.next(true)
+    this.loading = true
     try {
       const logs = await this.apiService.getServerLogs({ })
       this.logs = logs.map(l => `${l.timestamp} ${l.log}`).join('\n\n')
@@ -39,7 +36,7 @@ export class ServerLogsPage {
       console.error(e)
       this.error = e.message
     } finally {
-      this.$loading$.next(false)
+      this.loading = false
     }
   }
 }

@@ -22,15 +22,12 @@ export class BackupPage {
   ) { }
 
   ngOnInit () {
-    this.getExternalDisks().then(() => this.loading = false)
+    this.getExternalDisks()
   }
 
-  async doRefresh (event: any) {
-    await Promise.all([
-      this.getExternalDisks(),
-      pauseFor(600),
-    ])
-    event.target.complete()
+  async doRefresh () {
+    this.loading = true
+    await this.getExternalDisks()
   }
 
   async getExternalDisks (): Promise<void> {
@@ -40,6 +37,8 @@ export class BackupPage {
     } catch (e) {
       console.error(e)
       this.error = e.message
+    } finally {
+      this.loading = false
     }
   }
 

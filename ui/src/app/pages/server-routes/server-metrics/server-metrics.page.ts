@@ -18,15 +18,11 @@ export class ServerMetricsPage {
     private readonly apiService: ApiService,
   ) { }
 
-  async ngOnInit () {
-    await Promise.all([
-      this.getMetrics(),
-      pauseFor(600),
-    ])
-
-    this.loading = false
-
-    this.startDaemon()
+  ngOnInit () {
+    this.getMetrics().then(() => {
+      this.loading = false
+      this.startDaemon()
+    })
   }
 
   ngOnDestroy () {

@@ -5,7 +5,7 @@ export interface DataModel {
   'server-info': ServerInfo
   'package-data': { [id: string]: PackageDataEntry }
   ui: {
-    name: string
+    'server-name': string
     'welcome-ack': string
     'auto-check-updates': boolean
   }

@@ -44,6 +44,11 @@ export module RR {
   export type RefreshLanReq = { } // network.lan.refresh
   export type RefreshLanRes = null
 
+  // registry
+
+  export type SetRegistryReq = WithExpire<{ url: string }> // registry.set
+  export type SetRegistryRes = WithRevision<null>
+
   // notification
 
   export type GetNotificationsReq = WithExpire<{ page: number, 'per-page': number }> // notification.list
@@ -180,13 +185,10 @@ export interface Log {
 }
 
 export interface ActionResponse {
-  ok?: {
-    message: string
-    value: string | number | boolean | null
-    copyable: boolean
-    qr: boolean
-  }
-  err?: string
+  message: string
+  value: string | number | boolean | null
+  copyable: boolean
+  qr: boolean
 }
 
 export interface ServerMetrics {

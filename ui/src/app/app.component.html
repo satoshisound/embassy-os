@@ -1,19 +1,19 @@
 <ion-app>
   <!-- UPDATING -->
-  <ion-content *ngIf="updating">Embassy is updating</ion-content>
+  <ion-content *ngIf="isUpdating">Embassy is updating</ion-content>
   <!-- NOT UPDATING -->
-  <ion-split-pane *ngIf="!updating" (ionSplitPaneVisible)="splitPaneVisible($event)" contentId="main-content">
+  <ion-split-pane *ngIf="!isUpdating" (ionSplitPaneVisible)="splitPaneVisible($event)" contentId="main-content">
     <ion-menu contentId="main-content" type="overlay">
-      <ion-header *ngIf="showMenuContent$ | async" class="menu-style">
+      <ion-header *ngIf="showMenuContent$ | ngrxPush" class="menu-style">
         <ion-toolbar style="--background: var(--ion-background-color);">
-          <ion-title *ngIf="patch.watch$('ui', 'name') | async as name; else dots">{{ name }}</ion-title>
+          <ion-title *ngIf="patch.watch$('ui', 'server-name') | ngrxPush as name; else dots">{{ name }}</ion-title>
           <ng-template #dots>
             <ion-title><ion-spinner name="dots" color="warning"></ion-spinner></ion-title>
           </ng-template>
         </ion-toolbar>
       </ion-header>
       <ion-content scroll-y="false" class="menu-style">
-        <ng-container *ngIf="showMenuContent$ | async">
+        <ng-container *ngIf="showMenuContent$ | ngrxPush">
           <ion-list style="padding: 0px">
             <ion-menu-toggle auto-hide="false" *ngFor="let page of appPages; let i = index">
               <ion-item
@@ -27,12 +27,12 @@
               >
                 <ion-icon slot="start" [name]="page.icon"></ion-icon>
                 <ion-label style="font-family: 'Montserrat';">{{ page.title }}</ion-label>
-                <ion-badge *ngIf="page.url === '/notifications' && (patch.watch$('server-info', 'unread-notification-count') | async) as badge" color="danger" style="margin-right: 3%;" [class.selected-badge]="selectedIndex == i">{{ badge }}</ion-badge>
+                <ion-badge *ngIf="page.url === '/notifications' && (patch.watch$('server-info', 'unread-notification-count') | ngrxPush) as badge" color="danger" style="margin-right: 3%;" [class.selected-badge]="selectedIndex == i">{{ badge }}</ion-badge>
               </ion-item>
             </ion-menu-toggle>
           </ion-list>
         </ng-container>
-        <ng-container *ngIf="!(showMenuContent$ | async)">
+        <ng-container *ngIf="!(showMenuContent$ | ngrxPush)">
           <ion-card>
             <ion-card-header>
               <ion-card-title>Welcome</ion-card-title>
@@ -47,7 +47,7 @@
       </ion-content>
       <ion-footer style="padding-bottom: 16px; text-align: center;" class="menu-style">
         <ion-menu-toggle auto-hide="false">
-          <ion-item *ngIf="showMenuContent$ | async" button style="--background:var(--ion-background-color); margin-bottom: 16px;" fill="clear" (click)="presentAlertLogout()">
+          <ion-item *ngIf="showMenuContent$ | ngrxPush" button style="--background:var(--ion-background-color); margin-bottom: 16px;" fill="clear" (click)="presentAlertLogout()">
             <ion-icon size="small" slot="start" color="dark" name="log-out-outline"></ion-icon>
             <ion-label><ion-text color="danger">Logout</ion-text></ion-label>
           </ion-item>

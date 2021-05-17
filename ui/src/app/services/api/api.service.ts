@@ -58,6 +58,13 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
   abstract refreshLan (params: RR.RefreshLanReq): Promise<RR.RefreshLanRes>
 
+  // registry
+
+  protected abstract setRegistryRaw (params: RR.SetRegistryReq): Promise<RR.SetRegistryRes>
+  setRegistry = (params: RR.SetRegistryReq) => this.syncResponse(
+    () => this.setRegistryRaw(params),
+  )()
+
   // notification
 
   abstract getNotificationsRaw (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes>

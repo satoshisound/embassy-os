@@ -18,7 +18,7 @@ export module Mock {
           selected: 'Goosers5G',
           connected: 'Goosers5G',
         },
-        registry: 'beta-registry.start9labs.com',
+        registry: 'https://registry.start9.com',
         'unread-notification-count': 4,
         specs: {
           CPU: 'Cortex-A72: 4 Cores @1500MHz',
@@ -28,7 +28,7 @@ export module Mock {
       },
       'package-data': { },
       ui: {
-        name: 'My Embassy',
+        'server-name': 'My Embassy',
         'welcome-ack': '1.0.0',
         'auto-check-updates': true,
       },
@@ -131,7 +131,7 @@ export module Mock {
     },
   ]
 
-  export const SshInfo: RR.GetSSHKeysRes = {
+  export const SshKeys: RR.GetSSHKeysRes = {
     '28:d2:7e:78:61:b4:bf:g2:de:24:15:96:4e:d4:15:53': {
       alg: 'ed25519',
       pubkey: 'VeryLongSSHPublicKey',
@@ -141,6 +141,14 @@ export module Mock {
       alg: 'ed25519',
       pubkey: 'VeryLongSSHPublicKey',
       hostname: 'Aiden Key',
+    },
+  }
+
+  export const SshKey: RR.AddSSHKeyRes = {
+    '44:44:7e:78:61:b4:bf:g2:de:24:15:96:4e:d4:15:53': {
+      alg: 'ed25519',
+      pubkey: 'VeryLongSSHPublicKey',
+      hostname: 'Lucy Key',
     },
   }
 

@@ -1,4 +1,4 @@
 <div style="position: relative; margin-right: 1vh;">
-  <ion-badge *ngIf="(badge$ | async) && !(menuFixedOpen$ | async)" color="danger">{{ badge | async }}</ion-badge>
+  <ion-badge mode="md" class="md-badge" *ngIf="(badge$ | async) && !(menuFixedOpen$ | async)" color="danger">{{ badge$ | async }}</ion-badge>
   <ion-menu-button color="dark"></ion-menu-button>
 </div>

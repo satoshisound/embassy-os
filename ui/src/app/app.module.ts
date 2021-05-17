@@ -18,6 +18,7 @@ import { appConfigComponents } from './modals/app-config-injectable/modal-inject
 import { OSWelcomePageModule } from './modals/os-welcome/os-welcome.module'
 import { PatchDbModel } from './models/patch-db/patch-db-model'
 import { LocalStorageBootstrap } from './models/patch-db/local-storage-bootstrap'
+import { ReactiveComponentModule } from '@ngrx/component'
 
 @NgModule({
   declarations: [AppComponent],
@@ -35,6 +36,7 @@ import { LocalStorageBootstrap } from './models/patch-db/local-storage-bootstrap
     }),
     QRCodeModule,
     OSWelcomePageModule,
+    ReactiveComponentModule,
   ],
   providers: [
     Storage,

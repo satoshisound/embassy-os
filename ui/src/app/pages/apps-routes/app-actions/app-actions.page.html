@@ -8,10 +8,10 @@
 </ion-header>
 
 <ion-content class="ion-padding-top">
-  <ng-container *ngIf="(pkg$ | async as pkg)">
+  <ng-container *ngIf="pkg$ | async as pkg">
     <ng-container *ngIf="pkg.installed.manifest as manifest">
 
-      <ion-item *ngIf="manifest.actions | empty; else #actions">
+      <ion-item *ngIf="manifest.actions | empty; else actions">
         <ion-label class="ion-text-wrap">
           <p>No Actions for {{ manifest.title }} {{ manifest.versionInstalled }}.</p>
         </ion-label>

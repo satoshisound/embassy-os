@@ -21,7 +21,6 @@ import { ServerInfo, ServerStatus } from './models/patch-db/data-model'
   styleUrls: ['app.component.scss'],
 })
 export class AppComponent {
-  fullPageMenu = true
   showMenuContent$ = new BehaviorSubject(false)
   selectedIndex = 0
   isUpdating = false
@@ -58,10 +57,10 @@ export class AppComponent {
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly emver: Emver,
-    private readonly patch: PatchDbModel,
     private readonly toastCtrl: ToastController,
     private readonly navCtrl: NavController,
     readonly splitPane: SplitPaneTracker,
+    readonly patch: PatchDbModel,
   ) {
     // set dark theme
     document.body.classList.toggle('dark', true)

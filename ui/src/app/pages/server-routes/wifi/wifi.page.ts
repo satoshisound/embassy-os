@@ -5,6 +5,7 @@ import { ActionSheetButton } from '@ionic/core'
 import { WifiService } from './wifi.service'
 import { LoaderService } from 'src/app/services/loader.service'
 import { WiFiInfo } from 'src/app/models/patch-db/data-model'
+import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 
 @Component({
   selector: 'wifi',
@@ -18,7 +19,8 @@ export class WifiListPage {
     private readonly apiService: ApiService,
     private readonly loader: LoaderService,
     private readonly actionCtrl: ActionSheetController,
-    public readonly wifiService: WifiService,
+    private readonly wifiService: WifiService,
+    public readonly patch: PatchDbModel,
   ) { }
 
   async presentAction (ssid: string, wifi: WiFiInfo) {

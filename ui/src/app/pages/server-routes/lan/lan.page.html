@@ -10,29 +10,46 @@
 <ion-content class="ion-padding-top">
 
   <ion-item-group>
-    <ion-item lines="none">
+    <!-- about -->
+    <ion-item>
       <ion-label class="ion-text-wrap">
-        <p>About</p>
+        <p style="padding-bottom: 6px;">About</p>
         <h2>You can connect to your Embassy over your Local Area Network (LAN). This can be useful for achieving a faster experience, as well as a fallback in case the Tor network is experiencing issues.</h2>
       </ion-label>
     </ion-item>
     <ion-item>
-      <ion-button slot="start" fill="clear" color="primary" [href]="docsUrl">View Instructions</ion-button>
+      <ion-button slot="start" fill="clear" color="primary" [href]="docsUrl" target="_blank">View Instructions</ion-button>
     </ion-item>
 
-    <ion-item-divider></ion-item-divider>
-
     <ng-container *ngIf="lanDisabled">
+      <ion-item-divider></ion-item-divider>
       <ion-item>
         <ion-label class="ion-text-wrap">
-          <p>Setup</p>
+          <p style="padding-bottom: 4px;">Setup</p>
           <ion-text color="warning" [innerHtml]="lanDisabledExplanation[lanDisabled]"></ion-text>
         </ion-label>
       </ion-item>
     </ng-container>
 
+    <!-- Refresh Network -->
+    <ion-item-divider></ion-item-divider>
+    <ion-item>
+      <ion-label class="ion-text-wrap">
+        <p style="padding-bottom: 6px;">Troubleshooting</p>
+        <h2>If you are having issues connecting to your Embassy over LAN, try refreshing the network by clicking the button below.</h2>
+      </ion-label>
+    </ion-item>
+    <ion-item>
+      <ion-button slot="start" fill="clear" (click)="refreshLAN()">
+        <ion-icon slot="start" name="refresh-outline"></ion-icon>
+        Refresh Network
+      </ion-button>
+    </ion-item>
+
+    <ion-item-divider></ion-item-divider>
+
+    <!-- Certificate and Lan Address -->
     <ng-container *ngIf="!lanDisabled">
-      <!-- Certificate -->
       <ion-item>
         <ion-label class="ion-text-wrap">
           <h2>Root Certificate Authority</h2>
@@ -42,11 +59,11 @@
           <ion-icon slot="icon-only" name="download-outline"></ion-icon>
         </ion-button>
       </ion-item>
-      <!-- URL -->
+
       <ion-item>
         <ion-label class="ion-text-wrap">
           <h2>LAN Address</h2>
-          <p>https://{{ patch.watch$('server', 'serverId') | async }}.local</p>
+          <p>https://{{ patch.watch$('server-info', 'lan-address') | async }}</p>
         </ion-label>
         <ion-button slot="end" fill="clear" (click)="copyLAN()">
           <ion-icon slot="icon-only" name="copy-outline"></ion-icon>
@@ -54,18 +71,6 @@
       </ion-item>
       <ion-item-divider></ion-item-divider>
     </ng-container>
-
-    <ion-item>
-      <ion-label class="ion-text-wrap">
-        If you are having issues connecting to your Embassy or services over LAN, you can try refreshing the network by clicking the button below.
-      </ion-label>
-    </ion-item>
-    <ion-item>
-      <ion-button slot="start" fill="clear" (click)="refreshLAN()">
-        <ion-icon slot="start" name="refresh-outline"></ion-icon>
-        Refresh Network
-      </ion-button>
-    </ion-item>
   </ion-item-group>
 
   <!-- hidden element for downloading cert -->

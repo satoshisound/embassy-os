@@ -1,9 +1,8 @@
 import { Component } from '@angular/core'
-import { ApiService } from 'src/app/services/api/api.service'
 import { ServerConfigService } from 'src/app/services/server-config.service'
 import { AlertController } from '@ionic/angular'
-import { SSHKeys } from 'src/app/services/api/api-types'
 import { LoaderService } from 'src/app/services/loader.service'
+import { SSHService } from './ssh.service'
 
 @Component({
   selector: 'dev-ssh-keys',
@@ -11,20 +10,19 @@ import { LoaderService } from 'src/app/services/loader.service'
   styleUrls: ['dev-ssh-keys.page.scss'],
 })
 export class DevSSHKeysPage {
-  sshKeys: SSHKeys
   error = ''
   loading = true
 
   constructor (
     private readonly loader: LoaderService,
-    private readonly apiService: ApiService,
     private readonly serverConfigService: ServerConfigService,
     private readonly alertCtrl: AlertController,
+    public readonly sshService: SSHService,
   ) { }
 
   ngOnInit () {
-    this.apiService.getSshKeys({ }).then(keys => {
-      this.sshKeys = keys
+    this.sshService.getKeys().then(() => {
+      this.loading = false
     })
   }
 
@@ -61,8 +59,7 @@ export class DevSSHKeysPage {
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      await this.apiService.deleteSshKey({ hash })
-      this.error = ''
+      await this.sshService.delete(hash)
     }).catch(e => {
       console.error(e)
       this.error = ''

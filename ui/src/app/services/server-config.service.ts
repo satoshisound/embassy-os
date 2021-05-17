@@ -4,6 +4,7 @@ import { AppConfigValuePage } from '../modals/app-config-value/app-config-value.
 import { ApiService } from './api/api.service'
 import { ConfigSpec } from '../pkg-config/config-types'
 import { ConfigCursor } from '../pkg-config/config-cursor'
+import { SSHService } from '../pages/server-routes/developer-routes/dev-ssh-keys/ssh.service'
 
 @Injectable({
   providedIn: 'root',
@@ -13,6 +14,7 @@ export class ServerConfigService {
   constructor (
     private readonly modalCtrl: ModalController,
     private readonly apiService: ApiService,
+    private readonly sshService: SSHService,
   ) { }
 
   async presentModalValueEdit (key: string, current?: string) {
@@ -39,11 +41,11 @@ export class ServerConfigService {
       return this.apiService.setDbValue({ pointer: 'ui/auto-check-updates', value })
     },
     ssh: async (pubkey: string) => {
-      return this.apiService.addSshKey({ pubkey })
+      return this.sshService.add(pubkey)
     },
-    // registry: async (url: string) => {
-    //   return this.apiService.setRegistry({ url })
-    // },
+    registry: async (url: string) => {
+      return this.apiService.setRegistry({ url })
+    },
     // password: async (password: string) => {
     //   return this.apiService.updatePassword({ password })
     // },
@@ -76,21 +78,22 @@ const serverConfig: ConfigSpec = {
     // @TODO regex for SSH Key
     // pattern: '',
     patternDescription: 'Must be a valid SSH key',
-    masked: true,
+    masked: false,
+    copyable: false,
+  },
+  registry: {
+    type: 'string',
+    name: 'Marketplace URL',
+    description: 'The URL of the service marketplace. By default, your Embassy connects to the official Start9 Embassy Marketplace.',
+    nullable: true,
+    // @TODO regex for URL
+    // pattern: '',
+    patternDescription: 'Must be a valid URL',
+    changeWarning: 'Downloading services from an alternative marketplace can result in malicious or harmful code being installed on your device.',
+    default: 'https://registry.start9.com',
+    masked: false,
     copyable: true,
   },
-  // registry: {
-  //   type: 'string',
-  //   name: 'Marketplace URL',
-  //   description: 'Used for connecting to an alternative service marketplace.',
-  //   nullable: true,
-  //   // @TODO regex for URL
-  //   // pattern: '',
-  //   patternDescription: 'Must be a valid URL',
-  //   changeWarning: 'Downloading services from an alternative marketplace could result in malicious or harmful code being installed on your device.',
-  //   masked: false,
-  //   copyable: true,
-  // },
   // password: {
   //   type: 'string',
   //   name: 'Change Password',

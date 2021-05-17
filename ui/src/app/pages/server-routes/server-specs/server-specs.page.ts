@@ -13,15 +13,11 @@ export class ServerSpecsPage {
   constructor (
     private readonly toastCtrl: ToastController,
     public readonly patch: PatchDbModel,
-  ) {
-    this.patch.watch$('server-info').subscribe(info => {
-      console.log('INFO', info)
-    })
-  }
+  ) { }
 
-  async copyTor (address: string) {
+  async copy (address: string) {
     let message = ''
-    await copyToClipboard(address.trim() || '')
+    await copyToClipboard(address || '')
       .then(success => { message = success ? 'copied to clipboard!' : 'failed to copy'})
 
     const toast = await this.toastCtrl.create({

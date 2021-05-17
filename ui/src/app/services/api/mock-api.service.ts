@@ -107,6 +107,22 @@ export class MockApiService extends ApiService {
     return null
   }
 
+  // registry
+
+  async setRegistryRaw (params: RR.SetRegistryReq): Promise<RR.SetRegistryRes> {
+    await pauseFor(2000)
+    return {
+      response: null,
+      revision: {
+        id: this.nextSequence(),
+        patch: [
+          { op: PatchOp.REPLACE, path: '/server-info/registry', value: params.url },
+        ],
+        expireId: null,
+      },
+    }
+  }
+
   // notification
 
   async getNotificationsRaw (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes> {
@@ -116,7 +132,7 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: 'server-info/unread-notification-count', value: 0 },
+          { op: PatchOp.REPLACE, path: '/server-info/unread-notification-count', value: 0 },
         ],
         expireId: null,
       },
@@ -142,7 +158,8 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: 'server-info/wifi/selected', value: params.ssid },
+          { op: PatchOp.REPLACE, path: '/server-info/wifi/selected', value: params.ssid },
+          { op: PatchOp.REPLACE, path: '/server-info/wifi/connected', value: params.ssid },
         ],
         expireId: null,
       },
@@ -156,8 +173,8 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: 'server-info/wifi/selected', value: null },
-          { op: PatchOp.REPLACE, path: 'server-info/wifi/connected', value: null },
+          { op: PatchOp.REPLACE, path: '/server-info/wifi/selected', value: null },
+          { op: PatchOp.REPLACE, path: '/server-info/wifi/connected', value: null },
         ],
         expireId: null,
       },
@@ -168,12 +185,12 @@ export class MockApiService extends ApiService {
 
   async getSshKeys (params: RR.GetSSHKeysReq): Promise<RR.GetSSHKeysRes> {
     await pauseFor(2000)
-    return Mock.SshInfo
+    return Mock.SshKeys
   }
 
   async addSshKey (params: RR.AddSSHKeyReq): Promise<RR.AddSSHKeyRes> {
     await pauseFor(2000)
-    return null
+    return Mock.SshKey
   }
 
   async deleteSshKey (params: RR.DeleteSSHKeyReq): Promise<RR.DeleteSSHKeyRes> {
@@ -190,7 +207,7 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: 'server-info/status', value: ServerStatus.BackingUp },
+          { op: PatchOp.REPLACE, path: '/server-info/status', value: ServerStatus.BackingUp },
         ],
         expireId: null,
       },
@@ -325,13 +342,10 @@ export class MockApiService extends ApiService {
   async executePackageAction (params: RR.ExecutePackageActionReq): Promise<RR.ExecutePackageActionRes> {
     await pauseFor(2000)
     return {
-      ok: {
-        message: 'Action success!',
-        value: 'new password',
-        copyable: true,
-        qr: false,
-      },
-      // err: '',
+      message: 'Action success!',
+      value: 'new password',
+      copyable: true,
+      qr: false,
     }
   }
 

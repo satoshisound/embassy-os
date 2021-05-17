@@ -8,9 +8,9 @@
 </ion-header>
 
 <ion-content style="position: relative">
-  <ng-container *ngVar="patch.watch$('package-data') | async as pkgs">
-    <ion-grid *ngIf="pkgs.length; else welcome">
-      <ion-row *ngVar="connectionService.monitor$ | async as connected">
+  <ng-container *ngrxLet="patch.watch$('package-data') as pkgs">
+    <ion-grid *ngIf="!(pkgs | empty); else welcome">
+      <ion-row *ngrxLet="connectionService.monitor$ as connected">
         <ion-col *ngFor="let pkg of pkgs" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
           <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', (pkg | manifest).id]">
             <div class="launch-container" *ngIf="pkg | hasUi">

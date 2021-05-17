@@ -29,7 +29,7 @@ export class AppAvailableShowPage extends Cleanup {
   $dependenciesLoading$ = new BehaviorSubject(false)
 
   $error$ = new BehaviorSubject(undefined)
-  // $app$: PropertySubject<AppAvailableFull> = { } as any
+  $app$: any = { } as any
   pkgId: string
 
   openRecommendation = false

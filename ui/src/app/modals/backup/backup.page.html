@@ -20,17 +20,28 @@
     <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
   </ion-item>
 
-  <p>
+  <!-- <p style="padding: 0 16px;">
     Select a location to back up your Embassy.
     <br /><br />
     Internal drives and drives currently backing up other services will not be available.
     <br /><br />
     Depending on the amount of data on your Embassy, your first backup may take a very long. Future backups to the same disk will be significantly faster, depending on how much new data has been generated between backups.
-  </p>
+  </p> -->
 
-  <ion-spinner *ngIf="loading" class="center" name="lines" color="warning"></ion-spinner>
+  <div *ngIf="loading" class="ion-text-center ion-margin">
+    <ion-spinner name="lines" color="warning"></ion-spinner>
+    <p>Fetching disks...</p>
+  </div>
 
   <ng-container *ngIf="!loading">
+
+    <ion-item class="ion-margin-bottom">
+      <ion-label class="ion-text-wrap">
+        <p><ion-text color="dark">About</ion-text></p>
+        <p>Select a location to back up your Embassy.</p>
+      </ion-label>
+    </ion-item>
+
     <ion-item *ngIf="allPartitionsMounted">
       <ion-text *ngIf="type === 'create'" class="ion-text-wrap" color="warning">No partitions available. To begin a backup, insert a storage device into your Embassy.</ion-text>
       <ion-text *ngIf="type === 'restore'" class="ion-text-wrap" color="warning">No partitions available. Insert the storage device containing the backup you wish to restore.</ion-text>

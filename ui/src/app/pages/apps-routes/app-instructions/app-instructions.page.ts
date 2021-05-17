@@ -11,6 +11,7 @@ import { HttpService, Method } from 'src/app/services/http.service'
 })
 export class AppInstructionsPage {
   instructions: string
+  loading = true
 
   constructor (
     private readonly route: ActivatedRoute,
@@ -29,7 +30,10 @@ export class AppInstructionsPage {
         }
         return this.http.httpRequest<string>(opts)
       }),
-      tap(instructions => this.instructions = instructions),
+      tap(instructions => {
+        this.instructions = instructions
+        this.loading = false
+      }),
       take(1),
     )
     .subscribe(url => url)
