@@ -62,7 +62,7 @@ const serverConfig: ConfigSpec = {
     // pattern: '',
     patternDescription: 'Must be less than 40 characters',
     masked: false,
-    copyable: true,
+    copyable: false,
   },
   autoCheckUpdates: {
     type: 'boolean',
@@ -92,7 +92,7 @@ const serverConfig: ConfigSpec = {
     changeWarning: 'Downloading services from an alternative marketplace can result in malicious or harmful code being installed on your device.',
     default: 'https://registry.start9.com',
     masked: false,
-    copyable: true,
+    copyable: false,
   },
   // password: {
   //   type: 'string',

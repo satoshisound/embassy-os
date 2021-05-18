@@ -1,5 +1,6 @@
 import { Pipe, PipeTransform } from '@angular/core'
 import { PackageDataEntry } from '../models/patch-db/data-model'
+import { ConnectionState } from '../services/connection.service'
 import { renderPkgStatus } from '../services/pkg-status-rendering.service'
 
 @Pipe({
@@ -7,13 +8,15 @@ import { renderPkgStatus } from '../services/pkg-status-rendering.service'
 })
 export class DisplayBulbPipe implements PipeTransform {
 
-  transform (pkg: PackageDataEntry, connected: boolean, d: DisplayBulb): boolean {
-    const rendering = renderPkgStatus(pkg, connected)
-    switch (rendering.color) {
-      case 'danger': return d === 'red'
-      case 'success': return d === 'green'
-      case 'warning': return d === 'yellow'
-      default: return d === 'off'
+  transform (pkg: PackageDataEntry, bulb: DisplayBulb, connection: ConnectionState): boolean {
+    console.log('BULB', connection, bulb)
+    const { color } = renderPkgStatus(pkg, connection)
+    console.log(color)
+    switch (color) {
+      case 'danger': return bulb === 'red'
+      case 'success': return bulb === 'green'
+      case 'warning': return bulb === 'yellow'
+      default: return bulb === 'off'
     }
   }
 }

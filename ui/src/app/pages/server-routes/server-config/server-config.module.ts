@@ -5,7 +5,6 @@ import { ServerConfigPage } from './server-config.page'
 import { Routes, RouterModule } from '@angular/router'
 import { SharingModule } from 'src/app/modules/sharing.module'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
-import { ReactiveComponentModule } from '@ngrx/component'
 
 const routes: Routes = [
   {
@@ -21,7 +20,6 @@ const routes: Routes = [
     SharingModule,
     RouterModule.forChild(routes),
     PwaBackComponentModule,
-    ReactiveComponentModule,
   ],
   declarations: [
     ServerConfigPage,

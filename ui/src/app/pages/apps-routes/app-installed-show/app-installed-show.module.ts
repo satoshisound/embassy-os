@@ -10,7 +10,6 @@ import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-b
 import { BadgeMenuComponentModule } from 'src/app/components/badge-menu-button/badge-menu.component.module'
 import { InstallWizardComponentModule } from 'src/app/components/install-wizard/install-wizard.component.module'
 import { InformationPopoverComponentModule } from 'src/app/components/information-popover/information-popover.component.module'
-import { ReactiveComponentModule } from '@ngrx/component'
 
 const routes: Routes = [
   {
@@ -31,7 +30,6 @@ const routes: Routes = [
     BadgeMenuComponentModule,
     InstallWizardComponentModule,
     InformationPopoverComponentModule,
-    ReactiveComponentModule,
   ],
   declarations: [AppInstalledShowPage],
 })

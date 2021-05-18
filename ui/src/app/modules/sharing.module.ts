@@ -11,6 +11,8 @@ import { DisplayBulbPipe } from '../pipes/display-bulb.pipe'
 import { HasUiPipe, LaunchablePipe, ManifestPipe } from '../pipes/ui.pipe'
 import { EmptyPipe } from '../pipes/empty.pipe'
 import { StatusPipe } from '../pipes/status.pipe'
+import { NotificationColorPipe } from '../pipes/notification-color.pipe'
+import { ReactiveComponentModule } from '@ngrx/component'
 
 @NgModule({
     declarations: [
@@ -32,6 +34,10 @@ import { StatusPipe } from '../pipes/status.pipe'
         ManifestPipe,
         EmptyPipe,
         StatusPipe,
+        NotificationColorPipe,
+    ],
+    imports: [
+      ReactiveComponentModule,
     ],
     exports: [
         EmverComparesPipe,
@@ -52,6 +58,8 @@ import { StatusPipe } from '../pipes/status.pipe'
         ManifestPipe,
         EmptyPipe,
         StatusPipe,
+        NotificationColorPipe,
+        ReactiveComponentModule,
     ],
 })
 export class SharingModule { }

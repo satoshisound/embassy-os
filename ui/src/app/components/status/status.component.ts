@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core'
-import { BehaviorSubject } from 'rxjs'
 import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
+import { ConnectionState } from 'src/app/services/connection.service'
 import { renderPkgStatus } from 'src/app/services/pkg-status-rendering.service'
 
 @Component({
@@ -10,12 +10,17 @@ import { renderPkgStatus } from 'src/app/services/pkg-status-rendering.service'
 })
 export class StatusComponent {
   @Input() pkg: PackageDataEntry
-  @Input() connected: boolean
+  @Input() connection: ConnectionState
   @Input() size: 'small' | 'medium' | 'large' | 'italics-small' | 'bold-large' = 'large'
-  display = new BehaviorSubject<string>(undefined)
+  display = ''
+  color = ''
+  showDots = false
 
   ngOnChanges () {
-    this.display.next(renderPkgStatus(this.pkg, this.connected).display)
+    const { display, color, showDots } = renderPkgStatus(this.pkg, this.connection)
+    this.display = display
+    this.color = color
+    this.showDots = showDots
   }
 }
 

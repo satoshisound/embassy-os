@@ -225,8 +225,7 @@ export interface MainStatusStopping {
 export interface MainStatusRunning {
   status: PackageMainStatus.Running
   started: string // UTC date string
-  main: HealthCheckResult
-  interfaces: { [id: string]: HealthCheckResult }
+  health: { [id: string]: HealthCheckResult }
 }
 
 export interface MainStatusBackingUp {
@@ -292,10 +291,12 @@ export interface DependencyErrorConfigUnsatisfied {
 }
 
 export interface DependencyErrorHealthCheckFailed {
+  type: 'health-check-failed'
   check: HealthCheckResult
 }
 
 export interface DependencyErrorInterfaceHealthChecksFailed {
+  type: 'interface-health-checks-failed'
   failures: { [id: string]: HealthCheckResult }
 }
 

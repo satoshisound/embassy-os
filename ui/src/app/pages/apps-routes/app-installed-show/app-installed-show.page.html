@@ -16,7 +16,7 @@
     <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
   </ion-item>
 
-  <ng-container *ngrxLet="connectionService.monitor$ as connected">
+  <ng-container *ngrxLet="connectionService.monitor$() as connected">
     <ng-container *ngrxLet="pkg | manifest as manifest">
       <ng-container *ngrxLet="pkg | status : connected">
         <div class="top-plate">

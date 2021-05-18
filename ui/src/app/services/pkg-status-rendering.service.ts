@@ -1,8 +1,9 @@
 import { PackageDataEntry, PackageMainStatus, PackageState, Status } from '../models/patch-db/data-model'
+import { ConnectionState } from './connection.service'
 
-export function renderPkgStatus (pkg: PackageDataEntry, connected: boolean): PkgStatusRendering {
-  if (!connected) {
-    return { display: 'Connecting', color: 'warning', showDots: true, feStatus: FEStatus.Connecting }
+export function renderPkgStatus (pkg: PackageDataEntry, connection: ConnectionState): PkgStatusRendering {
+  if (!connection.network || !connection.internet) {
+    return { display: 'Connecting', color: 'medium', showDots: true, feStatus: FEStatus.Connecting }
   }
 
   switch (pkg.state) {

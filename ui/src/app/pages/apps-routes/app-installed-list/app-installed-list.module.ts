@@ -6,7 +6,6 @@ import { AppInstalledListPage } from './app-installed-list.page'
 import { StatusComponentModule } from 'src/app/components/status/status.component.module'
 import { SharingModule } from 'src/app/modules/sharing.module'
 import { BadgeMenuComponentModule } from 'src/app/components/badge-menu-button/badge-menu.component.module'
-import { ReactiveComponentModule } from '@ngrx/component'
 
 const routes: Routes = [
   {
@@ -23,7 +22,6 @@ const routes: Routes = [
     IonicModule,
     RouterModule.forChild(routes),
     BadgeMenuComponentModule,
-    ReactiveComponentModule,
   ],
   declarations: [
     AppInstalledListPage,

@@ -24,11 +24,6 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   abstract getDump (): Promise<RR.GetDumpRes>
 
   protected abstract setDbValueRaw (params: RR.SetDBValueReq): Promise<RR.SetDBValueRes>
-  // async setDbValue (params: RR.SetDBValueReq): Promise<RR.SetDBValueRes['response']> {
-  //   return this.process<RR.SetDBValueRes['response']>(
-  //     () => this.setDbValueRaw(params),
-  //   )
-  // }
   setDbValue = (params: RR.SetDBValueReq) => this.syncResponse(
     () => this.setDbValueRaw(params),
   )()
@@ -68,7 +63,7 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   // notification
 
   abstract getNotificationsRaw (params: RR.GetNotificationsReq): Promise<RR.GetNotificationsRes>
-  getNotifications = (params: RR.GetNotificationsReq) => this.syncResponse(
+  getNotifications = (params: RR.GetNotificationsReq) => this.syncResponse<RR.GetNotificationsRes['response'], any>(
     () => this.getNotificationsRaw(params),
   )()
 
@@ -180,7 +175,7 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
   // Helper allowing quick decoration to sync the response patch and return the response contents.
   // Pass in a tempUpdate function which returns a UpdateTemp corresponding to a temporary
   // state change you'd like to enact prior to request and expired when request terminates.
-  private syncResponse<T extends (...args: any[]) => Promise<any>> (f: T, temp?: Operation): (...args: Parameters<T>) => ExtractResultPromise<ReturnType<T>> {
+  private syncResponse<T, F extends (...args: any[]) => Promise<{ response: T, revision?: Revision }>> (f: F, temp?: Operation): (...args: Parameters<F>) => Promise<T> {
     return (...a) => {
       let expireId = undefined
       if (temp) {
@@ -195,16 +190,17 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
     }
   }
 
-  private async process<T, F extends (args: object) => Promise<{ response: T, revision?: Revision}>> (f: F, temps: Operation[] = []): Promise<T> {
-    let expireId = undefined
-    if (temps.length) {
-      expireId = uuid.v4()
-      this.sync.next({ patch: temps, expiredBy: expireId })
-    }
-    const { response, revision } = await f({ ...f.arguments, expireId })
-    if (revision) this.sync.next(revision)
-    return response
-  }
+  // @TODO better types?
+  // private async process<T, F extends (args: object) => Promise<{ response: T, revision?: Revision }>> (f: F, temps: Operation[] = []): Promise<T> {
+  //   let expireId = undefined
+  //   if (temps.length) {
+  //     expireId = uuid.v4()
+  //     this.sync.next({ patch: temps, expiredBy: expireId })
+  //   }
+  //   const { response, revision } = await f({ ...f.arguments, expireId })
+  //   if (revision) this.sync.next(revision)
+  //   return response
+  // }
 }
 // used for type inference in syncResponse
 type ExtractResultPromise<T extends Promise<any>> = T extends Promise<infer R> ? Promise<R> : any

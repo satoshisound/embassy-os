@@ -1,7 +1,122 @@
-import { ServerStatus } from 'src/app/models/patch-db/data-model'
+import { DockerIoFormat, PackageDataEntry, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
 import { RR, ServerNotification } from './api-types'
 
 export module Mock {
+
+  export const bitcoind: PackageDataEntry = {
+    state: PackageState.Installed,
+    'static-files': {
+      license: 'licenseURL',
+      icon: 'assets/img/service-icons/bitcoind.png',
+      instructions: 'instructionsURL',
+    },
+    installed: {
+      manifest: {
+        id: 'bitcoind',
+        title: 'Bitcoin Core',
+        version: '0.21.0',
+        description: {
+          short: 'A Bitcoin full node by Bitcoin Core',
+          long: 'Bitcoin decentralized consensus protocol and monetary settlement network.',
+        },
+        'release-notes': 'Taproot, Schnorr, and more.',
+        license: 'MIT',
+        'wrapper-repo': 'https://github.com/start9labs/bitcoind-wrapper',
+        'upstream-repo': 'https://github.com/bitcoin/bitcoin',
+        'support-site': 'https://bitcoin.org',
+        'marketing-site': 'https://bitcoin.org',
+        alerts: {
+          install: 'Bitcoin can take over a week to sync.',
+          uninstall: 'Chain state will be lost, as will any funds stored on your Bitcoin Core waller that have not been backed up.',
+          restore: null,
+          start: null,
+          stop: 'Stopping Bitcoin is bad for your health.',
+        },
+        main: {
+          type: 'docker',
+          image: '',
+          system: true,
+          entrypoint: '',
+          args: [''],
+          mounts: { },
+          'io-format': DockerIoFormat.Yaml,
+          inject: false,
+          'shm-size': '',
+        },
+        'health-check': {
+          type: 'docker',
+          image: '',
+          system: true,
+          entrypoint: '',
+          args: [''],
+          mounts: { },
+          'io-format': DockerIoFormat.Yaml,
+          inject: false,
+          'shm-size': '',
+        },
+        config: null,
+        volumes: { },
+        'min-os-version': '0.2.12',
+        interfaces: {
+          ui: {
+            'tor-config': {
+              'hidden-service-version': 'v3',
+              'port-mapping': { },
+            },
+            'lan-config': { },
+            ui: false,
+            protocols: [],
+          },
+        },
+        backup: {
+          create: {
+            type: 'docker',
+            image: '',
+            system: true,
+            entrypoint: '',
+            args: [''],
+            mounts: { },
+            'io-format': DockerIoFormat.Yaml,
+            inject: false,
+            'shm-size': '',
+          },
+          restore: {
+            type: 'docker',
+            image: '',
+            system: true,
+            entrypoint: '',
+            args: [''],
+            mounts: { },
+            'io-format': DockerIoFormat.Yaml,
+            inject: false,
+            'shm-size': '',
+          },
+        },
+        migrations: null,
+        actions: { },
+        permissions: { },
+        dependencies: { },
+      },
+      status: {
+        configured: true,
+        main: {
+          status: PackageMainStatus.Running,
+          started: new Date().toISOString(),
+          health: { },
+        },
+        dependencies: { },
+      },
+      'interface-info': {
+        ip: '10.0.0.1',
+        addresses: {
+          rpc: {
+            'tor-address': 'bitcoind-address.onion',
+            'lan-address': 'bitcoind-address.local',
+          },
+        },
+      },
+    },
+  }
 
   export const DbDump: RR.GetDumpRes = {
     id: 1,
@@ -26,7 +141,9 @@ export module Mock {
           Memory: '8GB',
         },
       },
-      'package-data': { },
+      'package-data': {
+        'bitcoind': bitcoind,
+      },
       ui: {
         'server-name': 'My Embassy',
         'welcome-ack': '1.0.0',

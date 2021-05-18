@@ -36,7 +36,7 @@
     <ion-item *ngFor="let not of notifications; let i = index">
       <ion-label class="ion-text-wrap">
         <h2>
-          <ion-text [color]="getColor(not)"><b>{{ not.title }}</b></ion-text>
+          <ion-text [color]="not | notificationColor"><b>{{ not.title }}</b></ion-text>
         </h2>
         <h2 class="notification-message">{{ not.message }}</h2>
         <p>{{ not.createdAt | date: 'short' }}</p>

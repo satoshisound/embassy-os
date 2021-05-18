@@ -11,8 +11,8 @@ export class ConnectionService {
   private onlineSubscription: Subscription
   private httpSubscription: Subscription
   private readonly currentState: ConnectionState = {
-    hasInternetAccess: false,
-    hasNetworkConnection: window.navigator.onLine,
+    network: window.navigator.onLine,
+    internet: false,
   }
   private readonly stateChangeEventEmitter = new Subject<ConnectionState>()
 
@@ -29,6 +29,7 @@ export class ConnectionService {
       this.onlineSubscription.unsubscribe()
       this.httpSubscription.unsubscribe()
     } catch (e) {
+      console.error(e.message)
     }
   }
 
@@ -44,13 +45,13 @@ export class ConnectionService {
 
   private checkNetworkState (): void {
     this.onlineSubscription = fromEvent(window, 'online').subscribe(() => {
-      this.currentState.hasNetworkConnection = true
+      this.currentState.network = true
       this.checkInternetState()
       this.emitEvent()
     })
 
     this.offlineSubscription = fromEvent(window, 'offline').subscribe(() => {
-      this.currentState.hasNetworkConnection = false
+      this.currentState.network = false
       this.checkInternetState()
       this.emitEvent()
     })
@@ -70,7 +71,7 @@ export class ConnectionService {
           errors.pipe(
             tap(val => {
               console.error('Ping error: ', val)
-              this.currentState.hasInternetAccess = false
+              this.currentState.internet = false
               this.emitEvent()
             }),
             // restart after 2 seconds
@@ -79,7 +80,7 @@ export class ConnectionService {
         ),
       )
       .subscribe(() => {
-        this.currentState.hasInternetAccess = true
+        this.currentState.internet = true
         this.emitEvent()
       })
   }
@@ -96,9 +97,9 @@ export class ConnectionService {
   /**
    * "True" if browser has network connection. Determined by Window objects "online" / "offline" events.
    */
-  hasNetworkConnection: boolean
+  network: boolean
   /**
    * "True" if browser has Internet access. Determined by heartbeat system which periodically makes request to heartbeat Url.
    */
-  hasInternetAccess: boolean
+  internet: boolean
 }

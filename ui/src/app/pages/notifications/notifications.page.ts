@@ -42,8 +42,7 @@ export class NotificationsPage {
   async getNotifications (): Promise<ServerNotification[]> {
     let notifications: ServerNotification[] = []
     try {
-      // @TODO uncomment
-      // notifications = await this.apiService.getNotifications({ page: this.page, 'per-page': this.perPage})
+      notifications = await this.apiService.getNotifications({ page: this.page, 'per-page': this.perPage})
       this.needInfinite = notifications.length >= this.perPage
       this.page++
       this.error = ''
@@ -52,22 +51,6 @@ export class NotificationsPage {
       this.error = e.message
     } finally {
       return notifications
-    }
-  }
-
-  getColor (notification: ServerNotification): string {
-    const char = notification.code.charAt(0)
-    switch (char) {
-      case '0':
-        return 'primary'
-      case '1':
-        return 'success'
-      case '2':
-        return 'warning'
-      case '3':
-        return 'danger'
-      default:
-        return ''
     }
   }
 
