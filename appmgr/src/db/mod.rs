@@ -8,8 +8,11 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::config::action::ConfigRes;
+use crate::config::spec::PackagePointerSpecVariant;
 use crate::id::InterfaceId;
-use crate::install_new::progress::InstallProgress;
+use crate::install::progress::InstallProgress;
+use crate::net::Network;
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::status::Status;
 use crate::util::{IpPool, Version};
@@ -24,7 +27,7 @@ pub struct Database {
     pub package_data: AllPackageData,
     pub broken_packages: Vec<PackageId>,
     #[model]
-    pub resources: Resources,
+    pub network: Network,
     pub ui: Value,
     pub agent: Value,
 }
@@ -65,25 +68,66 @@ impl HasModel for AllPackageData {
     type Model = MapModel<Self>;
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct StaticFiles {
+    license: Url,
+    instructions: Url,
+    icon: Url,
+}
+impl StaticFiles {
+    pub fn local(id: &PackageId, icon_type: &str) -> Result<Self, Error> {
+        Ok(StaticFiles {
+            license: format!("/public/package-data/{}/LICENSE.md", id).parse()?,
+            instructions: format!("/public/package-data/{}/INSTRUCTIONS.md", id).parse()?,
+            icon: format!("/public/package-data/{}/icon.{}", id, icon_type).parse()?,
+        })
+    }
+    pub fn remote(id: &PackageId, version: &Version, icon_type: &str) -> Result<Self, Error> {
+        Ok(StaticFiles {
+            license: format!("/registry/packages/{}/{}/LICENSE.md", id, version.as_str())
+                .parse()?,
+            instructions: format!(
+                "/registry/packages/{}/{}/INSTRUCTIONS.md",
+                id,
+                version.as_str()
+            )
+            .parse()?,
+            icon: format!(
+                "/registry/packages/{}/{}/icon.{}",
+                id,
+                version.as_str(),
+                icon_type
+            )
+            .parse()?,
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, HasModel)]
 #[serde(tag = "state")]
 #[serde(rename_all = "kebab-case")]
 pub enum PackageDataEntry {
     #[serde(rename_all = "kebab-case")]
     Installing {
+        static_files: StaticFiles,
+        unverified_manifest: Manifest,
         install_progress: Arc<InstallProgress>,
     }, // { state: "installing", 'install-progress': InstallProgress }
     #[serde(rename_all = "kebab-case")]
     Updating {
+        static_files: StaticFiles,
         installed: InstalledPackageDataEntry,
         install_progress: Arc<InstallProgress>,
     },
     #[serde(rename_all = "kebab-case")]
     Removing {
+        static_files: StaticFiles,
         installed: InstalledPackageDataEntry,
     },
     #[serde(rename_all = "kebab-case")]
     Installed {
+        static_files: StaticFiles,
         installed: InstalledPackageDataEntry,
     },
 }
@@ -91,78 +135,8 @@ impl PackageDataEntryModel {
     pub fn installed(self) -> OptionModel<InstalledPackageDataEntry> {
         self.0.child("installed").into()
     }
-    pub fn install_progress(self) -> OptionModel<InstalledPackageDataEntry> {
+    pub fn install_progress(self) -> OptionModel<InstallProgress> {
         self.0.child("install-progress").into()
-    }
-}
-#[derive(Debug, Clone)]
-pub enum PackageDataEntryModelKnown {
-    Installing {
-        install_progress: Model<Arc<InstallProgress>>,
-    },
-    Updating {
-        installed: InstalledPackageDataEntryModel,
-        install_progress: Model<Arc<InstallProgress>>,
-    },
-    Removing {
-        installed: InstalledPackageDataEntryModel,
-    },
-    Installed {
-        installed: InstalledPackageDataEntryModel,
-    },
-}
-impl PackageDataEntryModel {
-    pub async fn check<Db: DbHandle>(
-        self,
-        db: &mut Db,
-    ) -> Result<PackageDataEntryModelKnown, Error> {
-        let variant: ModelData<String> = self.0.clone().child("state").get(db).await?;
-        Ok(match &**variant {
-            "installing" => PackageDataEntryModelKnown::Installing {
-                install_progress: JsonPointer::from(self.0)
-                    .join_end("install-progress")
-                    .into(),
-            },
-            "updating" => PackageDataEntryModelKnown::Updating {
-                installed: JsonPointer::from(self.0.clone())
-                    .join_end("installed")
-                    .into(),
-                install_progress: JsonPointer::from(self.0)
-                    .join_end("install-progress")
-                    .into(),
-            },
-            "removing" => PackageDataEntryModelKnown::Removing {
-                installed: JsonPointer::from(self.0).join_end("installed").into(),
-            },
-            "installed" => PackageDataEntryModelKnown::Installed {
-                installed: JsonPointer::from(self.0).join_end("installed").into(),
-            },
-            _ => {
-                return Err(Error::new(
-                    anyhow::anyhow!("invalid variant for PackageDataEntry"),
-                    crate::ErrorKind::Database,
-                ))
-            }
-        })
-    }
-}
-impl PackageDataEntryModelKnown {
-    pub fn as_installed(&self) -> Option<&InstalledPackageDataEntryModel> {
-        match self {
-            PackageDataEntryModelKnown::Installed { installed } => Some(installed),
-            PackageDataEntryModelKnown::Removing { installed, .. } => Some(installed),
-            PackageDataEntryModelKnown::Updating { installed, .. } => Some(installed),
-            _ => None,
-        }
-    }
-    pub fn as_install_progress(&self) -> Option<&Model<Arc<InstallProgress>>> {
-        match self {
-            PackageDataEntryModelKnown::Installing { install_progress } => Some(install_progress),
-            PackageDataEntryModelKnown::Updating {
-                install_progress, ..
-            } => Some(install_progress),
-            _ => None,
-        }
     }
 }
 
@@ -170,18 +144,19 @@ impl PackageDataEntryModelKnown {
 #[serde(rename_all = "kebab-case")]
 pub struct InstalledPackageDataEntry {
     #[model]
-    manifest: Manifest,
-    status: Status,
+    pub manifest: Manifest,
+    pub status: Status,
+    pub pointers: LinkedHashMap<PackageId, Vec<PackagePointerSpecVariant>>,
     #[model]
-    interface_info: InterfaceInfo,
+    pub interface_info: InterfaceInfo,
 }
 
 #[derive(Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename_all = "kebab-case")]
 pub struct InterfaceInfo {
-    ip: Ipv4Addr,
+    pub ip: Ipv4Addr,
     #[model]
-    addresses: InterfaceAddressMap,
+    pub addresses: InterfaceAddressMap,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -200,6 +175,6 @@ impl HasModel for InterfaceAddressMap {
 #[derive(Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename_all = "kebab-case")]
 pub struct InterfaceAddresses {
-    tor_address: Option<String>,
-    lan_address: Option<String>,
+    pub tor_address: Option<String>,
+    pub lan_address: Option<String>,
 }

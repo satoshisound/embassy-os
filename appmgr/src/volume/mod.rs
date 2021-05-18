@@ -9,6 +9,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::id::{Id, IdUnchecked, InterfaceId};
 use crate::s9pk::manifest::PackageId;
 
+pub mod disk;
+
 pub const PKG_VOLUME_DIR: &'static str = "/mnt/embassy-os/volumes/package-data";
 pub const BACKUP_DIR: &'static str = "/mnt/embassy-os-backups/EmbassyBackups";
 
@@ -65,7 +67,7 @@ where
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct CustomVolumeId<S: AsRef<str> = String>(Id<S>);
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Volumes(LinkedHashMap<VolumeId, Volume>);
 impl Volumes {
     pub fn get_path_for(&self, pkg_id: &PackageId, volume_id: &VolumeId) -> Option<PathBuf> {

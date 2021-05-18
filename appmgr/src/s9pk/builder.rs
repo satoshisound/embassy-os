@@ -7,15 +7,30 @@ use super::manifest::Manifest;
 use crate::{Error, ResultExt};
 
 #[derive(TypedBuilder)]
-pub struct S9pkPacker<'a, W: Write + Seek, RIcon: Read, RAppImage: Read> {
+pub struct S9pkPacker<
+    'a,
+    W: Write + Seek,
+    RLicense: Read,
+    RInstructions: Read,
+    RIcon: Read,
+    RDockerImages: Read,
+> {
     writer: W,
     manifest: &'a Manifest,
+    license: RLicense,
+    instructions: RInstructions,
     icon: RIcon,
-    docker_images: RAppImage,
-    #[builder(default)]
-    instructions: Option<&'a str>,
+    docker_images: RDockerImages,
 }
-impl<'a, W: Write + Seek, RIcon: Read, RAppImage: Read> S9pkPacker<'a, W, RIcon, RAppImage> {
+impl<
+        'a,
+        W: Write + Seek,
+        RLicense: Read,
+        RInstructions: Read,
+        RIcon: Read,
+        RDockerImages: Read,
+    > S9pkPacker<'a, W, RLicense, RInstructions, RIcon, RDockerImages>
+{
     /// BLOCKING
     pub fn pack(mut self) -> Result<(), Error> {
         let header_pos = self.writer.stream_position()?;
@@ -43,6 +58,24 @@ impl<'a, W: Write + Seek, RIcon: Read, RAppImage: Read> S9pkPacker<'a, W, RIcon,
             length: new_pos - position,
         };
         position = new_pos;
+        // license
+        std::io::copy(&mut self.license, &mut self.writer)
+            .with_ctx(|_| (crate::ErrorKind::Filesystem, "Copying License"))?;
+        let new_pos = self.writer.stream_position()?;
+        header.table_of_contents.license = FileSection {
+            position,
+            length: new_pos - position,
+        };
+        position = new_pos;
+        // instructions
+        std::io::copy(&mut self.instructions, &mut self.writer)
+            .with_ctx(|_| (crate::ErrorKind::Filesystem, "Copying Instructions"))?;
+        let new_pos = self.writer.stream_position()?;
+        header.table_of_contents.instructions = FileSection {
+            position,
+            length: new_pos - position,
+        };
+        position = new_pos;
         // icon
         std::io::copy(&mut self.icon, &mut self.writer)
             .with_ctx(|_| (crate::ErrorKind::Filesystem, "Copying Icon"))?;
@@ -61,18 +94,6 @@ impl<'a, W: Write + Seek, RIcon: Read, RAppImage: Read> S9pkPacker<'a, W, RIcon,
             length: new_pos - position,
         };
         position = new_pos;
-        // instructions
-        if let Some(instructions) = self.instructions {
-            self.writer
-                .write(instructions.as_bytes())
-                .with_ctx(|_| (crate::ErrorKind::Filesystem, "Packing App Image"))?;
-            let new_pos = self.writer.stream_position()?;
-            header.table_of_contents.docker_images = FileSection {
-                position,
-                length: new_pos - position,
-            };
-            position = new_pos;
-        }
         // header
         self.writer.seek(SeekFrom::Start(header_pos))?;
         header

@@ -9,12 +9,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::id::ImageId;
+use crate::net::host::Hosts;
 use crate::s9pk::manifest::{PackageId, SYSTEM_PACKAGE_ID};
 use crate::util::{Invoke, IpPool};
 use crate::volume::{VolumeId, Volumes};
 use crate::{Error, ResultExt};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename = "kebab-case")]
 pub enum DockerIOFormat {
     Json,
@@ -68,7 +69,7 @@ impl DockerIOFormat {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DockerAction {
     pub image: ImageId,
@@ -82,7 +83,7 @@ pub struct DockerAction {
     #[serde(default)]
     pub io_format: Option<DockerIOFormat>,
     #[serde(default)]
-    pub inject: bool,
+    pub inject: bool, // TODO: only allow in Actions
     #[serde(default)]
     pub shm_size_mb: Option<usize>, // TODO: use postfix sizing? like 1k vs 1m vs 1g
 }
@@ -92,12 +93,8 @@ impl DockerAction {
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
-        ip_pool: &mut IpPool,
-    ) -> Result<Ipv4Addr, Error> {
-        let ip = ip_pool
-            .get()
-            .ok_or_else(|| anyhow::anyhow!("No available IP addresses"))
-            .with_kind(crate::ErrorKind::Network)?;
+        ip: Ipv4Addr,
+    ) -> Result<(), Error> {
         tokio::process::Command::new("docker")
             .arg("create")
             .arg("--net")
@@ -106,10 +103,10 @@ impl DockerAction {
             .arg(format!("{}", ip))
             .arg("--name")
             .arg(Self::container_name(pkg_id, pkg_version))
-            .args(self.docker_args(pkg_id, pkg_version, volumes))
+            .args(self.docker_args(pkg_id, pkg_version, volumes, false))
             .invoke(crate::ErrorKind::Docker)
             .await?;
-        Ok(ip)
+        Ok(())
     }
 
     pub async fn execute<I: Serialize, O: for<'de> Deserialize<'de>>(
@@ -117,15 +114,74 @@ impl DockerAction {
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
+        hosts: &Hosts,
         input: Option<I>,
+        allow_inject: bool,
     ) -> Result<Result<O, (i32, String)>, Error> {
         let mut cmd = tokio::process::Command::new("docker");
-        if self.inject {
+        if self.inject && allow_inject {
             cmd.arg("exec");
         } else {
             cmd.arg("run").arg("--rm");
+            cmd.args(hosts.docker_args());
         }
-        cmd.args(self.docker_args(pkg_id, pkg_version, volumes));
+        cmd.args(self.docker_args(pkg_id, pkg_version, volumes, allow_inject));
+        let input_buf = if let (Some(input), Some(format)) = (&input, &self.io_format) {
+            cmd.stdin(std::process::Stdio::piped());
+            Some(format.to_vec(input)?)
+        } else {
+            None
+        };
+        let mut handle = cmd.spawn().with_kind(crate::ErrorKind::Docker)?;
+        if let (Some(input), Some(stdin)) = (&input_buf, &mut handle.stdin) {
+            use tokio::io::AsyncWriteExt;
+            stdin
+                .write_all(input)
+                .await
+                .with_kind(crate::ErrorKind::Docker)?;
+        }
+        let res = handle
+            .wait_with_output()
+            .await
+            .with_kind(crate::ErrorKind::Docker)?;
+        Ok(if res.status.success() {
+            Ok(if let Some(format) = &self.io_format {
+                match format.from_slice(&res.stdout) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to deserialize stdout from {}: {}, falling back to UTF-8 string.",
+                            format,
+                            e
+                        );
+                        serde_json::from_value(String::from_utf8(res.stdout)?.into())
+                            .with_kind(crate::ErrorKind::Deserialization)?
+                    }
+                }
+            } else if res.stdout.is_empty() {
+                serde_json::from_value(Value::Null).with_kind(crate::ErrorKind::Deserialization)?
+            } else {
+                serde_json::from_value(String::from_utf8(res.stdout)?.into())
+                    .with_kind(crate::ErrorKind::Deserialization)?
+            })
+        } else {
+            Err((
+                res.status.code().unwrap_or_default(),
+                String::from_utf8(res.stderr)?,
+            ))
+        })
+    }
+
+    pub async fn sandboxed<I: Serialize, O: for<'de> Deserialize<'de>>(
+        &self,
+        pkg_id: &PackageId,
+        pkg_version: &Version,
+        input: Option<I>,
+    ) -> Result<Result<O, (i32, String)>, Error> {
+        let mut cmd = tokio::process::Command::new("docker");
+        cmd.arg("run").arg("--rm");
+        cmd.arg("--network=none");
+        cmd.args(self.docker_args(pkg_id, pkg_version, &Volumes::default(), false));
         let input_buf = if let (Some(input), Some(format)) = (&input, &self.io_format) {
             cmd.stdin(std::process::Stdio::piped());
             Some(format.to_vec(input)?)
@@ -186,6 +242,7 @@ impl DockerAction {
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
+        allow_inject: bool,
     ) -> Vec<Cow<'a, OsStr>> {
         let mut res = Vec::with_capacity(
             (2 * self.mounts.len()) // --mount <MOUNT_ARG>
@@ -213,7 +270,7 @@ impl DockerAction {
             res.push(OsStr::new("--shm-size").into());
             res.push(OsString::from(format!("{}m", shm_size_mb)).into());
         }
-        if self.inject {
+        if self.inject && allow_inject {
             res.push(OsString::from(Self::container_name(pkg_id, pkg_version)).into());
             res.push(OsStr::new(&self.entrypoint).into());
         } else {

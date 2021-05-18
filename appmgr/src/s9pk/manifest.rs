@@ -2,18 +2,20 @@ use std::borrow::Borrow;
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 
+use chrono::{DateTime, Utc};
 use hashlink::LinkedHashMap;
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize, Serializer};
 use url::Url;
 
-use crate::action::ActionImplementation;
-use crate::backup_new::BackupActions;
+use crate::action::{ActionImplementation, Actions};
+use crate::backup::BackupActions;
 use crate::config::action::ConfigActions;
 use crate::dependencies::Dependencies;
 use crate::id::{Id, InterfaceId, SYSTEM_ID};
 use crate::migration::Migrations;
-use crate::status::health_check::{HealthCheck, HealthCheckResult};
+use crate::net::host::Hosts;
+use crate::status::health_check::{HealthCheckResult, HealthChecks};
 use crate::tor::HiddenServiceVersion;
 use crate::util::Version;
 use crate::volume::Volumes;
@@ -72,7 +74,7 @@ where
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, HasModel)]
+#[derive(Clone, Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename_all = "kebab-case")]
 pub struct Manifest {
     pub id: PackageId,
@@ -93,7 +95,7 @@ pub struct Manifest {
     pub alerts: Alerts,
     #[model]
     pub main: ActionImplementation,
-    pub health_check: HealthCheck,
+    pub health_checks: HealthChecks,
     #[model]
     pub config: Option<ConfigActions>,
     #[model]
@@ -108,32 +110,24 @@ pub struct Manifest {
     #[serde(default)]
     #[model]
     pub migrations: Migrations,
-    // #[serde(default)]
+    #[serde(default)]
     pub actions: Actions,
     // #[serde(default)]
-    pub permissions: Permissions,
+    // pub permissions: Permissions,
     // #[serde(default)]
     pub dependencies: Dependencies,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Interfaces(LinkedHashMap<InterfaceId, Interface>); // TODO
 impl Interfaces {
     pub async fn install(&self, ip: &Ipv4Addr) -> Result<(), Error> {
         todo!()
     }
-    pub async fn check_all(
-        &self,
-        pkg_id: &PackageId,
-        version: &Version,
-        volumes: &Volumes,
-    ) -> Result<LinkedHashMap<InterfaceId, HealthCheckResult>, Error> {
-        todo!()
-    }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Interface {
     tor_config: Option<TorConfig>,
@@ -142,7 +136,7 @@ pub struct Interface {
     protocols: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct TorConfig {
     #[serde(default)]
@@ -150,19 +144,14 @@ pub struct TorConfig {
     port_mapping: LinkedHashMap<u16, u16>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct LanPortConfig {
     ssl: bool,
     mapping: u16,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Actions {} // TODO
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Permissions {} // TODO
-
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Assets {
     #[serde(default)]
     license: Option<PathBuf>,
@@ -207,13 +196,13 @@ impl Assets {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Description {
     pub short: String,
     pub long: String,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Alerts {
     pub install: Option<String>,

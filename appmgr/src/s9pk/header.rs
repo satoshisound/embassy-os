@@ -69,9 +69,9 @@ impl Header {
 pub struct TableOfContents {
     pub manifest: FileSection,
     pub license: FileSection,
+    pub instructions: FileSection,
     pub icon: FileSection,
     pub docker_images: FileSection,
-    pub instructions: Option<FileSection>,
 }
 impl TableOfContents {
     pub fn serialize<W: Write>(&self, mut writer: W) -> std::io::Result<()> {
@@ -79,19 +79,18 @@ impl TableOfContents {
             * (
                 1 + // manifest
                 1 + // license
+                1 + // instructions
                 1 + // icon
-                1 + // docker_images
-                1 // instructions
+                1 // docker_images
             );
         writer.write_all(&u32::to_be_bytes(len))?;
         self.manifest.serialize_entry("manifest", &mut writer)?;
         self.license.serialize_entry("license", &mut writer)?;
+        self.instructions
+            .serialize_entry("instructions", &mut writer)?;
         self.icon.serialize_entry("icon", &mut writer)?;
         self.docker_images
             .serialize_entry("docker_images", &mut writer)?;
-        self.instructions
-            .unwrap_or_default() // 0/0 is not a valid file section
-            .serialize_entry("instructions", &mut writer)?;
         Ok(())
     }
     pub async fn deserialize<R: AsyncRead + Unpin>(mut reader: R) -> std::io::Result<Self> {
@@ -125,9 +124,9 @@ impl TableOfContents {
         Ok(TableOfContents {
             manifest: from_table(&table, "manifest")?,
             license: from_table(&table, "license")?,
+            instructions: from_table(&table, "instructions")?,
             icon: from_table(&table, "icon")?,
             docker_images: from_table(&table, "docker_images")?,
-            instructions: table.get(&b"instructions"[..]).copied().and_then(as_opt),
         })
     }
 }

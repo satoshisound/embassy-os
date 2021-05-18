@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::action::ActionImplementation;
 
-#[derive(Debug, Default, Deserialize, Serialize, HasModel)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, HasModel)]
 pub struct Migrations {
     pub from: LinkedHashMap<VersionRange, ActionImplementation>,
     pub to: LinkedHashMap<VersionRange, ActionImplementation>,

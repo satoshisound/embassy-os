@@ -9,9 +9,10 @@ use rpc_toolkit::url::Host;
 use rpc_toolkit::Context;
 use serde::Deserialize;
 use tokio::fs::File;
+use tokio::sync::RwLock;
 
 use crate::util::{from_yaml_async_reader, AsyncFileExt};
-use crate::ResultExt;
+use crate::{Error, ResultExt};
 
 #[derive(Debug, Default, Deserialize)]
 pub struct RpcContextConfig {
@@ -25,9 +26,13 @@ pub struct RpcContextSeed {
 }
 
 #[derive(Clone)]
-pub struct RpcContext(Arc<RpcContextSeed>);
-impl RpcContext {
-    pub async fn init() -> Result<Self, crate::Error> {
+pub struct MaybeAuthedRpcContext(Arc<RwLock<Option<Arc<RpcContextSeed>>>>);
+impl MaybeAuthedRpcContext {
+    pub fn new() -> Self {
+        MaybeAuthedRpcContext(Arc::new(RwLock::new(None)))
+    }
+    pub async fn init(&self) -> Result<(), Error> {
+        let mut seed = self.0.write().await;
         let cfg_path = Path::new(crate::CONFIG_PATH);
         let base = if let Some(f) = File::maybe_open(cfg_path)
             .await
@@ -37,17 +42,31 @@ impl RpcContext {
         } else {
             RpcContextConfig::default()
         };
-        Ok(RpcContext(Arc::new(RpcContextSeed {
+        *seed = Some(Arc::new(RpcContextSeed {
             bind: base.bind.unwrap_or(([127, 0, 0, 1], 5960).into()),
             db: PatchDb::open(
                 base.db
-                    .unwrap_or_else(|| Path::new("/mnt/embassy-os").to_owned()),
+                    .unwrap_or_else(|| Path::new("/mnt/embassy-os/embassy.db").to_owned()),
             )
             .await?,
             docker: Docker::connect_with_unix_defaults()?,
-        })))
+        }));
+        Ok(())
+    }
+    pub async fn authed(&self) -> Result<RpcContext, Error> {
+        if let Some(ctx) = self.0.read().await.clone() {
+            Ok(RpcContext(ctx))
+        } else {
+            Err(Error::new(
+                anyhow::anyhow!("Encrypted disk has not been unlocked"),
+                crate::ErrorKind::Authorization,
+            ))
+        }
     }
 }
+
+#[derive(Clone)]
+pub struct RpcContext(Arc<RpcContextSeed>);
 impl Context for RpcContext {
     fn host(&self) -> Host<&str> {
         match self.0.bind.ip() {

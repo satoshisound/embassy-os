@@ -38,6 +38,9 @@ pub enum ErrorKind {
     InvalidSignature = 31,
     Backup = 32,
     Restore = 33,
+    Authorization = 34,
+    AutoConfigure = 35,
+    Action = 36,
 }
 impl ErrorKind {
     pub fn as_str(&self) -> &'static str {
@@ -76,6 +79,9 @@ impl ErrorKind {
             InvalidSignature => "Invalid Signature",
             Backup => "Backup Error",
             Restore => "Restore Error",
+            Authorization => "Unauthorized",
+            AutoConfigure => "Auto-Configure Error",
+            Action => "Action Failed",
         }
     }
 }

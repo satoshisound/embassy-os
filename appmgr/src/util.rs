@@ -679,27 +679,6 @@ impl<T> SNone<T> {
 }
 impl<T> SOption<T> for SNone<T> {}
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct IpPool(IdPool);
-impl IpPool {
-    pub fn new() -> Self {
-        let pool = IdPool::new();
-        IpPool(pool)
-    }
-
-    pub fn get(&mut self) -> Option<Ipv4Addr> {
-        let id = self.0.request_id()?;
-        let ip = u32::from_be_bytes(crate::HOST_IP) + id as u32;
-        Some(ip.into())
-    }
-
-    pub fn put(&mut self, ip: Ipv4Addr) {
-        let ip = u32::from_be_bytes(ip.octets());
-        let id = ip - u32::from_be_bytes(crate::HOST_IP);
-        let _ = self.0.return_id(id as u16);
-    }
-}
-
 #[derive(Debug, Serialize)]
 pub enum ValuePrimative {
     Null,

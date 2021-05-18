@@ -11,7 +11,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, ReadBuf, Take}
 use super::header::{FileSection, Header, TableOfContents};
 use super::manifest::Manifest;
 use super::SIG_CONTEXT;
-use crate::install_new::progress::InstallProgressTracker;
+use crate::install::progress::InstallProgressTracker;
 use crate::{Error, ResultExt};
 
 #[pin_project::pin_project]
@@ -130,19 +130,15 @@ impl<R: AsyncRead + AsyncSeek + Unpin> S9pkReader<R> {
         Ok(self.read_handle(self.toc.license).await?)
     }
 
+    pub async fn instructions<'a>(&'a mut self) -> Result<ReadHandle<'a, R>, Error> {
+        Ok(self.read_handle(self.toc.instructions).await?)
+    }
+
     pub async fn icon<'a>(&'a mut self) -> Result<ReadHandle<'a, R>, Error> {
         Ok(self.read_handle(self.toc.icon).await?)
     }
 
     pub async fn docker_images<'a>(&'a mut self) -> Result<ReadHandle<'a, R>, Error> {
         Ok(self.read_handle(self.toc.docker_images).await?)
-    }
-
-    pub async fn instructions<'a>(&'a mut self) -> Result<Option<ReadHandle<'a, R>>, Error> {
-        if let Some(instructions) = self.toc.instructions {
-            Ok(Some(self.read_handle(instructions).await?))
-        } else {
-            Ok(None)
-        }
     }
 }

@@ -41,32 +41,16 @@ impl InstallProgress {
     }
     pub async fn track_download<Db: DbHandle>(
         self: Arc<Self>,
-        model: OptionModel<PackageDataEntry>,
+        model: OptionModel<InstallProgress>,
         mut db: Db,
     ) -> (Db, Result<(), Error>) {
         while !self.download_complete.load(Ordering::SeqCst) {
-            if let Err(e) = model
-                .put(
-                    &mut db,
-                    &PackageDataEntry::Installing {
-                        install_progress: self.clone(),
-                    },
-                )
-                .await
-            {
+            if let Err(e) = model.put(&mut db, &self).await {
                 return (db, Err(e.into()));
             }
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
-        if let Err(e) = model
-            .put(
-                &mut db,
-                &PackageDataEntry::Installing {
-                    install_progress: self.clone(),
-                },
-            )
-            .await
-        {
+        if let Err(e) = model.put(&mut db, &self).await {
             (db, Err(e.into()))
         } else {
             (db, Ok(()))
@@ -78,7 +62,7 @@ impl InstallProgress {
         T,
     >(
         self: &Arc<Self>,
-        model: OptionModel<PackageDataEntry>,
+        model: OptionModel<InstallProgress>,
         db: &PatchDb,
         handle: &mut PatchDbHandle,
         f: F,
@@ -94,20 +78,12 @@ impl InstallProgress {
     }
     pub async fn track_read<Db: DbHandle>(
         self: Arc<Self>,
-        model: OptionModel<PackageDataEntry>,
+        model: OptionModel<InstallProgress>,
         mut db: Db,
         complete: Arc<AtomicBool>,
     ) -> (Db, Result<(), Error>) {
         while !complete.load(Ordering::SeqCst) {
-            if let Err(e) = model
-                .put(
-                    &mut db,
-                    &PackageDataEntry::Installing {
-                        install_progress: self.clone(),
-                    },
-                )
-                .await
-            {
+            if let Err(e) = model.put(&mut db, &self).await {
                 return (db, Err(e.into()));
             }
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -120,7 +96,7 @@ impl InstallProgress {
         T,
     >(
         self: &Arc<Self>,
-        model: OptionModel<PackageDataEntry>,
+        model: OptionModel<InstallProgress>,
         db: &PatchDb,
         handle: &mut PatchDbHandle,
         f: F,

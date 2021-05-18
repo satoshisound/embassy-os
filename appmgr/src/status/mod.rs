@@ -1,19 +1,23 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use bollard::container::{ListContainersOptions, StartContainerOptions, StopContainerOptions};
 use bollard::models::{ContainerStateStatusEnum, ContainerSummaryInner};
 use bollard::Docker;
-use futures::StreamExt;
+use chrono::{DateTime, Utc};
+use futures::{StreamExt, TryFutureExt};
 use hashlink::LinkedHashMap;
-use patch_db::{DbHandle, HasModel, Map, MapModel};
+use patch_db::{DbHandle, HasModel, Map, MapModel, Model, ModelData, ModelDataMut};
 use serde::{Deserialize, Serialize};
 
-use self::health_check::HealthCheckResult;
+use self::health_check::{HealthCheckId, HealthCheckResult};
 use crate::action::docker::DockerAction;
 use crate::context::RpcContext;
+use crate::db::{InstalledPackageDataEntryModel, PackageDataEntryModel};
 use crate::dependencies::DependencyError;
 use crate::id::InterfaceId;
+use crate::net::host::Hosts;
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::util::Invoke;
 use crate::Error;
@@ -81,17 +85,21 @@ pub async fn synchronize_all(ctx: &RpcContext) -> Result<(), Error> {
                         crate::ErrorKind::Database,
                     )
                 })?;
-            let (status, manifest) = if let Some(installed) = pkg_data.installed().check(db).await?
-            {
-                (
-                    installed.clone().status().get(db).await?,
-                    installed.manifest().get(db).await?,
-                )
-            } else {
-                return Ok(false);
-            };
+            let (mut status, manifest) =
+                if let Some(installed) = pkg_data.installed().check(db).await? {
+                    (
+                        installed.clone().status().get_mut(db).await?,
+                        installed.manifest().get(db).await?,
+                    )
+                } else {
+                    return Ok(false);
+                };
 
-            status.main.synchronize(docker, &*manifest, summary).await
+            let res = status.main.synchronize(docker, &*manifest, summary).await?;
+
+            status.save(db).await?;
+
+            Ok(res)
         }
         match status(&ctx.docker, &id, &mut db, &summary).await {
             Ok(a) => fuckening |= a,
@@ -116,74 +124,143 @@ pub async fn synchronize_all(ctx: &RpcContext) -> Result<(), Error> {
 
 pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
     let mut db = ctx.db.handle();
+    let hosts = Arc::new(
+        crate::db::DatabaseModel::new()
+            .network()
+            .hosts()
+            .get(&mut db)
+            .await?
+            .to_owned(),
+    );
     let pkg_ids = crate::db::DatabaseModel::new()
         .package_data()
         .keys(&mut db)
         .await?;
-    async fn main_status<Db: DbHandle>(id: PackageId, mut db: Db) -> Result<(), Error> {
-        let pkg_data = crate::db::DatabaseModel::new()
+    let mut status_manifest = Vec::with_capacity(pkg_ids.len());
+    for id in &pkg_ids {
+        let model = crate::db::DatabaseModel::new()
             .package_data()
-            .idx_model(&id)
+            .idx_model(id)
             .check(&mut db)
             .await?
             .ok_or_else(|| {
                 Error::new(
-                    anyhow!("VersionedPackageData does not exist"),
+                    anyhow!("PackageDataEntry does not exist"),
                     crate::ErrorKind::Database,
                 )
             })?;
-        let (mut status, manifest) =
-            if let Some(installed) = pkg_data.installed().check(&mut db).await? {
-                (
-                    installed.clone().status().get_mut(&mut db).await?,
-                    installed.manifest().get(&mut db).await?,
-                )
-            } else {
-                return Ok(());
-            };
+        if let Some(installed) = model.installed().check(&mut db).await? {
+            status_manifest.push((
+                installed.clone().status(),
+                Arc::new(installed.manifest().get(&mut db).await?),
+            ));
+        }
+    }
+    drop(db);
+    async fn main_status<Db: DbHandle>(
+        status_model: Model<Status>,
+        manifest: Arc<ModelData<Manifest>>,
+        hosts: Arc<Hosts>,
+        mut db: Db,
+    ) -> Result<Status, Error> {
+        let mut status = status_model.get_mut(&mut db).await?;
 
-        status.main.check(&*manifest).await?;
+        status.main.check(&*manifest, &*hosts).await?;
+
+        let res = (*status).clone();
+
+        status.save(&mut db).await?;
+
+        Ok(res)
+    }
+    let (status_sender, mut statuses_recv) = tokio::sync::mpsc::channel(status_manifest.len());
+    futures::stream::iter(
+        status_manifest
+            .clone()
+            .into_iter()
+            .zip(pkg_ids.clone())
+            .zip(std::iter::repeat(hosts)),
+    )
+    .for_each_concurrent(None, move |(((status, manifest), id), hosts)| {
+        let status_sender = status_sender.clone();
+        async move {
+            match tokio::spawn(main_status(status, manifest, hosts, ctx.db.handle()))
+                .await
+                .unwrap()
+            {
+                Err(e) => {
+                    log::error!("Error running main health check for {}: {}", id, e);
+                    log::debug!("{:?}", e);
+                }
+                Ok(status) => {
+                    status_sender.send((id, status)).await;
+                }
+            }
+        }
+    })
+    .await;
+    let mut statuses = HashMap::with_capacity(status_manifest.len());
+    while let Some((id, status)) = statuses_recv.recv().await {
+        statuses.insert(id, status);
+    }
+    let statuses = Arc::new(statuses);
+    async fn dependency_status<Db: DbHandle>(
+        statuses: Arc<HashMap<PackageId, Status>>,
+        status_model: Model<Status>,
+        manifest: Arc<ModelData<Manifest>>,
+        mut db: Db,
+    ) -> Result<(), Error> {
+        let mut status = status_model.get_mut(&mut db).await?;
+
+        status.dependencies = manifest.dependencies.check_status(&*statuses).await?;
 
         status.save(&mut db).await?;
 
         Ok(())
     }
-    drop(db);
-    futures::stream::iter(pkg_ids)
-        .for_each_concurrent(None, |id| async move {
-            if let Err(e) = tokio::spawn(main_status(id.clone(), ctx.db.handle()))
+    futures::stream::iter(status_manifest.into_iter().zip(pkg_ids.clone()))
+        .for_each_concurrent(None, |((status, manifest), id)| {
+            let statuses = statuses.clone();
+            async move {
+                if let Err(e) = tokio::spawn(dependency_status(
+                    statuses,
+                    status,
+                    manifest,
+                    ctx.db.handle(),
+                ))
                 .await
                 .unwrap()
-            {
-                log::error!("Error running health check for {}: {}", id, e);
-                log::debug!("{:?}", e);
+                {
+                    log::error!("Error running dependency health check for {}: {}", id, e);
+                    log::debug!("{:?}", e);
+                }
             }
         })
         .await;
 
-    // TODO: dependencies
-
     Ok(())
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Status {
     pub configured: bool,
     pub main: MainStatus,
     pub dependencies: DependencyErrors,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "status")]
 #[serde(rename_all = "kebab-case")]
 pub enum MainStatus {
     Stopped,
+    Stopping,
     Running {
-        main: HealthCheckResult,
-        interfaces: LinkedHashMap<InterfaceId, HealthCheckResult>,
+        started: DateTime<Utc>,
+        health: LinkedHashMap<HealthCheckId, HealthCheckResult>,
     },
     BackingUp {
-        running: bool,
+        started: Option<DateTime<Utc>>,
+        health: LinkedHashMap<HealthCheckId, HealthCheckResult>,
     },
     Restoring {
         running: bool,
@@ -191,7 +268,7 @@ pub enum MainStatus {
 }
 impl MainStatus {
     pub async fn synchronize(
-        &self,
+        &mut self,
         docker: &Docker,
         manifest: &Manifest,
         summary: &ContainerSummaryInner,
@@ -214,7 +291,11 @@ impl MainStatus {
         match state {
             Some("created") | Some("exited") => match self {
                 MainStatus::Stopped => (),
-                MainStatus::Running { .. } => {
+                MainStatus::Stopping => {
+                    *self = MainStatus::Stopped;
+                }
+                MainStatus::Running { started, .. } => {
+                    *started = Utc::now();
                     docker
                         .start_container(&name, None::<StartContainerOptions<String>>)
                         .await?;
@@ -223,7 +304,7 @@ impl MainStatus {
                 MainStatus::Restoring { .. } => (),
             },
             Some("running") | Some("restarting") => match self {
-                MainStatus::Stopped | MainStatus::Restoring { .. } => {
+                MainStatus::Stopped | MainStatus::Stopping | MainStatus::Restoring { .. } => {
                     docker
                         .stop_container(&name, Some(StopContainerOptions { t: 30 }))
                         .await?;
@@ -235,7 +316,7 @@ impl MainStatus {
                 }
             },
             Some("paused") => match self {
-                MainStatus::Stopped | MainStatus::Restoring { .. } => {
+                MainStatus::Stopped | MainStatus::Stopping | MainStatus::Restoring { .. } => {
                     docker.unpause_container(&name).await?;
                     docker
                         .stop_container(&name, Some(StopContainerOptions { t: 30 }))
@@ -256,21 +337,34 @@ impl MainStatus {
         }
         Ok(false)
     }
-    pub async fn check(&mut self, manifest: &Manifest) -> Result<(), Error> {
+    pub async fn check(&mut self, manifest: &Manifest, hosts: &Hosts) -> Result<(), Error> {
         match self {
-            MainStatus::Running { main, interfaces } => {
-                let (main_res, iface_res) = tokio::try_join!(
-                    manifest
-                        .health_check
-                        .check(&manifest.id, &manifest.version, &manifest.volumes),
-                    manifest.interfaces.check_all(
+            MainStatus::Running { started, health } => {
+                *health = manifest
+                    .health_checks
+                    .check_all(
+                        started,
                         &manifest.id,
                         &manifest.version,
-                        &manifest.volumes
+                        &manifest.volumes,
+                        hosts,
                     )
-                )?;
-                *main = main_res;
-                *interfaces = iface_res;
+                    .await?;
+                for (check, res) in health {
+                    if matches!(
+                        res.result,
+                        health_check::HealthCheckResultVariant::Failure { .. }
+                    ) && manifest
+                        .health_checks
+                        .0
+                        .get(check)
+                        .map(|hc| hc.critical)
+                        .unwrap_or_default()
+                    {
+                        todo!("emit notification");
+                        *self = MainStatus::Stopping;
+                    }
+                }
             }
             _ => (),
         }
@@ -278,7 +372,7 @@ impl MainStatus {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DependencyErrors(LinkedHashMap<PackageId, DependencyError>);
 impl Map for DependencyErrors {
     type Key = PackageId;

@@ -7,9 +7,9 @@ use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
 
 use self::docker::DockerAction;
-use crate::apps::DockerStatus;
 use crate::config::{Config, ConfigSpec};
 use crate::id::Id;
+use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
 use crate::util::{IpPool, ValuePrimative};
 use crate::volume::Volumes;
@@ -52,6 +52,7 @@ where
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Actions(pub LinkedHashMap<ActionId, Action>);
 
 #[derive(Debug, Deserialize)]
@@ -69,7 +70,14 @@ pub struct ActionResultV0 {
     pub qr: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DockerStatus {
+    Running,
+    Stopped,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Action {
     pub name: String,
@@ -87,19 +95,20 @@ impl Action {
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
+        hosts: &Hosts,
         input: Config,
-    ) -> Result<Result<ActionResult, String>, Error> {
+    ) -> Result<ActionResult, Error> {
         self.input_spec
             .matches(&input)
             .with_kind(crate::ErrorKind::ConfigSpecViolation)?;
         self.implementation
-            .execute(pkg_id, pkg_version, volumes, Some(input))
-            .await
-            .map(|e| e.map_err(|e| e.1))
+            .execute(pkg_id, pkg_version, volumes, hosts, Some(input), true)
+            .await?
+            .map_err(|e| Error::new(anyhow::anyhow!("{}", e.1), crate::ErrorKind::Action))
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, HasModel)]
+#[derive(Clone, Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename = "kebab-case")]
 #[serde(tag = "type")]
 pub enum ActionImplementation {
@@ -111,11 +120,11 @@ impl ActionImplementation {
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
-        ip_pool: &mut IpPool,
-    ) -> Result<Ipv4Addr, Error> {
+        ip: Ipv4Addr,
+    ) -> Result<(), Error> {
         match self {
             ActionImplementation::Docker(action) => {
-                action.create(pkg_id, pkg_version, volumes, ip_pool).await
+                action.create(pkg_id, pkg_version, volumes, ip).await
             }
         }
     }
@@ -124,11 +133,27 @@ impl ActionImplementation {
         pkg_id: &PackageId,
         pkg_version: &Version,
         volumes: &Volumes,
+        hosts: &Hosts,
+        input: Option<I>,
+        allow_inject: bool,
+    ) -> Result<Result<O, (i32, String)>, Error> {
+        match self {
+            ActionImplementation::Docker(action) => {
+                action
+                    .execute(pkg_id, pkg_version, volumes, hosts, input, allow_inject)
+                    .await
+            }
+        }
+    }
+    pub async fn sandboxed<I: Serialize, O: for<'de> Deserialize<'de>>(
+        &self,
+        pkg_id: &PackageId,
+        pkg_version: &Version,
         input: Option<I>,
     ) -> Result<Result<O, (i32, String)>, Error> {
         match self {
             ActionImplementation::Docker(action) => {
-                action.execute(pkg_id, pkg_version, volumes, input).await
+                action.sandboxed(pkg_id, pkg_version, input).await
             }
         }
     }

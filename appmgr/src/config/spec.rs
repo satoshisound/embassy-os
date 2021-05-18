@@ -7,17 +7,23 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use itertools::Itertools;
+use jsonpath_lib::Compiled;
 use linear_map::set::LinearSet;
 use linear_map::LinearMap;
+use patch_db::json_ptr::JsonPointer;
+use patch_db::{DbHandle, OptionModel};
 use rand::{CryptoRng, Rng};
 use regex::Regex;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::util::{self, CharSet, NumRange, UniqueBy, STATIC_NULL};
 use super::value::{Config, Value};
 use super::{MatchError, NoMatchWithPath, TimeoutError};
 use crate::config::ConfigurationError;
-use crate::manifest::ManifestLatest;
+use crate::id::InterfaceId;
+use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::util::PersistencePath;
+use crate::Error;
 
 // Config Value Specifications
 #[async_trait]
@@ -26,8 +32,8 @@ pub trait ValueSpec {
     // consistent with the spec in &self
     fn matches(&self, value: &Value) -> Result<(), NoMatchWithPath>;
     // This function checks whether the value spec is consistent with itself,
-    // since not all invariants can be checked by the type
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath>;
+    // since not all inVariant can be checked by the type
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath>;
     // update is to fill in values for environment pointers recursively
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError>;
     // requires returns whether the app id is the target of a pointer within it
@@ -92,7 +98,7 @@ where
 
 // WithDefault - trivial wrapper that pairs a 'DefaultableWith' type with a
 // default spec
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WithDefault<T: DefaultableWith> {
     #[serde(flatten)]
     pub inner: T,
@@ -133,7 +139,7 @@ where
     fn matches(&self, value: &Value) -> Result<(), NoMatchWithPath> {
         self.inner.matches(value)
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.inner.validate(manifest)
     }
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
@@ -147,7 +153,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WithNullable<T> {
     #[serde(flatten)]
     pub inner: T,
@@ -165,7 +171,7 @@ where
             _ => self.inner.matches(value),
         }
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.inner.validate(manifest)
     }
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
@@ -211,7 +217,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WithDescription<T> {
     #[serde(flatten)]
@@ -230,7 +236,7 @@ where
     fn matches(&self, value: &Value) -> Result<(), NoMatchWithPath> {
         self.inner.matches(value)
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.inner.validate(manifest)
     }
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
@@ -276,7 +282,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "type")]
 pub enum ValueSpecAny {
@@ -323,7 +329,7 @@ impl ValueSpec for ValueSpecAny {
             ValueSpecAny::Pointer(a) => a.matches(value),
         }
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         match self {
             ValueSpecAny::Boolean(a) => a.validate(manifest),
             ValueSpecAny::Enum(a) => a.validate(manifest),
@@ -393,7 +399,7 @@ impl Defaultable for ValueSpecAny {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValueSpecBoolean {}
 #[async_trait]
 impl ValueSpec for ValueSpecBoolean {
@@ -407,7 +413,7 @@ impl ValueSpec for ValueSpecBoolean {
             ))),
         }
     }
-    fn validate(&self, _manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
     async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
@@ -437,7 +443,7 @@ impl DefaultableWith for ValueSpecBoolean {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueSpecEnum {
     pub values: LinearSet<String>,
@@ -445,7 +451,7 @@ pub struct ValueSpecEnum {
 }
 impl<'de> serde::de::Deserialize<'de> for ValueSpecEnum {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(serde::Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct _ValueSpecEnum {
             pub values: LinearSet<String>,
@@ -486,7 +492,7 @@ impl ValueSpec for ValueSpecEnum {
             ))),
         }
     }
-    fn validate(&self, _manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
     async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
@@ -516,7 +522,7 @@ impl DefaultableWith for ValueSpecEnum {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListSpec<T> {
     pub spec: T,
     pub range: NumRange<usize>,
@@ -562,7 +568,7 @@ where
             ))),
         }
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.spec.validate(manifest)
     }
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
@@ -628,7 +634,7 @@ unsafe impl Send for ValueSpecObject {} // TODO: remove
 unsafe impl Sync for ValueSpecUnion {} // TODO: remove
 unsafe impl Send for ValueSpecUnion {} // TODO: remove
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "subtype")]
 pub enum ValueSpecList {
@@ -649,7 +655,7 @@ impl ValueSpec for ValueSpecList {
             ValueSpecList::Union(a) => a.matches(value),
         }
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         match self {
             ValueSpecList::Enum(a) => a.validate(manifest),
             ValueSpecList::Number(a) => a.validate(manifest),
@@ -729,7 +735,7 @@ impl Defaultable for ValueSpecList {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValueSpecNumber {
     range: Option<NumRange<f64>>,
     #[serde(default)]
@@ -762,7 +768,7 @@ impl ValueSpec for ValueSpecNumber {
             ))),
         }
     }
-    fn validate(&self, _manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
     async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
@@ -778,7 +784,7 @@ impl ValueSpec for ValueSpecNumber {
         }
     }
 }
-#[derive(Clone, Copy, Debug, serde::Serialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct Number(pub f64);
 impl<'de> serde::de::Deserialize<'de> for Number {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -841,7 +847,7 @@ impl DefaultableWith for ValueSpecNumber {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueSpecObject {
     pub spec: ConfigSpec,
@@ -863,7 +869,7 @@ impl ValueSpec for ValueSpecObject {
             ))),
         }
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.spec.validate(manifest)
     }
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
@@ -922,7 +928,7 @@ impl Defaultable for ValueSpecObject {
     }
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ConfigSpec(pub LinearMap<String, ValueSpecAny>);
 impl ConfigSpec {
     pub fn matches(&self, value: &Config) -> Result<(), NoMatchWithPath> {
@@ -949,13 +955,8 @@ impl ConfigSpec {
         Ok(Config(res))
     }
 
-    pub fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    pub fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         for (name, val) in &self.0 {
-            if let Err(_) = super::rules::validate_key(&name) {
-                return Err(NoMatchWithPath::new(MatchError::InvalidKey(
-                    name.to_owned(),
-                )));
-            }
             val.validate(manifest)
                 .map_err(|e| e.prepend(name.clone()))?;
         }
@@ -983,7 +984,7 @@ impl ConfigSpec {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Pattern {
     #[serde(with = "util::serde_regex")]
@@ -991,7 +992,7 @@ pub struct Pattern {
     pub pattern_description: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValueSpecString {
     #[serde(flatten)]
     pub pattern: Option<Pattern>,
@@ -1025,7 +1026,7 @@ impl ValueSpec for ValueSpecString {
             ))),
         }
     }
-    fn validate(&self, _manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
     async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
@@ -1077,7 +1078,7 @@ impl DefaultableWith for ValueSpecString {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DefaultString {
     Literal(String),
@@ -1092,7 +1093,7 @@ impl DefaultString {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Entropy {
     pub charset: Option<CharSet>,
     pub len: usize,
@@ -1109,7 +1110,7 @@ impl Entropy {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnionTag {
     pub id: String,
@@ -1118,28 +1119,28 @@ pub struct UnionTag {
     pub variant_names: LinearMap<String, String>,
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueSpecUnion {
     pub tag: UnionTag,
-    pub variants: LinearMap<String, ConfigSpec>,
+    pub Variant: LinearMap<String, ConfigSpec>,
     pub display_as: Option<String>,
     pub unique_by: UniqueBy,
 }
 
 impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(serde::Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         #[serde(untagged)]
         pub enum _UnionTag {
             Old(String),
             New(UnionTag),
         }
-        #[derive(serde::Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct _ValueSpecUnion {
-            pub variants: LinearMap<String, ConfigSpec>,
+            pub Variant: LinearMap<String, ConfigSpec>,
             pub tag: _UnionTag,
             pub display_as: Option<String>,
             #[serde(default)]
@@ -1154,7 +1155,7 @@ impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
                     name: id,
                     description: None,
                     variant_names: union
-                        .variants
+                        .Variant
                         .keys()
                         .map(|k| (k.to_owned(), k.to_owned()))
                         .collect(),
@@ -1169,8 +1170,8 @@ impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
                     name,
                     description,
                     variant_names: {
-                        let mut iter = union.variants.keys();
-                        while variant_names.len() < union.variants.len() {
+                        let mut iter = union.Variant.keys();
+                        while variant_names.len() < union.Variant.len() {
                             if let Some(variant) = iter.next() {
                                 variant_names.insert(variant.to_owned(), variant.to_owned());
                             } else {
@@ -1181,7 +1182,7 @@ impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
                     },
                 },
             },
-            variants: union.variants,
+            Variant: union.Variant,
             display_as: union.display_as,
             unique_by: union.unique_by,
         })
@@ -1194,14 +1195,14 @@ impl ValueSpec for ValueSpecUnion {
         match value {
             Value::Object(o) => {
                 if let Some(Value::String(ref tag)) = o.0.get(&self.tag.id) {
-                    if let Some(obj_spec) = self.variants.get(tag) {
+                    if let Some(obj_spec) = self.Variant.get(tag) {
                         let mut without_tag = o.clone();
                         without_tag.0.remove(&self.tag.id);
                         obj_spec.matches(&without_tag)
                     } else {
                         Err(NoMatchWithPath::new(MatchError::Union(
                             tag.clone(),
-                            self.variants.keys().cloned().collect(),
+                            self.Variant.keys().cloned().collect(),
                         )))
                     }
                 } else {
@@ -1217,8 +1218,8 @@ impl ValueSpec for ValueSpecUnion {
             ))),
         }
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
-        for (name, variant) in &self.variants {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
+        for (name, variant) in &self.Variant {
             if variant.0.get(&self.tag.id).is_some() {
                 return Err(NoMatchWithPath::new(MatchError::PropertyMatchesUnionTag(
                     self.tag.id.clone(),
@@ -1235,7 +1236,7 @@ impl ValueSpec for ValueSpecUnion {
                 None => Err(ConfigurationError::NoMatch(NoMatchWithPath::new(
                     MatchError::MissingTag(self.tag.id.clone()),
                 ))),
-                Some(Value::String(tag)) => match self.variants.get(tag) {
+                Some(Value::String(tag)) => match self.Variant.get(tag) {
                     None => Err(ConfigurationError::InvalidVariant(tag.clone())),
                     Some(spec) => spec.update(o).await,
                 },
@@ -1253,7 +1254,7 @@ impl ValueSpec for ValueSpecUnion {
     fn requires(&self, id: &str, value: &Value) -> bool {
         if let Value::Object(o) = value {
             match o.0.get(&self.tag.id) {
-                Some(Value::String(tag)) => match self.variants.get(tag) {
+                Some(Value::String(tag)) => match self.Variant.get(tag) {
                     None => false,
                     Some(spec) => spec.requires(id, o),
                 },
@@ -1280,7 +1281,7 @@ impl DefaultableWith for ValueSpecUnion {
         rng: &mut R,
         timeout: &Option<Duration>,
     ) -> Result<Value, Self::Error> {
-        let variant = if let Some(v) = self.variants.get(spec) {
+        let variant = if let Some(v) = self.Variant.get(spec) {
             v
         } else {
             return Err(ConfigurationError::InvalidVariant(spec.clone()));
@@ -1295,17 +1296,17 @@ impl DefaultableWith for ValueSpecUnion {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "subtype")]
 #[serde(rename_all = "kebab-case")]
 pub enum ValueSpecPointer {
-    App(AppPointerSpec),
+    Package(PackagePointerSpec),
     System(SystemPointerSpec),
 }
 impl fmt::Display for ValueSpecPointer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ValueSpecPointer::App(p) => write!(f, "{}", p),
+            ValueSpecPointer::Package(p) => write!(f, "{}", p),
             ValueSpecPointer::System(p) => write!(f, "{}", p),
         }
     }
@@ -1324,25 +1325,25 @@ impl Defaultable for ValueSpecPointer {
 impl ValueSpec for ValueSpecPointer {
     fn matches(&self, value: &Value) -> Result<(), NoMatchWithPath> {
         match self {
-            ValueSpecPointer::App(a) => a.matches(value),
+            ValueSpecPointer::Package(a) => a.matches(value),
             ValueSpecPointer::System(a) => a.matches(value),
         }
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         match self {
-            ValueSpecPointer::App(a) => a.validate(manifest),
+            ValueSpecPointer::Package(a) => a.validate(manifest),
             ValueSpecPointer::System(a) => a.validate(manifest),
         }
     }
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
         match self {
-            ValueSpecPointer::App(a) => a.update(value).await,
+            ValueSpecPointer::Package(a) => a.update(value).await,
             ValueSpecPointer::System(a) => a.update(value).await,
         }
     }
     fn requires(&self, id: &str, value: &Value) -> bool {
         match self {
-            ValueSpecPointer::App(a) => a.requires(id, value),
+            ValueSpecPointer::Package(a) => a.requires(id, value),
             ValueSpecPointer::System(a) => a.requires(id, value),
         }
     }
@@ -1351,88 +1352,110 @@ impl ValueSpec for ValueSpecPointer {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct AppPointerSpec {
-    pub app_id: String,
+pub struct PackagePointerSpec {
+    pub package_id: PackageId,
     #[serde(flatten)]
-    pub target: AppPointerSpecVariants,
+    pub target: Option<PackagePointerSpecVariant>,
 }
-impl fmt::Display for AppPointerSpec {
+impl fmt::Display for PackagePointerSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{}].{}", self.app_id, self.target)
-    }
-}
-impl AppPointerSpec {
-    async fn deref(&self) -> Result<Value, ConfigurationError> {
-        match self.target {
-            AppPointerSpecVariants::TorAddress => {
-                let mut apps = crate::apps::list_info()
-                    .await
-                    .map_err(ConfigurationError::SystemError)?;
-                let info = apps.remove(&self.app_id);
-                Ok(info
-                    .and_then(|info| info.tor_address)
-                    .map(Value::String)
-                    .unwrap_or(Value::Null))
-            }
-            AppPointerSpecVariants::TorKey => {
-                let services_path = PersistencePath::from_ref(crate::SERVICES_YAML);
-                let service_map = crate::tor::services_map(&services_path)
-                    .await
-                    .map_err(ConfigurationError::SystemError)?;
-                let service =
-                    service_map
-                        .map
-                        .get(&self.app_id)
-                        .ok_or(ConfigurationError::SystemError(crate::Error::new(
-                            anyhow::anyhow!("Service Not Found"),
-                            crate::ErrorKind::NotFound,
-                        )))?;
-                Ok(
-                    crate::tor::read_tor_key(&self.app_id, service.hidden_service_version, None)
-                        .await
-                        .map(Value::String)
-                        .unwrap_or(Value::Null),
-                )
-            }
-            AppPointerSpecVariants::LanAddress => {
-                let services_path = PersistencePath::from_ref(crate::SERVICES_YAML);
-                let mut service_map = crate::tor::services_map(&services_path)
-                    .await
-                    .map_err(ConfigurationError::SystemError)?;
-                let service = service_map.map.remove(&self.app_id);
-                Ok(service
-                    .map(|service| Value::String(format!("{}", service.ip)))
-                    .unwrap_or(Value::Null))
-            }
-            AppPointerSpecVariants::Config { ref index } => {
-                // check if the app exists
-                if !crate::apps::list_info()
-                    .await
-                    .map_err(ConfigurationError::SystemError)?
-                    .contains_key(&self.app_id)
-                {
-                    return Ok(Value::Null);
-                }
-                // fetch the config of the pointer target
-                let app_config = crate::apps::config(&self.app_id)
-                    .await
-                    .map_err(ConfigurationError::SystemError)?;
-                let cfg = if let Some(cfg) = app_config.config {
-                    cfg
-                } else {
-                    return Ok(Value::Null);
-                };
-                let mut cfgs = LinearMap::new();
-                cfgs.insert(self.app_id.as_str(), Cow::Borrowed(&cfg));
-
-                Ok((index.compiled)(&cfg, &cfgs))
-            }
+        if let Some(target) = &self.target {
+            write!(f, "{}: {}", self.package_id, target)
+        } else {
+            write!(f, "{}", self.package_id)
         }
     }
 }
-impl Defaultable for AppPointerSpec {
+impl PackagePointerSpec {
+    async fn deref<Db: DbHandle>(&self, db: &mut Db) -> Result<Value, ConfigurationError> {
+        match &self.target {
+            Some(PackagePointerSpecVariant::TorAddress { interface }) => {
+                let addr = crate::db::DatabaseModel::new()
+                    .package_data()
+                    .idx_model(&self.package_id)
+                    .and_then(|pde| pde.installed())
+                    .and_then(|installed| {
+                        installed.interface_info().addresses().idx_model(interface)
+                    })
+                    .and_then(|addresses| addresses.tor_address())
+                    .get(db)
+                    .await
+                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                Ok(addr.to_owned().map(Value::String).unwrap_or(Value::Null))
+            }
+            Some(PackagePointerSpecVariant::LanAddress { interface }) => {
+                let addr = crate::db::DatabaseModel::new()
+                    .package_data()
+                    .idx_model(&self.package_id)
+                    .and_then(|pde| pde.installed())
+                    .and_then(|installed| {
+                        installed.interface_info().addresses().idx_model(interface)
+                    })
+                    .and_then(|addresses| addresses.lan_address())
+                    .get(db)
+                    .await
+                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                Ok(addr.to_owned().map(Value::String).unwrap_or(Value::Null))
+            }
+            Some(PackagePointerSpecVariant::Config { selector, multi }) => {
+                let manifest_model: OptionModel<_> = crate::db::DatabaseModel::new()
+                    .package_data()
+                    .idx_model(&self.package_id)
+                    .and_then(|pde| pde.installed())
+                    .map(|installed| installed.manifest())
+                    .into();
+                let version = manifest_model
+                    .clone()
+                    .map(|manifest| manifest.version())
+                    .get(db)
+                    .await
+                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                let cfg_actions = manifest_model
+                    .clone()
+                    .and_then(|manifest| manifest.config())
+                    .get(db)
+                    .await
+                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                let volumes = manifest_model
+                    .map(|manifest| manifest.volumes())
+                    .get(db)
+                    .await
+                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                let hosts = crate::db::DatabaseModel::new()
+                    .network()
+                    .hosts()
+                    .get(db)
+                    .await
+                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                if let (Some(version), Some(cfg_actions), Some(volumes)) =
+                    (&*version, &*cfg_actions, &*volumes)
+                {
+                    let cfg_res = cfg_actions
+                        .get(&self.package_id, version, volumes, &*hosts)
+                        .await
+                        .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                    if let Some(cfg) = cfg_res.config {
+                        let obj = serde_json::Value::Object(cfg.into());
+                        let selected = selector.compiled.select(&obj).ok().unwrap_or_else(Vec::new);
+                        if *multi {
+                            Ok(Value::List(selected.into_iter().map(Value::from).collect()))
+                        } else {
+                            Ok(Value::from(selected.get(0).unwrap_or(Value::Null)))
+                        }
+                    } else {
+                        Ok(Value::Null)
+                    }
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+            None => Ok(Value::Null),
+        }
+    }
+}
+impl Defaultable for PackagePointerSpec {
     type Error = ConfigurationError;
     fn gen<R: Rng + CryptoRng + Sync + Send>(
         &self,
@@ -1443,22 +1466,18 @@ impl Defaultable for AppPointerSpec {
     }
 }
 #[async_trait]
-impl ValueSpec for AppPointerSpec {
+impl ValueSpec for PackagePointerSpec {
     fn matches(&self, _value: &Value) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
-    fn validate(&self, manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
-        if manifest.id != self.app_id && !manifest.dependencies.0.contains_key(&self.app_id) {
+    fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
+        if manifest.id != self.package_id && !manifest.dependencies.0.contains_key(&self.package_id)
+        {
             return Err(NoMatchWithPath::new(MatchError::InvalidPointer(
-                ValueSpecPointer::App(self.clone()),
+                ValueSpecPointer::Package(self.clone()),
             )));
         }
         match self.target {
-            AppPointerSpecVariants::TorKey if manifest.id != self.app_id => {
-                Err(NoMatchWithPath::new(MatchError::InvalidPointer(
-                    ValueSpecPointer::App(self.clone()),
-                )))
-            }
             _ => Ok(()),
         }
     }
@@ -1467,92 +1486,77 @@ impl ValueSpec for AppPointerSpec {
         Ok(())
     }
     fn requires(&self, id: &str, _value: &Value) -> bool {
-        self.app_id == id
+        self.package_id == id
     }
     fn eq(&self, _lhs: &Value, _rhs: &Value) -> bool {
         false
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "target")]
 #[serde(rename_all = "kebab-case")]
-pub enum AppPointerSpecVariants {
-    TorAddress,
-    TorKey,
-    LanAddress,
-    Config { index: Arc<ConfigPointer> },
+pub enum PackagePointerSpecVariant {
+    TorAddress {
+        interface: InterfaceId,
+    },
+    LanAddress {
+        interface: InterfaceId,
+    },
+    Config {
+        selector: Arc<ConfigSelector>,
+        multi: bool,
+    },
 }
-impl fmt::Display for AppPointerSpecVariants {
+impl fmt::Display for PackagePointerSpecVariant {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::TorAddress => write!(f, "TOR_ADDRESS"),
-            Self::TorKey => write!(f, "TOR_KEY"),
-            Self::LanAddress => write!(f, "LAN_ADDRESS"),
-            Self::Config { index } => write!(f, "{}", index.src),
+            Self::TorAddress { interface } => write!(f, "tor-address: {}", interface),
+            Self::LanAddress { interface } => write!(f, "lan-address: {}", interface),
+            Self::Config { selector } => write!(f, "config: {}", selector),
         }
     }
 }
 
-#[derive(Clone)]
-pub struct ConfigPointer {
-    pub src: String,
-    pub compiled: Arc<super::rules::CompiledExpr<Value>>,
+#[derive(Clone, Debug)]
+pub struct ConfigSelector {
+    src: String,
+    compiled: Compiled,
 }
-impl std::fmt::Debug for ConfigPointer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ConfigPointer")
-            .field("src", &self.src)
-            .field("compiled", &"Fn(&Config, &Config) -> bool")
-            .finish()
+impl fmt::Display for ConfigSelector {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.src)
     }
 }
-impl<'de> serde::de::Deserialize<'de> for ConfigPointer {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::de::Deserializer<'de>,
-    {
-        let src = String::deserialize(deserializer)?;
-        let compiled = super::rules::compile_expr(&src).map_err(serde::de::Error::custom)?;
-        Ok(ConfigPointer {
-            src,
-            compiled: Arc::new(compiled),
-        })
-    }
-}
-impl serde::ser::Serialize for ConfigPointer {
+impl Serialize for ConfigSelector {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::ser::Serializer,
+        S: Serializer,
     {
         serializer.serialize_str(&self.src)
     }
 }
+impl<'de> Deserialize<'de> for ConfigSelector {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let src = Deserialize::deserialize(deserializer)?;
+    }
+}
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "target")]
-pub enum SystemPointerSpec {
-    HostIp,
-}
+pub enum SystemPointerSpec {}
 impl fmt::Display for SystemPointerSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "[SYSTEM].{}",
-            match self {
-                SystemPointerSpec::HostIp => "HOST_IP",
-            }
-        )
+        write!(f, "SYSTEM: {}", match self {})
     }
 }
 impl SystemPointerSpec {
     async fn deref(&self) -> Result<Value, ConfigurationError> {
-        Ok(match self {
-            SystemPointerSpec::HostIp => {
-                Value::String(format!("{}", std::net::Ipv4Addr::from(crate::HOST_IP)))
-            }
-        })
+        Ok(match self {})
     }
 }
 impl Defaultable for SystemPointerSpec {
@@ -1570,7 +1574,7 @@ impl ValueSpec for SystemPointerSpec {
     fn matches(&self, _value: &Value) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
-    fn validate(&self, _manifest: &ManifestLatest) -> Result<(), NoMatchWithPath> {
+    fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
     async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
@@ -1761,7 +1765,7 @@ mod test {
                 "name": "Type",
                 "variantNames": {}
             },
-            "variants": {
+            "Variant": {
               "internal": {
                 "lan-address": {
                   "name": "LAN Address",
@@ -1845,7 +1849,7 @@ mod test {
         spec.validate(&crate::manifest::ManifestV0 {
             id: "test-app".to_owned(),
             version: "0.1.0".parse().unwrap(),
-            title: "Test App".to_owned(),
+            title: "Test Package".to_owned(),
             description: crate::manifest::Description {
                 short: "A test app.".to_owned(),
                 long: "A super cool test app for testing".to_owned(),

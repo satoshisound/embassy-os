@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate pest_derive;
 
-pub const CONFIG_PATH: &'static str = "/etc/embassy/embassy.yaml";
+pub const CONFIG_PATH: &'static str = "/etc/embassy/config.toml";
 pub const TOR_RC: &'static str = "/root/appmgr/tor/torrc";
 pub const SERVICES_YAML: &'static str = "tor/services.yaml";
 pub const VOLUMES: &'static str = "/root/volumes";
@@ -20,27 +20,21 @@ lazy_static::lazy_static! {
 }
 
 pub mod action;
-pub mod actions; // deprecated
-pub mod apps;
-pub mod backup; // deprecated
-pub mod backup_new;
+pub mod backup;
 pub mod config;
 pub mod context;
-pub mod control;
 pub mod db;
 pub mod dependencies;
-pub mod disks;
 pub mod error;
 pub mod id;
 pub mod index;
 pub mod inspect;
 pub mod install;
-pub mod install_new;
 #[cfg(feature = "avahi")]
 pub mod lan;
 pub mod logs;
-pub mod manifest;
 pub mod migration;
+pub mod net;
 pub mod pack;
 pub mod registry;
 pub mod remove;
@@ -54,9 +48,7 @@ pub mod volume;
 
 pub use config::{configure, Config};
 use context::EitherContext;
-pub use control::{restart_app, start_app, stop_app, stop_dependents};
 pub use error::{Error, ErrorKind, ResultExt};
-pub use install::{install_name, install_path, install_url};
 pub use logs::{logs, notifications, stats, LogOptions};
 pub use pack::{pack, verify};
 pub use remove::remove;

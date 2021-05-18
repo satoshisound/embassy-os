@@ -14,12 +14,10 @@ use crate::util::{from_yaml_async_reader, to_yaml_async_writer, PersistencePath}
 use crate::ResultExt as _;
 
 pub mod action;
-pub mod rules;
 pub mod spec;
 pub mod util;
 pub mod value;
 
-pub use rules::{ConfigRuleEntry, ConfigRuleEntryWithSuggestions};
 pub use spec::{ConfigSpec, Defaultable};
 use util::NumRange;
 pub use value::Config;
