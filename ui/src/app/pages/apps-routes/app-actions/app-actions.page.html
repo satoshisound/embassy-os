@@ -8,8 +8,8 @@
 </ion-header>
 
 <ion-content class="ion-padding-top">
-  <ng-container *ngIf="pkg$ | async as pkg">
-    <ng-container *ngIf="pkg.installed.manifest as manifest">
+  <ng-container *ngIf="patch.watch$('package-data', pkgId, 'installed') | ngrxPush as installed">
+    <ng-container *ngIf="installed.manifest as manifest">
 
       <ion-item *ngIf="manifest.actions | empty; else actions">
         <ion-label class="ion-text-wrap">
@@ -19,9 +19,9 @@
   
       <ng-template #actions>
         <ion-item-group>
-          <ion-item button *ngFor="let action of manifest.actions | keyvalue: asIsOrder" (click)="handleAction(pkg, action)" >
+          <ion-item button *ngFor="let action of manifest.actions | keyvalue: asIsOrder" (click)="handleAction(installed, action)" >
             <ion-label class="ion-text-wrap">
-              <h2><ion-text color="primary">{{ action.value.name }}</ion-text><ion-icon *ngIf="!(action.value['allowed-statuses'] | includes: pkg.installed.status.main.status)" color="danger" name="close-outline"></ion-icon></h2>
+              <h2><ion-text color="primary">{{ action.value.name }}</ion-text><ion-icon *ngIf="!(action.value['allowed-statuses'] | includes: installed.status.main.status)" color="danger" name="close-outline"></ion-icon></h2>
               <p><ion-text color="dark">{{ action.value.description }}</ion-text></p>
             </ion-label>
           </ion-item>

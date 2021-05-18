@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms'
 import { IonicModule } from '@ionic/angular'
 import { AuthenticatePageRoutingModule } from './authenticate-routing.module'
 import { AuthenticatePage } from './authenticate.page'
+import { SharingModule } from 'src/app/modules/sharing.module'
 
 @NgModule({
   imports: [
@@ -11,6 +12,7 @@ import { AuthenticatePage } from './authenticate.page'
     FormsModule,
     IonicModule,
     AuthenticatePageRoutingModule,
+    SharingModule,
   ],
   declarations: [AuthenticatePage],
 })

@@ -9,42 +9,43 @@
 
 <ion-content style="position: relative">
   <ng-container *ngrxLet="patch.watch$('package-data') as pkgs">
-    <ion-grid *ngIf="!(pkgs | empty); else welcome">
-      <ion-row *ngrxLet="connectionService.monitor$() as connection">
-        <ion-col *ngFor="let pkg of pkgs | keyvalue" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
-          <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', (pkg.value | manifest).id]">
-            <div class="launch-container" *ngIf="pkg.value | hasUi">
-              <div class="launch-button-triangle"  (click)="launchUi(pkg.value, $event)" [class.disabled]="!(pkg.value | isLaunchable)">
-                <ion-icon name="rocket-outline"></ion-icon>
-              </div>
-            </div>
-  
-            <img style="position: absolute" class="main-img" [src]="pkg.value['static-files'].icon" [alt]="icon" />
-            <img class="main-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=">
-            <img class="bulb-on" *ngIf="pkg.value | displayBulb: 'green' : connection" src="assets/img/running-bulb.png"/>
-            <img class="bulb-on" *ngIf="pkg.value | displayBulb: 'red' : connection" src="assets/img/issue-bulb.png"/>
-            <img class="bulb-on" *ngIf="pkg.value | displayBulb: 'yellow' : connection" src="assets/img/warning-bulb.png"/>
-            <img class="bulb-off" *ngIf="pkg.value | displayBulb: 'off' : connection" src="assets/img/off-bulb.png"/>
-            <ion-card-header>
-              <status [pkg]="pkg.value" [connection]="connection" size="small"></status>
-              <p>{{ (pkg.value | manifest).title }}</p>
-            </ion-card-header>
-          </ion-card>
-        </ion-col>
-      </ion-row>
-    </ion-grid>
-  
-    <ng-template #welcome>
-      <div class="ion-text-center ion-padding">
-        <div style="display: flex; flex-direction: column; justify-content: center; height: 40vh">
-          <h2>Welcome to your <span style="font-style: italic; color: var(--ion-color-start9)">Embassy</span></h2>
-          <p class="ion-text-wrap">Get started by installing your first service.</p>
-        </div>
-        <ion-button [routerLink]="['/services','marketplace']" style="width: 50%;" fill="outline">
-          <ion-icon slot="start" name="storefront-outline"></ion-icon>
-          Marketplace
-        </ion-button>
+
+    <div *ngIf="pkgs | empty; else list" class="ion-text-center ion-padding">
+      <div style="display: flex; flex-direction: column; justify-content: center; height: 40vh">
+        <h2>Welcome to your <span style="font-style: italic; color: var(--ion-color-start9)">Embassy</span></h2>
+        <p class="ion-text-wrap">Get started by installing your first service.</p>
       </div>
+      <ion-button [routerLink]="['/services','marketplace']" style="width: 50%;" fill="outline">
+        <ion-icon slot="start" name="storefront-outline"></ion-icon>
+        Marketplace
+      </ion-button>
+    </div>
+
+    <ng-template #list>
+      <ion-grid>
+        <ion-row *ngrxLet="connectionService.monitor$() as connection">
+          <ion-col *ngFor="let pkg of pkgs | keyvalue" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
+            <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', (pkg.value | manifest).id]">
+              <div class="launch-container" *ngIf="pkg.value | hasUi">
+                <div class="launch-button-triangle"  (click)="launchUi(pkg.value, $event)" [class.disabled]="!(pkg.value | isLaunchable)">
+                  <ion-icon name="rocket-outline"></ion-icon>
+                </div>
+              </div>
+    
+              <img style="position: absolute" class="main-img" [src]="pkg.value['static-files'].icon" [alt]="icon" />
+              <img class="main-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=">
+              <img class="bulb-on" *ngIf="pkg.value | displayBulb: 'green' : connection" src="assets/img/running-bulb.png"/>
+              <img class="bulb-on" *ngIf="pkg.value | displayBulb: 'red' : connection" src="assets/img/issue-bulb.png"/>
+              <img class="bulb-on" *ngIf="pkg.value | displayBulb: 'yellow' : connection" src="assets/img/warning-bulb.png"/>
+              <img class="bulb-off" *ngIf="pkg.value | displayBulb: 'off' : connection" src="assets/img/off-bulb.png"/>
+              <ion-card-header>
+                <status [pkg]="pkg.value" [connection]="connection" size="small"></status>
+                <p>{{ (pkg.value | manifest).title }}</p>
+              </ion-card-header>
+            </ion-card>
+          </ion-col>
+        </ion-row>
+      </ion-grid>
     </ng-template>
   </ng-container>
 </ion-content>

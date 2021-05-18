@@ -11,22 +11,22 @@
 </ion-header>
 
 <ion-content class="ion-padding-bottom" *ngIf="{
-    id: $app$.id | async,
-    status: $app$.status | async,
-    title: $app$.title | async,
-    versionInstalled: $app$.versionInstalled | async,
-    versionViewing: $app$.versionViewing | async,
-    descriptionLong: $app$.descriptionLong | async,
-    serviceRequirements: $app$.serviceRequirements | async,
-    iconURL: $app$.iconURL | async,
-    releaseNotes: $app$.releaseNotes | async
+    id: $app$.id | ngrxPush,
+    status: $app$.status | ngrxPush,
+    title: $app$.title | ngrxPush,
+    versionInstalled: $app$.versionInstalled | ngrxPush,
+    versionViewing: $app$.versionViewing | ngrxPush,
+    descriptionLong: $app$.descriptionLong | ngrxPush,
+    serviceRequirements: $app$.serviceRequirements | ngrxPush,
+    iconURL: $app$.iconURL | ngrxPush,
+    releaseNotes: $app$.releaseNotes | ngrxPush
   } as vars"
 >
-  <ion-spinner *ngIf="($loading$ | async)" class="center" name="lines" color="warning"></ion-spinner>
+  <ion-spinner *ngIf="($loading$ | ngrxPush)" class="center" name="lines" color="warning"></ion-spinner>
 
   <error-message [$error$]="$error$" [dismissable]="vars.id"></error-message>
 
-  <ng-container *ngIf="!($loading$ | async) && vars.id && ($app$ | compareInstalledAndViewing | async) as installedStatus">
+  <ng-container *ngIf="!($loading$ | ngrxPush) && vars.id && ($app$ | compareInstalledAndViewing | ngrxPush) as installedStatus">
     <ion-item-group>
       <ion-item lines="none">
         <ion-avatar slot="start">
@@ -88,10 +88,10 @@
 
       <ion-item-divider style="color: var(--ion-color-dark); font-weight: bold;">New in {{ vars.versionViewing | displayEmver }}</ion-item-divider>
       <ion-item lines="none">
-        <ion-label *ngIf="!($newVersionLoading$ | async)" style="display: flex; align-items: center; justify-content: space-between;" class="ion-text-wrap" >
+        <ion-label *ngIf="!($newVersionLoading$ | ngrxPush)" style="display: flex; align-items: center; justify-content: space-between;" class="ion-text-wrap" >
           <div id='release-notes'color="dark" [innerHTML]="vars.releaseNotes | markdown"></div>
         </ion-label>
-        <ion-spinner style="display: block; margin: auto;" name="lines" color="dark" *ngIf="$newVersionLoading$ | async"></ion-spinner>
+        <ion-spinner style="display: block; margin: auto;" name="lines" color="dark" *ngIf="$newVersionLoading$ | ngrxPush"></ion-spinner>
       </ion-item>
 
       <ion-item-divider class="divider">Description</ion-item-divider>

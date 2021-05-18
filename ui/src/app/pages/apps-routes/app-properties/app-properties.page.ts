@@ -1,8 +1,8 @@
 import { Component } from '@angular/core'
 import { ActivatedRoute } from '@angular/router'
 import { ApiService } from 'src/app/services/api/api.service'
-import { pauseFor } from 'src/app/util/misc.util'
-import { BehaviorSubject } from 'rxjs'
+import { isEmptyObject, pauseFor } from 'src/app/util/misc.util'
+import { BehaviorSubject, Subject } from 'rxjs'
 import { copyToClipboard } from 'src/app/util/web.util'
 import { AlertController, NavController, PopoverController, ToastController } from '@ionic/angular'
 import { PackageProperties } from 'src/app/util/properties.util'
@@ -10,6 +10,7 @@ import { QRComponent } from 'src/app/components/qr/qr.component'
 import { PropertyStore } from './property-store'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import * as JSONpointer from 'json-pointer'
+import { FEStatus } from 'src/app/services/pkg-status-rendering.service'
 
 @Component({
   selector: 'app-properties',
@@ -18,13 +19,14 @@ import * as JSONpointer from 'json-pointer'
 })
 export class AppPropertiesPage {
   error = ''
-  loading$ = new BehaviorSubject(true)
+  loading = true
   pkgId: string
   pointer: string
   qrCode: string
   properties$ = new BehaviorSubject<PackageProperties>({ })
   hasProperties$ = new BehaviorSubject<boolean>(null)
   unmasked: { [key: string]: boolean } = { }
+  FeStatus = FEStatus
 
   constructor (
     private readonly route: ActivatedRoute,
@@ -41,14 +43,14 @@ export class AppPropertiesPage {
     this.pkgId = this.route.snapshot.paramMap.get('pkgId')
     this.pointer = this.route.queryParams['pointer']
 
-    this.getProperties().then(() => this.loading$.next(false))
+    this.getProperties().then(() => this.loading = false)
 
-    this.propertyStore.watch().subscribe(m => {
+    this.propertyStore.watch$().subscribe(m => {
       const properties = JSONpointer.get(m, this.pointer || '')
       this.properties$.next(properties)
     })
     this.properties$.subscribe(m => {
-      this.hasProperties$.next(!!Object.keys(m || { }).length)
+      this.hasProperties$.next(!isEmptyObject(m))
     })
     this.route.queryParams.subscribe(queryParams => {
       if (queryParams['pointer'] === this.pointer) return
@@ -116,11 +118,8 @@ export class AppPropertiesPage {
 
   private async getProperties (): Promise<void> {
     try {
-      const [properties] = await Promise.all([
-        this.apiService.getPackageProperties({ id: this.pkgId }),
-        pauseFor(600),
-      ])
-      this.propertyStore.update(properties.data)
+      const properties = await this.apiService.getPackageProperties({ id: this.pkgId })
+      this.propertyStore.update(properties)
     } catch (e) {
       console.error(e)
       this.error = e.message

@@ -1,5 +1,5 @@
 
-<ng-container *ngIf="{ loading: $loading$ | async, disabled: installing || ($loading$ | async) } as l" >
+<ng-container *ngIf="{ loading: $loading$ | ngrxPush, disabled: installing || ($loading$ | ngrxPush) } as l" >
   <ion-item
     class="dependency"
     lines="none"

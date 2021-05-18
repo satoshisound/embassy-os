@@ -172,9 +172,11 @@ export enum VolumeType {
 }
 
 export interface InterfaceDef {
+  name: string
+  description: string
+  ui: boolean
   'tor-config': TorConfig | null
   'lan-config': LanConfig | null
-  ui: boolean
   protocols: string[]
 }
 

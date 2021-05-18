@@ -15,7 +15,11 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
     return this.sync.asObservable().pipe(filter(() => this.syncing))
   }
 
+  // used for determining internet connectivity
   abstract ping (): Promise<void>
+
+  // for getting static files: ex icons, instructions, licenses
+  abstract getStatic (url: string): Promise<string>
 
   // db
 
@@ -111,9 +115,7 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
   // package
 
-  abstract getPackageInstructions (params: RR.GetPackageInstructionsReq): Promise<RR.GetPackageInstructionsRes>
-
-  abstract getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes>
+  abstract getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes<any>['data']>
 
   abstract getPackageLogs (params: RR.GetPackageLogsReq): Promise<RR.GetPackageLogsRes>
 

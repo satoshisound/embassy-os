@@ -30,7 +30,7 @@ export class HttpService {
     const httpOpts = {
       method: Method.POST,
       data: rpcOpts,
-      url: this.rootUrl,
+      url: '',
     }
 
     const res = await this.httpRequest<RPCResponse<T>>(httpOpts)
@@ -41,7 +41,8 @@ export class HttpService {
   }
 
   async httpRequest<T> (httpOpts: HttpOptions): Promise<T> {
-    const { url, body, timeout, ...rest} = translateOptions(httpOpts)
+    let { url, body, timeout, ...rest} = translateOptions(httpOpts)
+    url = this.rootUrl + url
 
     let req: Observable<{ body: T }>
     switch (httpOpts.method){

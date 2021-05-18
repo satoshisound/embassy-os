@@ -63,7 +63,7 @@
       <ion-item>
         <ion-label class="ion-text-wrap">
           <h2>LAN Address</h2>
-          <p>https://{{ patch.watch$('server-info', 'lan-address') | async }}</p>
+          <p>https://{{ patch.watch$('server-info', 'lan-address') | ngrxPush }}</p>
         </ion-label>
         <ion-button slot="end" fill="clear" (click)="copyLAN()">
           <ion-icon slot="icon-only" name="copy-outline"></ion-icon>

@@ -13,22 +13,22 @@
     <ion-refresher-content pullingIcon="lines" refreshingSpinner="lines"></ion-refresher-content>
   </ion-refresher>
 
-  <ion-spinner *ngIf="$loading$ | async" class="center" name="lines" color="warning"></ion-spinner>
+  <ion-spinner *ngIf="$loading$ | ngrxPush" class="center" name="lines" color="warning"></ion-spinner>
 
-  <ng-container *ngIf="!($loading$ | async)">
+  <ng-container *ngIf="!($loading$ | ngrxPush)">
 
     <ion-item *ngIf="error" style="margin-bottom: 16px;">
       <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
     </ion-item>
 
     <ion-card *ngFor="let app of apps" style="margin: 10px 10px;" [routerLink]="[app.id]">
-      <ion-item style="--inner-border-width: 0 0 .4px 0; --border-color: #525252;" *ngIf="{ installing: (app.subject.status | async) === 'INSTALLING', installComparison: app.subject | compareInstalledAndLatest | async } as l">
+      <ion-item style="--inner-border-width: 0 0 .4px 0; --border-color: #525252;" *ngIf="{ installing: (app.subject.status | ngrxPush) === 'INSTALLING', installComparison: app.subject | compareInstalledAndLatest | ngrxPush } as l">
         <ion-avatar style="margin-top: 8px;" slot="start">
-          <img [src]="app.subject.iconURL | async" />
+          <img [src]="app.subject.iconURL | ngrxPush" />
         </ion-avatar>
         <ion-label style="margin-top: 6px; margin-bottom: 3px">
           <h1 style="font-family: 'Montserrat'; font-size: 20px; margin-bottom: 0px;">
-            {{app.subject.title | async}}
+            {{app.subject.title | ngrxPush}}
           </h1>
           <div *ngIf="!l.installing && l.installComparison === 'installed-equal'" class="beneath-title">
             <ion-text style="font-size: 12px;" color="success">Installed</ion-text>
@@ -47,7 +47,7 @@
         padding-bottom: 10px;
         padding-top: 6px;
         ">
-        {{ app.subject.descriptionShort | async }}
+        {{ app.subject.descriptionShort | ngrxPush }}
       </ion-card-content>
     </ion-card>
   </ng-container>

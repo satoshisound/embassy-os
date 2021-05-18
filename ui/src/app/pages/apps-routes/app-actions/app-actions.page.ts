@@ -5,8 +5,7 @@ import { AlertController } from '@ionic/angular'
 import { LoaderService } from 'src/app/services/loader.service'
 import { HttpErrorResponse } from '@angular/common/http'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
-import { Observable } from 'rxjs'
-import { Action, InstalledPackageDataEntry, PackageDataEntry, PackageMainStatus } from 'src/app/models/patch-db/data-model'
+import { Action, InstalledPackageDataEntry, PackageMainStatus } from 'src/app/models/patch-db/data-model'
 
 @Component({
   selector: 'app-actions',
@@ -14,7 +13,7 @@ import { Action, InstalledPackageDataEntry, PackageDataEntry, PackageMainStatus 
   styleUrls: ['./app-actions.page.scss'],
 })
 export class AppActionsPage {
-  pkg$: Observable<PackageDataEntry>
+  pkgId: string
 
   constructor (
     private readonly route: ActivatedRoute,
@@ -25,12 +24,11 @@ export class AppActionsPage {
   ) { }
 
   ngOnInit () {
-    const pkgId = this.route.snapshot.paramMap.get('pkgId')
-    this.pkg$ = this.patch.watch$('package-data', pkgId)
+    this.pkgId = this.route.snapshot.paramMap.get('pkgId')
   }
 
-  async handleAction (app: InstalledPackageDataEntry, action: { key: string, value: Action }) {
-    if ((action.value['allowed-statuses'] as PackageMainStatus[]).includes(app.status.main.status)) {
+  async handleAction (pkg: InstalledPackageDataEntry, action: { key: string, value: Action }) {
+    if ((action.value['allowed-statuses'] as PackageMainStatus[]).includes(pkg.status.main.status)) {
       const alert = await this.alertCtrl.create({
         header: 'Confirm',
         message: `Are you sure you want to execute action "${action.value.name}"? ${action.value.warning || ''}`,
@@ -42,7 +40,7 @@ export class AppActionsPage {
           {
             text: 'Execute',
             handler: () => {
-              this.executeAction(app.manifest.id, action.key)
+              this.executeAction(pkg.manifest.id, action.key)
             },
           },
         ],

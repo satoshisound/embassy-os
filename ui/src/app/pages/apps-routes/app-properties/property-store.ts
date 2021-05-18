@@ -7,7 +7,7 @@ import { PackageProperties } from '../../../util/properties.util'
 })
 export class PropertyStore {
   properties$: BehaviorSubject<PackageProperties> = new BehaviorSubject({ })
-  watch () { return this.properties$.asObservable() }
+  watch$ () { return this.properties$.asObservable() }
 
   update (properties: PackageProperties): void {
     this.properties$.next(properties)

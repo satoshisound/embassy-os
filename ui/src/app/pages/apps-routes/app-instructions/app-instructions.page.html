@@ -7,12 +7,12 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding-top">
+<ion-content class="ion-padding">
   <ion-spinner *ngIf="loading; else loaded" class="center" name="lines" color="warning"></ion-spinner>
 
   <ng-template #loaded>
-    <ion-item *ngIf="!instructions">
-      <ion-label>No instructions.</ion-label>
+    <ion-item *ngIf="error" style="margin-bottom: 16px;">
+      <ion-text class="ion-text-wrap" color="danger">{{ error }}</ion-text>
     </ion-item>
 
     <div *ngIf="instructions" class="instuctions-padding" [innerHTML]="instructions | markdown"></div>

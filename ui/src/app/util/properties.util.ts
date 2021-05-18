@@ -46,6 +46,7 @@ export function parsePropertiesPermissive (properties: any, errorCallback: (err:
     errorCallback(new TypeError(`${properties} is not an object`))
     return { }
   }
+  // @TODO still need this conditional?
   if (typeof properties.version !== 'number' || !properties.data) {
     return Object.entries(properties)
       .filter(([_, value]) => {
@@ -71,13 +72,12 @@ export function parsePropertiesPermissive (properties: any, errorCallback: (err:
         return acc
       }, { })
   }
-  const typedProperties = properties as PackagePropertiesVersioned<number>
-  switch (typedProperties.version) {
+  switch (properties.version) {
     case 2:
-      return parsePropertiesV2Permissive(typedProperties.data, errorCallback)
+      return parsePropertiesV2Permissive(properties.data, errorCallback)
     default:
       errorCallback(new Error(`unknown properties version ${properties.version}, attempting to parse as v2`))
-      return parsePropertiesV2Permissive(typedProperties.data, errorCallback)
+      return parsePropertiesV2Permissive(properties.data, errorCallback)
   }
 }
 

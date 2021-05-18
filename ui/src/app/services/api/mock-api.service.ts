@@ -29,6 +29,10 @@ export class MockApiService extends ApiService {
     return
   }
 
+  async getStatic (url: string): Promise<string> {
+    return Mock.DbDump.value['package-data']['bitcoind']['static-files'].instructions
+  }
+
   // db
 
   async getRevisions (since: number): Promise<RR.GetRevisionsRes> {
@@ -233,14 +237,9 @@ export class MockApiService extends ApiService {
 
   // package
 
-  async getPackageInstructions (params: RR.GetPackageInstructionsReq): Promise<RR.GetPackageInstructionsRes> {
-    // return require('./md-sample.md')
-    return '**testing markdown**'
-  }
-
-  async getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes> {
+  async getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes<any>['data']> {
     await pauseFor(2000)
-    return parsePropertiesPermissive(Mock.PackageProperties) as any // @TODO why is any needed?
+    return parsePropertiesPermissive(Mock.PackageProperties)
   }
 
   async getPackageLogs (params: RR.GetPackageLogsReq): Promise<RR.GetPackageLogsRes> {

@@ -1,5 +1,6 @@
 import { DockerIoFormat, PackageDataEntry, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
 import { RR, ServerNotification } from './api-types'
+import instructions from 'raw-loader!./md-sample.md'
 
 export module Mock {
 
@@ -8,7 +9,7 @@ export module Mock {
     'static-files': {
       license: 'licenseURL',
       icon: 'assets/img/service-icons/bitcoind.png',
-      instructions: 'instructionsURL',
+      instructions: instructions, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
     installed: {
       manifest: {
@@ -59,12 +60,36 @@ export module Mock {
         'min-os-version': '0.2.12',
         interfaces: {
           ui: {
+            name: 'Node Visualizer',
+            description: 'Web application for viewing information about your node and the Bitcoin network.',
+            ui: true,
             'tor-config': {
               'hidden-service-version': 'v3',
               'port-mapping': { },
             },
             'lan-config': { },
+            protocols: [],
+          },
+          rpc: {
+            name: 'RPC',
+            description: 'Used by wallets to interact with your Bitcoin Core node.',
             ui: false,
+            'tor-config': {
+              'hidden-service-version': 'v3',
+              'port-mapping': { },
+            },
+            'lan-config': { },
+            protocols: [],
+          },
+          p2p: {
+            name: 'P2P',
+            description: 'Used by other Bitcoin nodes to communicate and interact with your node.',
+            ui: false,
+            'tor-config': {
+              'hidden-service-version': 'v3',
+              'port-mapping': { },
+            },
+            'lan-config': { },
             protocols: [],
           },
         },
@@ -93,7 +118,26 @@ export module Mock {
           },
         },
         migrations: null,
-        actions: { },
+        actions: {
+          resync: {
+            name: 'Resync Blockchain',
+            description: 'Use this to resync the Bitcoin blockchain from genesis',
+            warning: 'This will take a couple of days.',
+            'allowed-statuses': [PackageMainStatus.Running, PackageMainStatus.Stopped],
+            implementation: {
+              type: 'docker',
+              image: '',
+              system: true,
+              entrypoint: '',
+              args: [''],
+              mounts: { },
+              'io-format': DockerIoFormat.Yaml,
+              inject: false,
+              'shm-size': '',
+            },
+            'input-spec': null,
+          },
+        },
         permissions: { },
         dependencies: { },
       },
@@ -109,9 +153,17 @@ export module Mock {
       'interface-info': {
         ip: '10.0.0.1',
         addresses: {
+          ui: {
+            'tor-address': 'bitcoind-ui-address.onion',
+            'lan-address': 'bitcoind-ui-address.local',
+          },
           rpc: {
-            'tor-address': 'bitcoind-address.onion',
-            'lan-address': 'bitcoind-address.local',
+            'tor-address': 'bitcoind-rpc-address.onion',
+            'lan-address': 'bitcoind-rpc-address.local',
+          },
+          p2p: {
+            'tor-address': 'bitcoind-p2p-address.onion',
+            'lan-address': 'bitcoind-p2p-address.local',
           },
         },
       },
@@ -240,7 +292,7 @@ export module Mock {
     },
     {
       timestamp: '2019-12-26T14:21:30.872Z',
-      log: 'ServerLogs ServerLogs ServerLogs ServerLogs ServerLogs',
+      log: 'PackageLogs PackageLogs PackageLogs PackageLogs PackageLogs',
     },
     {
       timestamp: '2019-12-26T14:22:30.872Z',
@@ -310,7 +362,7 @@ export module Mock {
     },
   }
 
-  export const PackageProperties: RR.GetPackagePropertiesRes = {
+  export const PackageProperties: RR.GetPackagePropertiesRes<2> = {
     version: 2,
     data: {
       'Test': {

@@ -16,7 +16,7 @@
 
   <ion-item-group>
     <ion-item-divider>Saved Keys</ion-item-divider>
-    <ion-item *ngFor="let ssh of sshService.watch$() | async | keyvalue : asIsOrder">
+    <ion-item *ngFor="let ssh of sshService.watch$() | ngrxPush | keyvalue : asIsOrder">
       <ion-label class="ion-text-wrap">
         {{ ssh.value.alg }} {{ ssh.key }} {{ ssh.value.hostname }}
       </ion-label>

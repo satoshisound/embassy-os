@@ -12,15 +12,15 @@
 <ion-content class="ion-padding-top">
 
   <!-- loading -->
-  <div *ngIf="loading$ | async" class="full-page-spinner">
+  <div *ngIf="loading$ | ngrxPush" class="full-page-spinner">
     <ion-spinner style="justify-self: center; align-self: end;" name="lines" color="warning"></ion-spinner>
-    <ion-label style="justify-self: center;" *ngIf="(loadingText$ | async)" color="dark">
-      {{ loadingText$ | async }}
+    <ion-label style="justify-self: center;" *ngIf="(loadingText$ | ngrxPush)" color="dark">
+      {{ loadingText$ | ngrxPush }}
     </ion-label>
   </div>
 
   <!-- not loading  -->
-  <ng-container *ngIf="!(loading$ | async)">
+  <ng-container *ngIf="!(loading$ | ngrxPush)">
     <ion-item *ngIf="error" class="notifier-item">
       <ion-label style="margin: 7px 5px;" class="ion-text-wrap">
         <p style="color: var(--ion-color-danger)">{{ error.text }}</p>
@@ -47,7 +47,7 @@
               <ion-icon size="small" style="margin-right: 5px" slot="start" color="dark" slot="start" name="alert-circle-outline"></ion-icon>
               <ion-text style="font-size: smaller;">Initial Config</ion-text>
             </h2>
-            <p style="font-size: small">To use the default config for {{ app.title | async }}, click "Save" below.</p>
+            <p style="font-size: small">To use the default config for {{ app.title | ngrxPush }}, click "Save" below.</p>
           </ion-label>
         </ion-item>
       </ng-container>
@@ -63,7 +63,7 @@
               <ion-text style="margin: 5px; font-family: 'Montserrat'; font-size: smaller;">{{recommendation.title}}</ion-text>
             </h2>
             <div style="margin: 7px 5px;">
-              <p style="font-size: small; color: var(--ion-color-medium)"> {{app.title | async}} config has been modified to satisfy {{recommendation.title}}.
+              <p style="font-size: small; color: var(--ion-color-medium)"> {{app.title | ngrxPush}} config has been modified to satisfy {{recommendation.title}}.
                 <ion-text color="dark">To accept the changes, click “Save” below.</ion-text>
               </p>
               <a style="font-size: small" *ngIf="!openRecommendation" (click)="openRecommendation = true">More Info</a>
@@ -90,13 +90,13 @@
       <!-- no config -->
       <ion-item *ngIf="!hasConfig">
         <ion-label class="ion-text-wrap">
-          <p>No config options for {{ app.title | async }} {{ app.versionInstalled | async }}.</p>
+          <p>No config options for {{ app.title | ngrxPush }} {{ app.versionInstalled | ngrxPush }}.</p>
         </ion-label>
       </ion-item>
 
       <!-- save button, always show -->
       <ion-button
-        [disabled]="invalid || (!edited && !added && !(['NEEDS_CONFIG'] | includes: (app.status | async)))"
+        [disabled]="invalid || (!edited && !added && !(['NEEDS_CONFIG'] | includes: (app.status | ngrxPush)))"
         fill="outline"
         expand="block"
         style="margin: 10px"

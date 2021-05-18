@@ -103,11 +103,8 @@ export module RR {
 
   // package
 
-  export type GetPackageInstructionsReq = { id: string } // package.instructions
-  export type GetPackageInstructionsRes = string
-
   export type GetPackagePropertiesReq = { id: string } // package.properties
-  export type GetPackagePropertiesRes = PackagePropertiesVersioned<number>
+  export type GetPackagePropertiesRes<T extends number> = PackagePropertiesVersioned<T>
 
   export type GetPackageLogsReq = { id: string, before?: string } // package.logs
   export type GetPackageLogsRes = Log[]

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core'
-import { HttpService } from '../http.service'
+import { HttpService, Method } from '../http.service'
 import { ApiService  } from './api.service'
 import { RR } from './api-types'
 import { parsePropertiesPermissive } from 'src/app/util/properties.util'
@@ -14,6 +14,10 @@ export class LiveApiService extends ApiService {
 
   async ping (): Promise<void> {
     return this.http.rpcRequest({ method: 'ping', params: { } })
+  }
+
+  async getStatic (url: string): Promise<string> {
+    return this.http.httpRequest({ method: Method.GET, url })
   }
 
   // db
@@ -134,13 +138,9 @@ export class LiveApiService extends ApiService {
 
   // package
 
-  async getPackageInstructions (params: RR.GetPackageInstructionsReq): Promise<RR.GetPackageInstructionsRes> {
-    return this.http.rpcRequest( { method: 'package.instructions', params })
-  }
-
-  async getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes> {
+  async getPackageProperties (params: RR.GetPackagePropertiesReq): Promise<RR.GetPackagePropertiesRes<any>['data']> {
     return this.http.rpcRequest({ method: 'package.properties', params })
-      .then(parsePropertiesPermissive) as any // @TODO why is any needed?
+      .then(parsePropertiesPermissive)
   }
 
   async getPackageLogs (params: RR.GetPackageLogsReq): Promise<RR.GetPackageLogsRes> {

@@ -14,6 +14,7 @@ import { ConfigService, lanUiAddress, torUiAddress } from 'src/app/services/conf
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
 import { FEStatus } from 'src/app/services/pkg-status-rendering.service'
+import { ConnectionService } from 'src/app/services/connection.service'
 
 @Component({
   selector: 'app-installed-show',
@@ -44,12 +45,13 @@ export class AppInstalledShowPage {
     private readonly wizardBaker: WizardBaker,
     private readonly popoverController: PopoverController,
     private readonly config: ConfigService,
-    private readonly patch$: PatchDbModel,
+    private readonly patch: PatchDbModel,
+    public readonly connectionService: ConnectionService,
   ) { }
 
   async ngOnInit () {
     this.pkgId = this.route.snapshot.paramMap.get('pkgId')
-    this.pkgSub = this.patch$.watch$('package-data', this.pkgId).subscribe(pkg => this.pkg = pkg)
+    this.pkgSub = this.patch.watch$('package-data', this.pkgId).subscribe(pkg => this.pkg = pkg)
   }
 
   async ngOnDestroy () {

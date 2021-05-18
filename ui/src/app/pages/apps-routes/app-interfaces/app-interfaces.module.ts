@@ -1,15 +1,15 @@
 import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
+import { Routes, RouterModule } from '@angular/router'
 import { IonicModule } from '@ionic/angular'
-import { RouterModule, Routes } from '@angular/router'
-import { DevSSHKeysPage } from './dev-ssh-keys.page'
+import { AppInterfacesPage } from './app-interfaces.page'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
 import { SharingModule } from 'src/app/modules/sharing.module'
 
 const routes: Routes = [
   {
     path: '',
-    component: DevSSHKeysPage,
+    component: AppInterfacesPage,
   },
 ]
 
@@ -21,6 +21,6 @@ const routes: Routes = [
     PwaBackComponentModule,
     SharingModule,
   ],
-  declarations: [DevSSHKeysPage],
+  declarations: [AppInterfacesPage],
 })
-export class DevSSHKeysPageModule { }
+export class AppInterfacesPageModule { }

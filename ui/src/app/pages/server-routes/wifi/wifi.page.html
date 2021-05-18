@@ -23,7 +23,7 @@
     </ion-item>
 
     <ion-item-divider>Saved Networks</ion-item-divider>
-    <ng-container *ngIf="patch.watch$('server-info', 'wifi') | async as wifi">
+    <ng-container *ngIf="patch.watch$('server-info', 'wifi') | ngrxPush as wifi">
       <ion-item button detail="false" *ngFor="let ssid of wifi.ssids" (click)="presentAction(ssid, wifi)">
         <ion-label>{{ ssid }}</ion-label>
         <ion-icon *ngIf="ssid === wifi.connected" name="wifi" color="success"></ion-icon>
