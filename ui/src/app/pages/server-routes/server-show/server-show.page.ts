@@ -5,6 +5,7 @@ import { ApiService } from 'src/app/services/api/api.service'
 import { LoaderService } from 'src/app/services/loader.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
 import { BackupPage } from 'src/app/modals/backup/backup.page'
+import { ServerStatus } from 'src/app/models/patch-db/data-model'
 
 @Component({
   selector: 'server-show',
@@ -12,6 +13,8 @@ import { BackupPage } from 'src/app/modals/backup/backup.page'
   styleUrls: ['server-show.page.scss'],
 })
 export class ServerShowPage {
+  ServerStatus = ServerStatus
+
   constructor (
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,

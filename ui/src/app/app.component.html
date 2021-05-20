@@ -1,10 +1,7 @@
-<ion-app>
-  <!-- UPDATING -->
-  <ion-content *ngIf="isUpdating">Embassy is updating</ion-content>
-  <!-- NOT UPDATING -->
-  <ion-split-pane *ngIf="!isUpdating" (ionSplitPaneVisible)="splitPaneVisible($event)" contentId="main-content">
+<ion-app *ngIf="patch.initialized$ | ngrxPush">
+  <ion-split-pane [disabled]="!showMenu" (ionSplitPaneVisible)="splitPaneVisible($event)" contentId="main-content">
     <ion-menu contentId="main-content" type="overlay">
-      <ion-header *ngIf="showMenuContent$ | ngrxPush" class="menu-style">
+      <ion-header>
         <ion-toolbar style="--background: var(--ion-background-color);">
           <ion-title *ngIf="patch.watch$('ui', 'server-name') | ngrxPush as name; else dots">{{ name }}</ion-title>
           <ng-template #dots>
@@ -13,7 +10,7 @@
         </ion-toolbar>
       </ion-header>
       <ion-content scroll-y="false" class="menu-style">
-        <ng-container *ngIf="showMenuContent$ | ngrxPush">
+        <ng-container>
           <ion-list style="padding: 0px">
             <ion-menu-toggle auto-hide="false" *ngFor="let page of appPages; let i = index">
               <ion-item
@@ -23,7 +20,7 @@
                 [routerLink]="[page.url]"
                 lines="none"
                 detail="false"
-                [class.selected]="selectedIndex == i"
+                [class.selected]="selectedIndex === i"
               >
                 <ion-icon slot="start" [name]="page.icon"></ion-icon>
                 <ion-label style="font-family: 'Montserrat';">{{ page.title }}</ion-label>
@@ -32,22 +29,10 @@
             </ion-menu-toggle>
           </ion-list>
         </ng-container>
-        <ng-container *ngIf="!(showMenuContent$ | ngrxPush)">
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>Welcome</ion-card-title>
-            </ion-card-header>
-            <ion-card-content>
-              <p>This is the private website of your Start9 Embassy device.</p>
-              <br />
-              <p>Please authenticate yourself to continue.</p>
-            </ion-card-content>
-          </ion-card>
-        </ng-container>
       </ion-content>
       <ion-footer style="padding-bottom: 16px; text-align: center;" class="menu-style">
         <ion-menu-toggle auto-hide="false">
-          <ion-item *ngIf="showMenuContent$ | ngrxPush" button style="--background:var(--ion-background-color); margin-bottom: 16px;" fill="clear" (click)="presentAlertLogout()">
+          <ion-item button style="--background:var(--ion-background-color); margin-bottom: 16px;" fill="clear" (click)="presentAlertLogout()">
             <ion-icon size="small" slot="start" color="dark" name="log-out-outline"></ion-icon>
             <ion-label><ion-text color="danger">Logout</ion-text></ion-label>
           </ion-item>

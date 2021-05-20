@@ -17,7 +17,7 @@ export class BadgeMenuComponent {
     private readonly splitPane: SplitPaneTracker,
     private readonly patch: PatchDbModel,
   ) {
-    this.menuFixedOpen$ = this.splitPane.$menuFixedOpenOnLeft$.asObservable()
+    this.menuFixedOpen$ = this.splitPane.menuFixedOpenOnLeft$.asObservable()
     this.badge$ = this.patch.watch$('server-info', 'unread-notification-count')
   }
 }

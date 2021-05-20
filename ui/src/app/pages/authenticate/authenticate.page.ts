@@ -1,7 +1,6 @@
-import { Component, OnInit } from '@angular/core'
+import { Component } from '@angular/core'
 import { AuthService } from '../../services/auth.service'
 import { LoaderService } from '../../services/loader.service'
-import { BehaviorSubject } from 'rxjs'
 import { Router } from '@angular/router'
 
 @Component({
@@ -9,10 +8,10 @@ import { Router } from '@angular/router'
   templateUrl: './authenticate.page.html',
   styleUrls: ['./authenticate.page.scss'],
 })
-export class AuthenticatePage implements OnInit {
+export class AuthenticatePage {
   password: string = ''
   unmasked = false
-  $error$ = new BehaviorSubject(undefined)
+  error = ''
 
   constructor (
     private readonly authStore: AuthService,
@@ -20,10 +19,8 @@ export class AuthenticatePage implements OnInit {
     private readonly router: Router,
   ) { }
 
-  ngOnInit () { }
-
   ionViewDidEnter () {
-    this.$error$.next(undefined)
+    this.error = ''
   }
 
   toggleMask () {
@@ -38,7 +35,7 @@ export class AuthenticatePage implements OnInit {
       this.password = ''
       return this.router.navigate([''])
     } catch (e) {
-      this.$error$.next(e.message)
+      this.error = e.message
     }
   }
 }

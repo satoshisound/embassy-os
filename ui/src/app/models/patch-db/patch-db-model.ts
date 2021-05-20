@@ -1,6 +1,6 @@
 import { Inject, Injectable, InjectionToken } from '@angular/core'
 import { PatchDB, PatchDbConfig, Store } from 'patch-db-client'
-import { Observable, of, Subscription } from 'rxjs'
+import { BehaviorSubject, Observable, of, Subscription } from 'rxjs'
 import { catchError, finalize } from 'rxjs/operators'
 import { DataModel } from './data-model'
 
@@ -12,6 +12,7 @@ export const PATCH_CONFIG = new InjectionToken<PatchDbConfig<DataModel>>('app.co
 export class PatchDbModel {
   private patchDb: PatchDB<DataModel>
   private syncSub: Subscription
+  initialized$ = new BehaviorSubject<boolean>(false)
 
   constructor (
     @Inject(PATCH_CONFIG) private readonly conf: PatchDbConfig<DataModel>,
@@ -20,6 +21,7 @@ export class PatchDbModel {
   async init (): Promise<void> {
     if (this.patchDb) return console.warn('Cannot re-init patchDbModel')
     this.patchDb = await PatchDB.init<DataModel>(this.conf)
+    this.initialized$.next(true)
   }
 
   start (): void {

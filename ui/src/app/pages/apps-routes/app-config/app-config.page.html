@@ -12,15 +12,17 @@
 <ion-content class="ion-padding-top">
 
   <!-- loading -->
-  <div *ngIf="loading$ | ngrxPush" class="full-page-spinner">
-    <ion-spinner style="justify-self: center; align-self: end;" name="lines" color="warning"></ion-spinner>
-    <ion-label style="justify-self: center;" *ngIf="(loadingText$ | ngrxPush)" color="dark">
-      {{ loadingText$ | ngrxPush }}
-    </ion-label>
-  </div>
+  <ion-grid *ngIf="loadingText$ | ngrxPush as loadingText; else loaded" style="height: 100%;">
+    <ion-row class="ion-align-items-center ion-text-center" style="height: 100%;">
+      <ion-col>
+        <ion-spinner name="lines" color="warning"></ion-spinner>
+        <p>{{ loadingText }}</p>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
 
   <!-- not loading  -->
-  <ng-container *ngIf="!(loading$ | ngrxPush)">
+  <ng-template #loaded>
     <ion-item *ngIf="error" class="notifier-item">
       <ion-label style="margin: 7px 5px;" class="ion-text-wrap">
         <p style="color: var(--ion-color-danger)">{{ error.text }}</p>
@@ -116,5 +118,5 @@
         </ion-item-group>
       </ng-container>
     </ng-container>
-  </ng-container>
+  </ng-template>
 </ion-content>

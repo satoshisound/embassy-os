@@ -2,10 +2,10 @@ import { Component } from '@angular/core'
 import { NavController, AlertController, ModalController, PopoverController } from '@ionic/angular'
 import { ActivatedRoute } from '@angular/router'
 import { ApiService } from 'src/app/services/api/api.service'
-import { pauseFor, isEmptyObject } from 'src/app/util/misc.util'
+import { isEmptyObject } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
 import { TrackingModalController } from 'src/app/services/tracking-modal-controller.service'
-import { BehaviorSubject, forkJoin, from, fromEvent, of } from 'rxjs'
+import { BehaviorSubject, from, fromEvent, of } from 'rxjs'
 import { catchError, concatMap, map, take, tap } from 'rxjs/operators'
 import { Recommendation } from 'src/app/components/recommendation-button/recommendation-button.component'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
@@ -27,10 +27,8 @@ export class AppConfigPage extends Cleanup {
     { title: string, description: string, buttonText: string }
   }
 
-  loading$ = new BehaviorSubject(true)
   loadingText$ = new BehaviorSubject(undefined)
 
-  pkgId: string
   pkg: InstalledPackageDataEntry
   hasConfig = false
 
@@ -61,7 +59,7 @@ export class AppConfigPage extends Cleanup {
   ) { super() }
 
   async ngOnInit () {
-    this.pkgId = this.route.snapshot.paramMap.get('pkgId') as string
+    const pkgId = this.route.snapshot.paramMap.get('pkgId') as string
 
     this.cleanup(
       this.route.params.pipe(take(1)).subscribe(params => {
@@ -86,16 +84,16 @@ export class AppConfigPage extends Cleanup {
       }),
     )
 
-    this.patch.watch$('package-data', this.pkgId, 'installed')
+    this.patch.watch$('package-data', pkgId, 'installed')
     .pipe(
       tap(pkg => this.pkg = pkg),
       tap(() => this.loadingText$.next(`Fetching config spec...`)),
-      concatMap(() => forkJoin([this.apiService.getPackageConfig({ id: this.pkg.manifest.id }), pauseFor(600)])),
-      concatMap(([{ spec, config }]) => {
+      concatMap(() => this.apiService.getPackageConfig({ id: pkgId })),
+      concatMap(({ spec, config }) => {
         const rec = history.state && history.state.configRecommendation as Recommendation
         if (rec) {
           this.loadingText$.next(`Setting properties to accommodate ${rec.title}...`)
-          return from(this.apiService.dryConfigureDependency({ 'dependency-id': this.pkgId, 'dependent-id': rec.appId }))
+          return from(this.apiService.dryConfigureDependency({ 'dependency-id': pkgId, 'dependent-id': rec.appId }))
           .pipe(
             map(res => ({
               spec,
@@ -118,6 +116,7 @@ export class AppConfigPage extends Cleanup {
       }),
       map(({ spec, config, dependencyConfig }) => this.setConfig(spec, config, dependencyConfig)),
       tap(() => this.loadingText$.next(undefined)),
+      take(1),
     ).subscribe({
       error: e => {
         console.error(e.message)
@@ -178,7 +177,7 @@ export class AppConfigPage extends Cleanup {
       spinner: 'lines',
       cssClass: 'loader',
     }).displayDuringAsync(async () => {
-      const { breakages } = await this.apiService.drySetPackageConfig({ id: this.pkgId, config: this.config })
+      const { breakages } = await this.apiService.drySetPackageConfig({ id: pkg.manifest.id, config: this.config })
 
       if (breakages.length) {
         const { cancelled } = await wizardModal(
@@ -191,7 +190,7 @@ export class AppConfigPage extends Cleanup {
         if (cancelled) return { skip: true }
       }
 
-      return this.apiService.setPackageConfig({ id: this.pkgId, config: this.config })
+      return this.apiService.setPackageConfig({ id: pkg.manifest.id, config: this.config })
         .then(() => ({ skip: false }))
     })
     .then(({ skip }) => {

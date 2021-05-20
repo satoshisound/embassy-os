@@ -28,10 +28,7 @@
     Depending on the amount of data on your Embassy, your first backup may take a very long. Future backups to the same disk will be significantly faster, depending on how much new data has been generated between backups.
   </p> -->
 
-  <div *ngIf="loading" class="ion-text-center ion-margin">
-    <ion-spinner name="lines" color="warning"></ion-spinner>
-    <p>Fetching disks...</p>
-  </div>
+  <ion-spinner *ngIf="loading" name="lines" color="warning" class="center"></ion-spinner>
 
   <ng-container *ngIf="!loading">
 

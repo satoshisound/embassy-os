@@ -122,10 +122,6 @@ ion-title {
   font-weight: unset;
 }
 
-ion-item {
-  --border-width: 0;
-}
-
 ion-textarea {
   margin-top: 0;
   padding-left: 12px;
@@ -288,15 +284,6 @@ ion-avatar {
   // kills the lines
   --border-width: 0;
   --inner-border-width: 0;
-}
-
-.full-page-spinner { 
-  min-height: 80vh;
-  align-items: center;
-  color: white;
-  margin: 0px 30px;
-  display: grid;
-  grid-template-rows: 35% 15%;
 }
 
 .recommendation-item {

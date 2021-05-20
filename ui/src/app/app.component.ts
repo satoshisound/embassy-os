@@ -3,8 +3,7 @@ import { Storage } from '@ionic/storage'
 import { AuthService, AuthState } from './services/auth.service'
 import { ApiService } from './services/api/api.service'
 import { Router } from '@angular/router'
-import { BehaviorSubject } from 'rxjs'
-import { filter, takeWhile, tap } from 'rxjs/operators'
+import { concatMap, filter, takeWhile, tap } from 'rxjs/operators'
 import { AlertController, NavController, ToastController } from '@ionic/angular'
 import { LoaderService } from './services/loader.service'
 import { Emver } from './services/emver.service'
@@ -21,9 +20,9 @@ import { ServerInfo, ServerStatus } from './models/patch-db/data-model'
   styleUrls: ['app.component.scss'],
 })
 export class AppComponent {
-  showMenuContent$ = new BehaviorSubject(false)
+  ServerStatus = ServerStatus
+  showMenu = false
   selectedIndex = 0
-  isUpdating = false
   untilLoaded = true
   appPages = [
     {
@@ -80,29 +79,18 @@ export class AppComponent {
     await this.emver.init()
 
     let fromFresh = true
-    let authed = false
-
-    const serverStatus$ = this.patch.watch$('server-info', 'status')
-    .pipe(
-      tap(status => this.isUpdating = status === ServerStatus.Updating),
-      takeWhile(_ => !!authed),
-    )
 
     const routerEvents$ = this.router.events
     .pipe(
       filter(e => !!(e as any).urlAfterRedirects),
       tap((e: any) => {
         const appPageIndex = this.appPages.findIndex(
-          appPage => (e.urlAfterRedirects || e.url || '').startsWith(appPage.url),
+          appPage => (e.urlAfterRedirects).startsWith(appPage.url),
         )
         if (appPageIndex > -1) this.selectedIndex = appPageIndex
-
-        // TODO: while this works, it is dangerous and impractical.
-        if (e.urlAfterRedirects !== '/embassy' && e.urlAfterRedirects !== '/authenticate' && this.isUpdating) {
-          this.router.navigateByUrl('/embassy')
-        }
       }),
-      takeWhile(_ => !!authed),
+      concatMap(() => this.authService.watch$()),
+      takeWhile(auth => auth !== AuthState.VERIFIED),
     )
 
     this.authService.watch$()
@@ -110,18 +98,16 @@ export class AppComponent {
       // VERIFIED
       if (auth === AuthState.VERIFIED) {
         this.http.authReqEnabled = true
-        this.showMenuContent$.next(true)
+        this.showMenu = true
         this.patch.start()
-        serverStatus$.subscribe()
         routerEvents$.subscribe()
       // UNVERIFIED
       } else if (auth === AuthState.UNVERIFIED) {
-        authed = false
         this.http.authReqEnabled = false
         this.patch.stop()
         this.storage.clear()
         this.router.navigate(['/authenticate'], { replaceUrl: true })
-        this.showMenuContent$.next(false)
+        this.showMenu = false
       }
 
       if (fromFresh) {
@@ -215,7 +201,7 @@ export class AppComponent {
   }
 
   splitPaneVisible (e: any) {
-    this.splitPane.$menuFixedOpenOnLeft$.next(e.detail.visible)
+    this.splitPane.menuFixedOpenOnLeft$.next(e.detail.visible)
   }
 }
 

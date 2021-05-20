@@ -8,63 +8,75 @@
 </ion-header>
 
 <ion-content class="ion-padding-top ion-padding-bottom">
-  <ion-item-group>
-    <ion-item [routerLink]="['specs']">
-      <ion-icon slot="start" name="information-circle-outline" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">About</ion-text></ion-label>
-    </ion-item>
+  <ng-container *ngrxLet="patch.watch$('server-info', 'status') as status">
+    
+    <!-- UPDATING -->
+    <div *ngIf="status === ServerStatus.Updating">Embassy is updating</div>
 
-    <ion-item [routerLink]="['metrics']">
-      <ion-icon slot="start" name="pulse" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">Monitor</ion-text></ion-label>
-    </ion-item>
+    <!-- UPDATING -->
+    <div *ngIf="status === ServerStatus.BackingUp">Embassy is backing up</div>
 
-    <ion-item [routerLink]="['logs']">
-      <ion-icon slot="start" name="newspaper-outline" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">Logs</ion-text></ion-label>
-    </ion-item>
-
-    <ion-item-divider></ion-item-divider>
-
-    <ion-item button (click)="presentModalBackup()">
-      <ion-icon slot="start" name="save-outline" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">Create Backup</ion-text></ion-label>
-    </ion-item>
-
-    <ion-item-divider></ion-item-divider>
-
-    <ion-item lines="none" [routerLink]="['config']">
-      <ion-icon slot="start" name="cog-outline" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">Config</ion-text></ion-label>
-    </ion-item>
-
-    <ion-item [routerLink]="['lan']">
-      <ion-icon slot="start" name="home-outline" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">LAN Settings</ion-text></ion-label>
-    </ion-item>
-
-    <ion-item [routerLink]="['wifi']">
-      <ion-icon slot="start" name="wifi" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">WiFi Settings</ion-text></ion-label>
-    </ion-item>
-
-    <ion-item-divider></ion-item-divider>
-
-    <ion-item lines="none" [routerLink]="['developer']">
-      <ion-icon slot="start" name="terminal-outline" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">Developer Options</ion-text></ion-label>
-    </ion-item>
-
-    <ion-item-divider></ion-item-divider>
-
-    <ion-item button (click)="presentAlertRestart()">
-      <ion-icon slot="start" name="reload-outline" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">Restart</ion-text></ion-label>
-    </ion-item>
-
-    <ion-item button lines="none" (click)="presentAlertShutdown()">
-      <ion-icon slot="start" name="power" color="primary"></ion-icon>
-      <ion-label><ion-text color="primary">Shutdown</ion-text></ion-label>
-    </ion-item>
-  </ion-item-group>
+    <!-- NOT UPDATING OR BACKING UP -->
+    <ng-container *ngIf="status === ServerStatus.Running">
+      <ion-item-group>
+        <ion-item [routerLink]="['specs']">
+          <ion-icon slot="start" name="information-circle-outline" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">About</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item [routerLink]="['metrics']">
+          <ion-icon slot="start" name="pulse" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">Monitor</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item [routerLink]="['logs']">
+          <ion-icon slot="start" name="newspaper-outline" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">Logs</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item-divider></ion-item-divider>
+  
+        <ion-item button (click)="presentModalBackup()">
+          <ion-icon slot="start" name="save-outline" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">Create Backup</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item-divider></ion-item-divider>
+  
+        <ion-item lines="none" [routerLink]="['config']">
+          <ion-icon slot="start" name="cog-outline" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">Config</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item [routerLink]="['lan']">
+          <ion-icon slot="start" name="home-outline" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">LAN Settings</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item [routerLink]="['wifi']">
+          <ion-icon slot="start" name="wifi" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">WiFi Settings</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item-divider></ion-item-divider>
+  
+        <ion-item lines="none" [routerLink]="['developer']">
+          <ion-icon slot="start" name="terminal-outline" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">Developer Options</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item-divider></ion-item-divider>
+  
+        <ion-item button (click)="presentAlertRestart()">
+          <ion-icon slot="start" name="reload-outline" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">Restart</ion-text></ion-label>
+        </ion-item>
+  
+        <ion-item button lines="none" (click)="presentAlertShutdown()">
+          <ion-icon slot="start" name="power" color="primary"></ion-icon>
+          <ion-label><ion-text color="primary">Shutdown</ion-text></ion-label>
+        </ion-item>
+      </ion-item-group>
+    </ng-container>
+  </ng-container>
 </ion-content>

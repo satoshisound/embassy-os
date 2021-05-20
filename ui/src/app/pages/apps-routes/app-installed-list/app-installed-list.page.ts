@@ -22,4 +22,8 @@ export class AppInstalledListPage {
     event.stopPropagation()
     window.open(this.config.launchableURL(pkg.installed), '_blank')
   }
+
+  asIsOrder () {
+    return 0
+  }
 }

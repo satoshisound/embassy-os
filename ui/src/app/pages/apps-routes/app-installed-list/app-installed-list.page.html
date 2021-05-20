@@ -24,7 +24,7 @@
     <ng-template #list>
       <ion-grid>
         <ion-row *ngrxLet="connectionService.monitor$() as connection">
-          <ion-col *ngFor="let pkg of pkgs | keyvalue" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
+          <ion-col *ngFor="let pkg of pkgs | keyvalue : asIsOrder" sizeXs="4" sizeSm="3" sizeMd="2" sizeLg="2">
             <ion-card class="installed-card" style="position:relative" [routerLink]="['/services', 'installed', (pkg.value | manifest).id]">
               <div class="launch-container" *ngIf="pkg.value | hasUi">
                 <div class="launch-button-triangle"  (click)="launchUi(pkg.value, $event)" [class.disabled]="!(pkg.value | isLaunchable)">
