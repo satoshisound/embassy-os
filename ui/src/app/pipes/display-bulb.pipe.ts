@@ -9,9 +9,7 @@ import { renderPkgStatus } from '../services/pkg-status-rendering.service'
 export class DisplayBulbPipe implements PipeTransform {
 
   transform (pkg: PackageDataEntry, bulb: DisplayBulb, connection: ConnectionState): boolean {
-    console.log('BULB', connection, bulb)
     const { color } = renderPkgStatus(pkg, connection)
-    console.log(color)
     switch (color) {
       case 'danger': return bulb === 'red'
       case 'success': return bulb === 'green'

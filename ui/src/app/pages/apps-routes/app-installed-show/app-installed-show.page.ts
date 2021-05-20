@@ -5,7 +5,6 @@ import { ActivatedRoute } from '@angular/router'
 import { copyToClipboard } from 'src/app/util/web.util'
 import { chill } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
-import { BackupPage } from 'src/app/modals/backup/backup.page'
 import { Observable, of, Subscription } from 'rxjs'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
 import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
@@ -122,19 +121,6 @@ export class AppInstalledShowPage {
     } else {
       this.start()
     }
-  }
-
-  async presentModalBackup () {
-    const modal = await this.modalCtrl.create({
-      backdropDismiss: false,
-      component: BackupPage,
-      presentingElement: await this.modalCtrl.getTop(),
-      componentProps: {
-        pkg: this.pkg,
-      },
-    })
-
-    await modal.present()
   }
 
   async uninstall () {

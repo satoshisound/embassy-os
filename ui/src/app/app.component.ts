@@ -2,17 +2,16 @@ import { Component } from '@angular/core'
 import { Storage } from '@ionic/storage'
 import { AuthService, AuthState } from './services/auth.service'
 import { ApiService } from './services/api/api.service'
-import { Router } from '@angular/router'
-import { concatMap, filter, takeWhile, tap } from 'rxjs/operators'
-import { AlertController, NavController, ToastController } from '@ionic/angular'
+import { Router, RoutesRecognized } from '@angular/router'
+import { filter, finalize, takeWhile } from 'rxjs/operators'
+import { AlertController, ToastController } from '@ionic/angular'
 import { LoaderService } from './services/loader.service'
 import { Emver } from './services/emver.service'
 import { SplitPaneTracker } from './services/split-pane.service'
 import { LoadingOptions } from '@ionic/core'
-import { pauseFor } from './util/misc.util'
 import { PatchDbModel } from './models/patch-db/patch-db-model'
 import { HttpService } from './services/http.service'
-import { ServerInfo, ServerStatus } from './models/patch-db/data-model'
+import { ServerStatus } from './models/patch-db/data-model'
 
 @Component({
   selector: 'app-root',
@@ -57,7 +56,6 @@ export class AppComponent {
     private readonly loader: LoaderService,
     private readonly emver: Emver,
     private readonly toastCtrl: ToastController,
-    private readonly navCtrl: NavController,
     readonly splitPane: SplitPaneTracker,
     readonly patch: PatchDbModel,
   ) {
@@ -66,58 +64,91 @@ export class AppComponent {
     this.init()
   }
 
-  ionViewDidEnter () {
-    // weird bug where a browser grabbed the value 'getdots' from the app.component.html preload input field.
-    // this removes that field after prleloading occurs.
-    pauseFor(500).then(() => this.untilLoaded = false)
-  }
-
   async init () {
     await this.storage.create()
     await this.patch.init()
     await this.authService.init()
     await this.emver.init()
 
-    let fromFresh = true
+    this.router.initialNavigation()
 
-    const routerEvents$ = this.router.events
-    .pipe(
-      filter(e => !!(e as any).urlAfterRedirects),
-      tap((e: any) => {
-        const appPageIndex = this.appPages.findIndex(
-          appPage => (e.urlAfterRedirects).startsWith(appPage.url),
-        )
-        if (appPageIndex > -1) this.selectedIndex = appPageIndex
-      }),
-      concatMap(() => this.authService.watch$()),
-      takeWhile(auth => auth !== AuthState.VERIFIED),
-    )
+    // let fromFresh = true
+    // if (fromFresh) {
+    //   this.router.initialNavigation()
+    //   fromFresh = false
+    // }
 
+    // watch auth
     this.authService.watch$()
     .subscribe(auth => {
       // VERIFIED
       if (auth === AuthState.VERIFIED) {
+        console.log('HERERERERERERERERE')
         this.http.authReqEnabled = true
         this.showMenu = true
         this.patch.start()
-        routerEvents$.subscribe()
+        // watch router to highlight selected menu item
+        this.watchRouter(auth)
+        // watch status to display/hide maintenance page
+        this.watchStatus(auth)
+        // watch unread notification count to display toast
+        this.watchNotifications(auth)
       // UNVERIFIED
       } else if (auth === AuthState.UNVERIFIED) {
         this.http.authReqEnabled = false
+        this.showMenu = false
         this.patch.stop()
         this.storage.clear()
         this.router.navigate(['/authenticate'], { replaceUrl: true })
-        this.showMenu = false
-      }
-
-      if (fromFresh) {
-        this.router.initialNavigation()
-        fromFresh = false
       }
     })
 
     this.http.watch401$().subscribe(() => {
-      this.authService.setAuthStateUnverified()
+      this.authService.setUnverified()
+    })
+  }
+
+  private watchRouter (auth: AuthState): void {
+    this.router.events
+    .pipe(
+      filter((e: RoutesRecognized) => !!e.urlAfterRedirects),
+      takeWhile(() => auth === AuthState.VERIFIED),
+    )
+    .subscribe(e => {
+      const appPageIndex = this.appPages.findIndex(
+        appPage => e.urlAfterRedirects.startsWith(appPage.url),
+      )
+      if (appPageIndex > -1) this.selectedIndex = appPageIndex
+    })
+  }
+
+  private watchStatus (auth: AuthState): void {
+    this.patch.watch$('server-info', 'status')
+    .pipe(
+      takeWhile(() => auth === AuthState.VERIFIED),
+    )
+    .subscribe(status => {
+      const maintenance = '/maintenance'
+      const url = this.router.url
+      if (status === ServerStatus.Running && url.startsWith(maintenance)) {
+        this.router.navigate([''], { replaceUrl: true })
+      }
+      if ([ServerStatus.Updating, ServerStatus.BackingUp].includes(status) && !url.startsWith(maintenance)) {
+        this.router.navigate([maintenance], { replaceUrl: true })
+      }
+    })
+  }
+
+  private watchNotifications (auth: AuthState): void {
+    let previous: number
+    this.patch.watch$('server-info', 'unread-notification-count')
+    .pipe(
+      takeWhile(() => auth === AuthState.VERIFIED),
+      finalize(() => console.log('FINALIZING!!!')),
+    )
+    .subscribe(count => {
+      if (previous !== undefined && count > previous) this.presentToastNotifications()
+      previous = count
     })
   }
 
@@ -146,18 +177,14 @@ export class AppComponent {
   private async logout () {
     this.loader.of(LoadingSpinner('Logging out...'))
     .displayDuringP(this.api.logout({ }))
-    .then(() => this.authService.setAuthStateUnverified())
+    .then(() => this.authService.setUnverified())
     .catch(e => this.setError(e))
   }
 
-  private async handleNotifications (server: Readonly<ServerInfo>) {
-    const count = server['unread-notification-count']
-
-    if (!count) { return }
-
+  private async presentToastNotifications () {
     const toast = await this.toastCtrl.create({
       header: 'Embassy',
-      message: `${count} new notification${count === 1 ? '' : 's'}`,
+      message: `New notifications`,
       position: 'bottom',
       duration: 4000,
       cssClass: 'notification-toast',
@@ -173,7 +200,7 @@ export class AppComponent {
           side: 'end',
           text: 'View',
           handler: () => {
-            this.navCtrl.navigateForward(['/notifications'])
+            this.router.navigate(['/notifications'])
           },
         },
       ],

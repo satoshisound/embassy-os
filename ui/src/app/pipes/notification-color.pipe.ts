@@ -1,21 +1,20 @@
 import { Pipe, PipeTransform } from '@angular/core'
-import { ServerNotification } from '../services/api/api-types'
-import { isEmptyObject } from '../util/misc.util'
+import { NotificationLevel, ServerNotification } from '../services/api/api-types'
 
 @Pipe({
   name: 'notificationColor',
 })
 export class NotificationColorPipe implements PipeTransform {
-  transform (notification: ServerNotification): string {
-    const char = notification.code.charAt(0)
-    switch (char) {
-      case '0':
+  transform (notification: ServerNotification<any>): string {
+    const level = notification.level
+    switch (level) {
+      case NotificationLevel.Info:
         return 'primary'
-      case '1':
+      case NotificationLevel.Success:
         return 'success'
-      case '2':
+      case NotificationLevel.Warning:
         return 'warning'
-      case '3':
+      case NotificationLevel.Error:
         return 'danger'
       default:
         return ''

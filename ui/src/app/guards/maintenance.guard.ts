@@ -29,7 +29,6 @@ export class MaintenanceGuard implements CanActivate, CanActivateChild {
   }
 
   private runServerStatusCheck (): boolean {
-    console.log('STATUS', this.serverStatus)
     if ([ServerStatus.Updating, ServerStatus.BackingUp].includes(this.serverStatus)) {
       this.router.navigate(['/maintenance'], { replaceUrl: true })
       return false

@@ -52,7 +52,7 @@ export module RR {
   // notification
 
   export type GetNotificationsReq = WithExpire<{ page: number, 'per-page': number }> // notification.list
-  export type GetNotificationsRes = WithRevision<ServerNotification[]>
+  export type GetNotificationsRes = WithRevision<ServerNotification<number>[]>
 
   export type DeleteNotificationReq = { id: string } // notification.delete
   export type DeleteNotificationRes = null
@@ -231,11 +231,38 @@ export interface SSHKeyEntry {
   pubkey: string
 }
 
-export interface ServerNotification {
+export type ServerNotifications = ServerNotification<any>[]
+
+export interface ServerNotification<T extends number> {
   id: string
   'package-id': string | null
-  createdAt: string
-  code: string
+  'created-at': string
+  code: T
+  level: NotificationLevel
   title: string
   message: string
+  data: NotificationData<T>
+}
+
+export enum NotificationLevel {
+  Success = 'success',
+  Info = 'info',
+  Warning = 'warning',
+  Error = 'error',
+}
+
+export type NotificationData<T> = T extends 0 ? null :
+                                  T extends 1 ? BackupReport :
+                                  any
+
+export interface BackupReport {
+  server: {
+    attempted: boolean
+    error: string | null
+  }
+  packages: {
+    [id: string]: {
+      error: string | null
+    }
+  }
 }

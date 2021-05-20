@@ -98,13 +98,13 @@
               <ion-icon slot="start" name="newspaper-outline" color="primary"></ion-icon>
               <ion-label><ion-text color="primary">Logs</ion-text></ion-label>
             </ion-item>
-            <!-- restore backup -->
-            <ion-item lines="none" button [disabled]="[FeStatus.Connecting, FeStatus.Installing, FeStatus.Updating, FeStatus.Stopping, FeStatus.Removing, FeStatus.BackingUp, FeStatus.Restoring] | includes : status" (click)="presentModalBackup('restore')">
+            <!-- restore -->
+            <ion-item button [disabled]="[FeStatus.Connecting, FeStatus.Installing, FeStatus.Updating, FeStatus.Stopping, FeStatus.Removing, FeStatus.BackingUp, FeStatus.Restoring] | includes : status" [routerLink]="['restore']">
               <ion-icon slot="start" name="color-wand-outline" color="primary"></ion-icon>
               <ion-label><ion-text color="primary">Restore from Backup</ion-text></ion-label>
             </ion-item>
             <!-- marketplace -->
-            <ion-item lines="none" [routerLink]="['/services', 'marketplace', manifest.id]">
+            <ion-item [routerLink]="['/services', 'marketplace', manifest.id]">
               <ion-icon slot="start" name="storefront-outline" color="primary"></ion-icon>
               <ion-label><ion-text color="primary">Marketplace Listing</ion-text></ion-label>
             </ion-item>

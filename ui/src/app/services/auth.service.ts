@@ -4,7 +4,6 @@ import { distinctUntilChanged } from 'rxjs/operators'
 import { ApiService } from './api/api.service'
 import { Storage } from '@ionic/storage'
 import { StorageKeys } from '../models/storage-keys'
-import { isUnauthorized } from './http.service'
 
 export enum AuthState {
   UNVERIFIED,
@@ -35,28 +34,17 @@ export class AuthService {
     }
   }
 
-  peek (): AuthState { return this.authState$.getValue() }
-
   watch$ (): Observable<AuthState> {
     return this.authState$.pipe(distinctUntilChanged())
   }
 
   async login (password: string): Promise<void> {
-    try {
-      await this.api.login({ password })
-      await this.storage.set(StorageKeys.LOGGED_IN_KEY, true)
-      this.authState$.next(AuthState.VERIFIED)
-    } catch (e) {
-      if (isUnauthorized(e)) {
-        this.authState$.next(AuthState.UNVERIFIED)
-        throw { name: 'invalid', message: 'invalid credentials' }
-      }
-      console.error(`Failed login attempt`, e)
-      throw e
-    }
+    await this.api.login({ password })
+    await this.storage.set(StorageKeys.LOGGED_IN_KEY, true)
+    this.authState$.next(AuthState.VERIFIED)
   }
 
-  async setAuthStateUnverified (): Promise<void> {
+  async setUnverified (): Promise<void> {
     this.authState$.next(AuthState.UNVERIFIED)
   }
 }

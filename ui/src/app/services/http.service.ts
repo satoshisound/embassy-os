@@ -60,10 +60,6 @@ export class HttpService {
   }
 }
 
-export function isUnauthorized (e: HttpErrorResponse): boolean {
-  return e.status == 401
-}
-
 function RpcError (e: RPCError['error']): void {
   const { code, message } = e
   this.status = code

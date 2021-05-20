@@ -1,5 +1,5 @@
 import { DockerIoFormat, Manifest, PackageDataEntry, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
-import { RR, ServerNotification } from './api-types'
+import { NotificationLevel, RR, ServerNotification, ServerNotifications } from './api-types'
 import instructions from 'raw-loader!./md-sample.md'
 
 export module Mock {
@@ -207,38 +207,58 @@ export module Mock {
     },
   }
 
-  export const Notifications: ServerNotification[] = [
-    {
-      id: '123e4567-e89b-12d3-a456-426655440000',
-      'package-id': 'bitcoind',
-      createdAt: '2019-12-26T14:20:30.872Z',
-      code: '101',
-      title: 'Install Complete',
-      message: 'Installation of bitcoind has completed successfully.',
+  export const notification1: ServerNotification<1> = {
+    id: '123e4567-e89b-12d3-a456-426655440000',
+    'package-id': null,
+    'created-at': '2019-12-26T14:20:30.872Z',
+    code: 1,
+    level: NotificationLevel.Success,
+    title: 'Backup Complete',
+    message: 'Embassy and services have been successfully backed up.',
+    data: {
+      server: {
+        attempted: true,
+        error: null,
+      },
+      packages: {
+        'bitcoind': {
+          error: null,
+        },
+      },
     },
+  }
+
+  export const Notifications: ServerNotifications = [
+    notification1,
     {
       id: '123e4567-e89b-12d3-a456-426655440001',
       'package-id': 'bitcoind',
-      createdAt: '2019-12-26T14:20:30.872Z',
-      code: '201',
+      'created-at': '2019-12-26T14:20:30.872Z',
+      code: 2,
+      level: NotificationLevel.Warning,
       title: 'SSH Key Added',
       message: 'A new SSH key was added. If you did not do this, shit is bad.',
+      data: null,
     },
     {
       id: '123e4567-e89b-12d3-a456-426655440002',
       'package-id': 'bitcoind',
-      createdAt: '2019-12-26T14:20:30.872Z',
-      code: '002',
+      'created-at': '2019-12-26T14:20:30.872Z',
+      code: 3,
+      level: NotificationLevel.Info,
       title: 'SSH Key Removed',
       message: 'A SSH key was removed.',
+      data: null,
     },
     {
       id: '123e4567-e89b-12d3-a456-426655440003',
       'package-id': 'bitcoind',
-      createdAt: '2019-12-26T14:20:30.872Z',
-      code: '310',
-      title: 'App Crashed',
-      message: 'Bitcoind has crashed',
+      'created-at': '2019-12-26T14:20:30.872Z',
+      code: 4,
+      level: NotificationLevel.Error,
+      title: 'Service Crashed',
+      message: 'Bitcoind has crashed.',
+      data: null,
     },
   ]
 

@@ -31,7 +31,6 @@ export enum ServerStatus {
   Running = 'running',
   Updating = 'updating',
   BackingUp = 'backing-up',
-  Restoring = 'restoring',
 }
 
 export interface WiFiInfo {

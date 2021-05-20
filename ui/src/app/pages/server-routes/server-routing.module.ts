@@ -7,6 +7,10 @@ const routes: Routes = [
     loadChildren: () => import('./server-show/server-show.module').then(m => m.ServerShowPageModule),
   },
   {
+    path: 'backup',
+    loadChildren: () => import('./server-backup/server-backup.module').then(m => m.ServerBackupPageModule),
+  },
+  {
     path: 'specs',
     loadChildren: () => import('./server-specs/server-specs.module').then(m => m.ServerSpecsPageModule),
   },

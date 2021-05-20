@@ -1,16 +1,15 @@
 import { Component } from '@angular/core'
-import { ModalController } from '@ionic/angular'
+import { LoadingController, ModalController } from '@ionic/angular'
 import { ApiService } from 'src/app/services/api/api.service'
-import { pauseFor } from 'src/app/util/misc.util'
 import { BackupConfirmationComponent } from 'src/app/modals/backup-confirmation/backup-confirmation.component'
 import { DiskInfo, PartitionInfoEntry } from 'src/app/services/api/api-types'
 
 @Component({
-  selector: 'backup',
-  templateUrl: './backup.page.html',
-  styleUrls: ['./backup.page.scss'],
+  selector: 'server-backup',
+  templateUrl: './server-backup.page.html',
+  styleUrls: ['./server-backup.page.scss'],
 })
-export class BackupPage {
+export class ServerBackupPage {
   disks: DiskInfo
   loading = true
   error: string
@@ -19,6 +18,7 @@ export class BackupPage {
   constructor (
     private readonly modalCtrl: ModalController,
     private readonly apiService: ApiService,
+    private readonly loadingCtrl: LoadingController,
   ) { }
 
   ngOnInit () {
@@ -42,10 +42,6 @@ export class BackupPage {
     }
   }
 
-  async dismiss () {
-    await this.modalCtrl.dismiss()
-  }
-
   async presentModal (logicalname: string, partition: PartitionInfoEntry): Promise<void> {
     const m = await this.modalCtrl.create({
       componentProps: {
@@ -59,7 +55,7 @@ export class BackupPage {
     m.onWillDismiss().then(res => {
       const data = res.data
       if (data.cancel) return
-      return this.create(logicalname, data.password)
+      this.create(logicalname, data.password)
     })
 
     return await m.present()
@@ -67,12 +63,19 @@ export class BackupPage {
 
   private async create (logicalname: string, password: string): Promise<void> {
     this.error = ''
+
+    const loader = await this.loadingCtrl.create({
+      spinner: 'lines',
+    })
+    await loader.present()
+
     try {
       await this.apiService.createBackup({ logicalname, password })
-      this.dismiss()
     } catch (e) {
       console.error(e)
       this.error = e.message
+    } finally {
+      loader.dismiss()
     }
   }
 }

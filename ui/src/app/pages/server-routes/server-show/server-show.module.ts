@@ -4,7 +4,6 @@ import { IonicModule } from '@ionic/angular'
 import { RouterModule, Routes } from '@angular/router'
 import { ServerShowPage } from './server-show.page'
 import { StatusComponentModule } from 'src/app/components/status/status.component.module'
-import { BackupPageModule } from 'src/app/modals/backup/backup.module'
 import { FormsModule } from '@angular/forms'
 import { SharingModule } from 'src/app/modules/sharing.module'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
@@ -27,7 +26,6 @@ const routes: Routes = [
     SharingModule,
     PwaBackComponentModule,
     BadgeMenuComponentModule,
-    BackupPageModule,
   ],
   declarations: [ServerShowPage],
 })
