@@ -3,24 +3,47 @@ use std::path::Path;
 use std::time::Duration;
 
 use futures::future::{BoxFuture, FutureExt};
+use hashlink::{LinkedHashMap, LinkedHashSet};
 use itertools::Itertools;
-use linear_map::set::LinearSet;
-use linear_map::LinearMap;
 use rand::SeedableRng;
 use regex::Regex;
+use rpc_toolkit::command;
+use serde_json::Value;
 
-use crate::dependencies::{DependencyError, TaggedDependencyError};
-use crate::util::{from_yaml_async_reader, to_yaml_async_writer, PersistencePath};
-use crate::ResultExt as _;
+use crate::context::{EitherContext, ExtendedContext, RpcContext};
+use crate::dependencies::{BreakageRes, DependencyError};
+use crate::s9pk::manifest::PackageId;
+use crate::util::{
+    display_serializable, from_yaml_async_reader, parse_stdin_deserializable, to_yaml_async_writer,
+    IoFormat,
+};
+use crate::{Error, ResultExt as _};
 
 pub mod action;
 pub mod spec;
 pub mod util;
-pub mod value;
 
 pub use spec::{ConfigSpec, Defaultable};
 use util::NumRange;
-pub use value::Config;
+
+use self::action::ConfigRes;
+
+pub type Config = serde_json::Map<String, Value>;
+pub trait TypeOf {
+    fn type_of(&self) -> &'static str;
+}
+impl TypeOf for Value {
+    fn type_of(&self) -> &'static str {
+        match self {
+            Value::Array(_) => "list",
+            Value::Bool(_) => "boolean",
+            Value::Null => "null",
+            Value::Number(_) => "number",
+            Value::Object(_) => "object",
+            Value::String(_) => "string",
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigurationError {
@@ -75,7 +98,7 @@ pub enum MatchError {
     #[error("String {0:?} Does Not Match Pattern {1}")]
     Pattern(String, Regex),
     #[error("String {0:?} Is Not In Enum {1:?}")]
-    Enum(String, LinearSet<String>),
+    Enum(String, LinkedHashSet<String>),
     #[error("Field Is Not Nullable")]
     NotNullable,
     #[error("Length Mismatch: expected {0}, actual: {1}")]
@@ -87,7 +110,7 @@ pub enum MatchError {
     #[error("Number Is Not Integral: {0}")]
     NonIntegral(f64),
     #[error("Variant {0:?} Is Not In Union {1:?}")]
-    Union(String, LinearSet<String>),
+    Union(String, LinkedHashSet<String>),
     #[error("Variant Is Missing Tag {0:?}")]
     MissingTag(String),
     #[error("Property {0:?} Of Variant {1:?} Conflicts With Union Tag")]
@@ -102,12 +125,78 @@ pub enum MatchError {
     ListUniquenessViolation,
 }
 
+#[command(subcommands(get, set))]
+pub fn config(
+    #[context] ctx: RpcContext,
+    #[arg] id: PackageId,
+) -> Result<ExtendedContext<RpcContext, PackageId>, Error> {
+    Ok(ExtendedContext::from(ctx).map(|_| id))
+}
+
+#[command(display(display_serializable))]
+pub async fn get(
+    #[context] ctx: ExtendedContext<RpcContext, PackageId>,
+    #[arg(long = "format")] format: Option<IoFormat>,
+) -> Result<ConfigRes, Error> {
+    let mut db = ctx.base().db.handle();
+    let pkg_model = crate::db::DatabaseModel::new()
+        .package_data()
+        .idx_model(&ctx.extension)
+        .and_then(|m| m.installed())
+        .expect(&mut db)
+        .await
+        .with_kind(crate::ErrorKind::NotFound)?;
+    let action = pkg_model
+        .clone()
+        .manifest()
+        .config()
+        .get(&mut db)
+        .await?
+        .to_owned()
+        .ok_or_else(|| {
+            Error::new(
+                anyhow::anyhow!("{} has no config", &ctx.extension),
+                crate::ErrorKind::NotFound,
+            )
+        })?;
+    let version = pkg_model.clone().manifest().version().get(&mut db).await?;
+    let volumes = pkg_model.manifest().volumes().get(&mut db).await?;
+    let hosts = crate::db::DatabaseModel::new()
+        .network()
+        .hosts()
+        .get(&mut db)
+        .await?;
+    action
+        .get(&ctx.extension, &*version, &*volumes, &*hosts)
+        .await
+}
+
+#[command(subcommands(self(set_impl), set_dry), display(display_serializable))]
+pub fn set(
+    #[context] ctx: ExtendedContext<RpcContext, PackageId>,
+    #[arg(long = "format")] format: Option<IoFormat>,
+    #[arg(stdin, parse(parse_stdin_deserializable))] config: Config,
+) -> Result<ExtendedContext<RpcContext, (PackageId, Config)>, Error> {
+    todo!()
+}
+
+#[command(display(display_serializable))]
+pub fn set_dry(
+    #[context] ctx: ExtendedContext<RpcContext, (PackageId, Config)>,
+) -> Result<BreakageRes, Error> {
+    todo!()
+}
+
+pub fn set_impl(ctx: ExtendedContext<RpcContext, (PackageId, Config)>) -> Result<(), Error> {
+    todo!()
+}
+
 #[derive(Clone, Debug, Default, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigurationRes {
-    pub changed: LinearMap<String, Config>,
-    pub needs_restart: LinearSet<String>,
-    pub stopped: LinearMap<String, TaggedDependencyError>,
+    pub changed: LinkedHashMap<String, Config>,
+    pub needs_restart: LinkedHashSet<String>,
+    pub stopped: LinkedHashMap<String, TaggedDependencyError>,
 }
 
 // returns apps with changed configurations
@@ -194,7 +283,7 @@ pub async fn configure(
             spec.update(&mut config)
                 .await
                 .with_kind(crate::ErrorKind::ConfigSpecViolation)?;
-            let mut cfgs = LinearMap::new();
+            let mut cfgs = LinkedHashMap::new();
             cfgs.insert(name, Cow::Borrowed(&config));
             for rule in rules {
                 rule.check(&config, &cfgs)

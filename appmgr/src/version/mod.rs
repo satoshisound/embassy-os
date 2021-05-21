@@ -28,7 +28,7 @@ use tokio_compat_02::FutureExt;
 // pub use v0_2_12::Version as Current;
 pub type Current = ();
 
-use crate::util::{to_yaml_async_writer, AsyncCompat, PersistencePath};
+use crate::util::{to_yaml_async_writer, AsyncCompat};
 use crate::{Error, ResultExt as _};
 
 #[derive(serde::Serialize, serde::Deserialize)]

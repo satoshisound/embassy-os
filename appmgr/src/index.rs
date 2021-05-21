@@ -5,14 +5,12 @@ use std::path::Path;
 
 use emver::{Version, VersionRange};
 use futures::future::{BoxFuture, FutureExt};
-use linear_map::LinearMap;
 
 use crate::inspect::info_full;
-use crate::manifest::{Description, ManifestLatest};
 use crate::Error;
 
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-pub struct AppIndex(pub LinearMap<String, IndexInfo>);
+pub struct AppIndex(pub LinkedHashMap<String, IndexInfo>);
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]

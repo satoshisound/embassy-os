@@ -5,7 +5,6 @@ use std::path::Path;
 use futures::stream::{StreamExt, TryStreamExt};
 use tokio_stream::wrappers::LinesStream;
 
-use crate::util::PersistencePath;
 use crate::{Error, ResultExt as _};
 
 #[derive(Clone, Copy, Debug, serde::Serialize)]

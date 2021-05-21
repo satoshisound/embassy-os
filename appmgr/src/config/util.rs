@@ -2,10 +2,11 @@ use std::ops::{Bound, RangeBounds, RangeInclusive};
 
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde_json::Value;
 
-use super::value::Config;
+use super::Config;
 
-pub const STATIC_NULL: super::value::Value = super::value::Value::Null;
+pub const STATIC_NULL: Value = Value::Null;
 
 #[derive(Clone, Debug)]
 pub struct CharSet(pub Vec<(RangeInclusive<char>, usize)>, usize);
@@ -281,7 +282,7 @@ impl UniqueBy {
         match self {
             UniqueBy::Any(any) => any.iter().any(|u| u.eq(lhs, rhs)),
             UniqueBy::All(all) => all.iter().all(|u| u.eq(lhs, rhs)),
-            UniqueBy::Exactly(key) => lhs.0.get(key) == rhs.0.get(key),
+            UniqueBy::Exactly(key) => lhs.get(key) == rhs.get(key),
             UniqueBy::NotUnique => false,
         }
     }

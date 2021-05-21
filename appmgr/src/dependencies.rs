@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use emver::VersionRange;
 use hashlink::LinkedHashMap;
-use linear_map::LinearMap;
-use patch_db::DbHandle;
+use patch_db::{DbHandle, DiffPatch};
 use serde::{Deserialize, Serialize};
 
 use crate::action::ActionImplementation;
@@ -65,20 +64,15 @@ impl std::fmt::Display for DependencyError {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct TaggedDependencyError {
-    pub dependency: PackageId,
-    pub error: DependencyError,
-}
-impl std::fmt::Display for TaggedDependencyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.dependency, self.error)
-    }
+pub struct BreakageRes {
+    pub patch: DiffPatch,
+    pub breakages: LinkedHashMap<PackageId, DependencyError>,
 }
 
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-pub struct Dependencies(pub LinearMap<PackageId, DepInfo>);
+pub struct Dependencies(pub LinkedHashMap<PackageId, DepInfo>);
 impl Dependencies {
     pub async fn check_status(
         &self,

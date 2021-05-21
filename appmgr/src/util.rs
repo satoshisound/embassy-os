@@ -1,357 +1,19 @@
 use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
-use std::net::Ipv4Addr;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{exit, Stdio};
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use file_lock::FileLock;
-use id_pool::IdPool;
+use clap::ArgMatches;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 use crate::{Error, ResultExt as _};
-
-#[derive(Debug, Clone)]
-pub struct PersistencePath(PathBuf);
-impl PersistencePath {
-    pub fn from_ref<P: AsRef<Path>>(p: P) -> Self {
-        let path = p.as_ref();
-        PersistencePath(if path.has_root() {
-            path.strip_prefix("/").unwrap().to_owned()
-        } else {
-            path.to_owned()
-        })
-    }
-
-    pub fn new(path: PathBuf) -> Self {
-        PersistencePath(if path.has_root() {
-            path.strip_prefix("/").unwrap().to_owned()
-        } else {
-            path.to_owned()
-        })
-    }
-
-    pub fn join<P: AsRef<Path>>(&self, path: P) -> Self {
-        PersistencePath::new(self.0.join(path))
-    }
-
-    pub fn tmp(&self) -> PathBuf {
-        Path::new(crate::TMP_DIR).join(&self.0)
-    }
-
-    pub fn path(&self) -> PathBuf {
-        Path::new(crate::PERSISTENCE_DIR).join(&self.0)
-    }
-
-    pub async fn lock(&self, for_update: bool) -> Result<FileLock, Error> {
-        let path = self.path();
-        let lock_path = format!("{}.lock", path.display());
-        if tokio::fs::metadata(Path::new(&lock_path)).await.is_err() {
-            // !exists
-            tokio::fs::File::create(&lock_path)
-                .await
-                .with_ctx(|_| (crate::ErrorKind::Filesystem, lock_path.clone()))?;
-        }
-        let lock = lock_file(lock_path.clone(), for_update)
-            .await
-            .with_ctx(|_| (crate::ErrorKind::Filesystem, lock_path))?;
-        Ok(lock)
-    }
-
-    pub async fn exists(&self) -> bool {
-        tokio::fs::metadata(self.path()).await.is_ok()
-    }
-
-    pub async fn maybe_read(&self, for_update: bool) -> Option<Result<PersistenceFile, Error>> {
-        if self.exists().await {
-            // exists
-            Some(self.read(for_update).await)
-        } else {
-            None
-        }
-    }
-
-    pub async fn read(&self, for_update: bool) -> Result<PersistenceFile, Error> {
-        let path = self.path();
-        let lock = self.lock(for_update).await?;
-        let file = File::open(&path)
-            .await
-            .with_ctx(|_| (crate::ErrorKind::Filesystem, path.display().to_string()))?;
-        Ok(PersistenceFile::new(file, lock, None))
-    }
-
-    pub async fn write(&self, lock: Option<FileLock>) -> Result<PersistenceFile, Error> {
-        let path = self.path();
-        if let Some(parent) = path.parent() {
-            if tokio::fs::metadata(parent).await.is_err() {
-                // !exists
-                tokio::fs::create_dir_all(parent).await?;
-            }
-        }
-        let lock = if let Some(lock) = lock {
-            lock
-        } else {
-            self.lock(true).await?
-        };
-        Ok({
-            let path = self.tmp();
-            if let Some(parent) = path.parent() {
-                if tokio::fs::metadata(parent).await.is_err() {
-                    // !exists
-                    tokio::fs::create_dir_all(parent).await?;
-                }
-            }
-            PersistenceFile::new(File::create(path).await?, lock, Some(self.clone()))
-        })
-    }
-
-    pub async fn for_update(self) -> Result<UpdateHandle<ForRead>, Error> {
-        UpdateHandle::new(self).await
-    }
-
-    pub async fn delete(&self) -> Result<(), Error> {
-        match tokio::fs::remove_file(self.path()).await {
-            Ok(()) => Ok(()),
-            Err(k) if k.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            e => e.with_kind(crate::ErrorKind::Filesystem),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct PersistenceFile {
-    file: Option<File>,
-    lock: Option<FileLock>,
-    needs_commit: Option<PersistencePath>,
-}
-impl PersistenceFile {
-    pub fn new(file: File, lock: FileLock, needs_commit: Option<PersistencePath>) -> Self {
-        PersistenceFile {
-            file: Some(file),
-            lock: Some(lock),
-            needs_commit,
-        }
-    }
-
-    pub fn take_lock(&mut self) -> Option<FileLock> {
-        self.lock.take()
-    }
-
-    /// Commits the file to the persistence directory.
-    /// If this fails, the file was not saved.
-    pub async fn commit(mut self) -> Result<(), Error> {
-        if let Some(mut file) = self.file.take() {
-            file.flush().await?;
-            file.shutdown().await?;
-            file.sync_all().await?;
-            drop(file);
-        }
-        if let Some(path) = self.needs_commit.take() {
-            tokio::fs::rename(path.tmp(), path.path())
-                .await
-                .with_ctx(|_| {
-                    (
-                        crate::ErrorKind::Filesystem,
-                        format!("{} -> {}", path.tmp().display(), path.path().display(),),
-                    )
-                })?;
-            if let Some(lock) = self.lock.take() {
-                unlock(lock).await.with_ctx(|_| {
-                    (
-                        crate::ErrorKind::Filesystem,
-                        path.path().display().to_string(),
-                    )
-                })?;
-            }
-
-            Ok(())
-        } else {
-            Ok(())
-        }
-    }
-}
-impl std::ops::Deref for PersistenceFile {
-    type Target = File;
-
-    fn deref(&self) -> &Self::Target {
-        self.file.as_ref().unwrap()
-    }
-}
-impl std::ops::DerefMut for PersistenceFile {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.file.as_mut().unwrap()
-    }
-}
-impl AsRef<File> for PersistenceFile {
-    fn as_ref(&self) -> &File {
-        &*self
-    }
-}
-impl AsMut<File> for PersistenceFile {
-    fn as_mut(&mut self) -> &mut File {
-        &mut *self
-    }
-}
-impl Drop for PersistenceFile {
-    fn drop(&mut self) {
-        if let Some(path) = &self.needs_commit {
-            log::warn!(
-                "{} was dropped without being committed.",
-                path.path().display()
-            );
-        }
-    }
-}
-
-pub trait UpdateHandleMode {}
-pub struct ForRead;
-impl UpdateHandleMode for ForRead {}
-pub struct ForWrite;
-impl UpdateHandleMode for ForWrite {}
-
-pub struct UpdateHandle<Mode: UpdateHandleMode> {
-    path: PersistencePath,
-    file: PersistenceFile,
-    mode: PhantomData<Mode>,
-}
-impl UpdateHandle<ForRead> {
-    pub async fn new(path: PersistencePath) -> Result<Self, Error> {
-        if !path.path().exists() {
-            tokio::fs::File::create(path.path()).await?;
-        }
-        Ok(UpdateHandle {
-            file: path.read(true).await?,
-            path,
-            mode: PhantomData,
-        })
-    }
-
-    pub async fn into_writer(mut self) -> Result<UpdateHandle<ForWrite>, Error> {
-        let lock = self.file.take_lock();
-        Ok(UpdateHandle {
-            file: self.path.write(lock).await?,
-            path: self.path,
-            mode: PhantomData,
-        })
-    }
-}
-
-impl UpdateHandle<ForWrite> {
-    pub async fn commit(self) -> Result<(), Error> {
-        self.file.commit().await
-    }
-}
-
-impl tokio::io::AsyncRead for UpdateHandle<ForRead> {
-    fn poll_read(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut ReadBuf,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        unsafe { self.map_unchecked_mut(|a| a.file.file.as_mut().unwrap()) }.poll_read(cx, buf)
-    }
-}
-
-impl tokio::io::AsyncWrite for UpdateHandle<ForWrite> {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<std::io::Result<usize>> {
-        tokio::io::AsyncWrite::poll_write(
-            unsafe { self.map_unchecked_mut(|a| a.file.file.as_mut().unwrap()) },
-            cx,
-            buf,
-        )
-    }
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        tokio::io::AsyncWrite::poll_flush(
-            unsafe { self.map_unchecked_mut(|a| a.file.file.as_mut().unwrap()) },
-            cx,
-        )
-    }
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        tokio::io::AsyncWrite::poll_shutdown(
-            unsafe { self.map_unchecked_mut(|a| a.file.file.as_mut().unwrap()) },
-            cx,
-        )
-    }
-}
-
-pub struct YamlUpdateHandle<T: serde::Serialize + for<'de> serde::Deserialize<'de>> {
-    inner: T,
-    handle: UpdateHandle<ForRead>,
-    committed: bool,
-}
-impl<T> YamlUpdateHandle<T>
-where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de>,
-{
-    pub async fn new(path: PersistencePath) -> Result<Self, Error> {
-        let mut handle = path.for_update().await?;
-        let inner = from_yaml_async_reader(&mut handle).await?;
-        Ok(YamlUpdateHandle {
-            inner,
-            handle,
-            committed: false,
-        })
-    }
-
-    pub async fn commit(mut self) -> Result<(), Error> {
-        let mut file = self.handle.into_writer().await?;
-        to_yaml_async_writer(&mut file, &self.inner).await?;
-        file.commit().await?;
-        self.committed = true;
-        Ok(())
-    }
-}
-
-impl<T> YamlUpdateHandle<T>
-where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Default,
-{
-    pub async fn new_or_default(path: PersistencePath) -> Result<Self, Error> {
-        if !path.path().exists() {
-            Ok(YamlUpdateHandle {
-                inner: Default::default(),
-                handle: path.for_update().await?,
-                committed: false,
-            })
-        } else {
-            Self::new(path).await
-        }
-    }
-}
-
-impl<T> std::ops::Deref for YamlUpdateHandle<T>
-where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Default,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-impl<T> std::ops::DerefMut for YamlUpdateHandle<T>
-where
-    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Default,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub enum Never {}
@@ -456,14 +118,6 @@ where
     ) -> std::task::Poll<std::io::Result<()>> {
         futures::io::AsyncWrite::poll_close(unsafe { self.map_unchecked_mut(|a| &mut a.0) }, cx)
     }
-}
-
-pub async fn lock_file(filename: String, for_write: bool) -> std::io::Result<FileLock> {
-    tokio::task::spawn_blocking(move || FileLock::lock(&filename, true, for_write)).await?
-}
-
-pub async fn unlock(lock: FileLock) -> std::io::Result<()> {
-    tokio::task::spawn_blocking(move || lock.unlock()).await?
 }
 
 pub async fn from_yaml_async_reader<T, R>(mut reader: R) -> Result<T, crate::Error>
@@ -894,4 +548,167 @@ impl AsyncFileExt for File {
             Ok(())
         }
     }
+}
+
+pub struct FmtWriter<W: std::fmt::Write>(W);
+impl<W: std::fmt::Write> std::io::Write for FmtWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .write_str(
+                std::str::from_utf8(buf)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+            )
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename = "kebab-case")]
+pub enum IoFormat {
+    Json,
+    JsonPretty,
+    Yaml,
+    Cbor,
+    Toml,
+    TomlPretty,
+}
+impl Default for IoFormat {
+    fn default() -> Self {
+        IoFormat::JsonPretty
+    }
+}
+impl std::fmt::Display for IoFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use IoFormat::*;
+        match self {
+            Json => write!(f, "JSON"),
+            JsonPretty => write!(f, "JSON (pretty)"),
+            Yaml => write!(f, "YAML"),
+            Cbor => write!(f, "CBOR"),
+            Toml => write!(f, "TOML"),
+            TomlPretty => write!(f, "TOML (pretty)"),
+        }
+    }
+}
+impl std::str::FromStr for IoFormat {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_value(Value::String(s.to_owned()))
+            .with_kind(crate::ErrorKind::Deserialization)
+    }
+}
+impl IoFormat {
+    pub fn to_writer<W: std::io::Write, T: Serialize>(
+        &self,
+        writer: W,
+        value: &T,
+    ) -> Result<(), Error> {
+        match self {
+            IoFormat::Json => {
+                serde_json::to_writer(writer, value).with_kind(crate::ErrorKind::Serialization)
+            }
+            IoFormat::JsonPretty => serde_json::to_writer_pretty(writer, value)
+                .with_kind(crate::ErrorKind::Serialization),
+            IoFormat::Yaml => {
+                serde_yaml::to_writer(writer, value).with_kind(crate::ErrorKind::Serialization)
+            }
+            IoFormat::Cbor => {
+                serde_cbor::to_writer(writer, value).with_kind(crate::ErrorKind::Serialization)
+            }
+            IoFormat::Toml => writer
+                .write_all(&serde_toml::to_vec(value).with_kind(crate::ErrorKind::Serialization)?)
+                .with_kind(crate::ErrorKind::Serialization),
+            IoFormat::TomlPretty => writer
+                .write_all(
+                    serde_toml::to_string_pretty(value)
+                        .with_kind(crate::ErrorKind::Serialization)?
+                        .as_bytes(),
+                )
+                .with_kind(crate::ErrorKind::Serialization),
+        }
+    }
+    pub fn to_vec<T: Serialize>(&self, value: &T) -> Result<Vec<u8>, Error> {
+        match self {
+            IoFormat::Json => serde_json::to_vec(value).with_kind(crate::ErrorKind::Serialization),
+            IoFormat::JsonPretty => {
+                serde_json::to_vec_pretty(value).with_kind(crate::ErrorKind::Serialization)
+            }
+            IoFormat::Yaml => serde_yaml::to_vec(value).with_kind(crate::ErrorKind::Serialization),
+            IoFormat::Cbor => serde_cbor::to_vec(value).with_kind(crate::ErrorKind::Serialization),
+            IoFormat::Toml => serde_toml::to_vec(value).with_kind(crate::ErrorKind::Serialization),
+            IoFormat::TomlPretty => serde_toml::to_string_pretty(value)
+                .map(|s| s.into_bytes())
+                .with_kind(crate::ErrorKind::Serialization),
+        }
+    }
+    pub fn from_reader<R: std::io::Read, T: for<'de> Deserialize<'de>>(
+        &self,
+        reader: R,
+    ) -> Result<T, Error> {
+        match self {
+            IoFormat::Json | IoFormat::JsonPretty => {
+                serde_json::from_reader(reader).with_kind(crate::ErrorKind::Deserialization)
+            }
+            IoFormat::Yaml => {
+                serde_yaml::from_reader(reader).with_kind(crate::ErrorKind::Deserialization)
+            }
+            IoFormat::Cbor => {
+                serde_cbor::from_reader(reader).with_kind(crate::ErrorKind::Deserialization)
+            }
+            IoFormat::Toml | IoFormat::TomlPretty => {
+                let mut s = String::new();
+                reader.read_to_string(&mut s);
+                serde_toml::from_str(&s).with_kind(crate::ErrorKind::Deserialization)
+            }
+        }
+    }
+    pub fn from_slice<T: for<'de> Deserialize<'de>>(&self, slice: &[u8]) -> Result<T, Error> {
+        match self {
+            IoFormat::Json | IoFormat::JsonPretty => {
+                serde_json::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
+            }
+            IoFormat::Yaml => {
+                serde_yaml::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
+            }
+            IoFormat::Cbor => {
+                serde_cbor::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
+            }
+            IoFormat::Toml | IoFormat::TomlPretty => {
+                serde_toml::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
+            }
+        }
+    }
+}
+
+pub fn display_serializable<T: Serialize>(t: T, matches: &ArgMatches<'_>) {
+    let format = match matches.value_of("format").map(|f| f.parse()) {
+        Some(Ok(f)) => f,
+        Some(Err(e)) => {
+            eprintln!("unrecognized formatter");
+            exit(1)
+        }
+        None => IoFormat::default(),
+    };
+    format
+        .to_writer(std::io::stdout(), &t)
+        .expect("Error serializing result to stdout")
+}
+
+pub fn parse_stdin_deserializable<'de, T: Deserialize<'de>>(
+    stdin: &mut std::io::Stdin,
+    matches: &ArgMatches<'_>,
+) -> Result<T, Error> {
+    let format = match matches.value_of("format").map(|f| f.parse()) {
+        Some(Ok(f)) => f,
+        Some(Err(e)) => {
+            eprintln!("unrecognized formatter");
+            exit(1)
+        }
+        None => IoFormat::default(),
+    };
+    format.from_reader(stdin)
 }

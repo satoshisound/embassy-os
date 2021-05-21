@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use futures::stream::StreamExt;
-use linear_map::LinearMap;
+use linear_map::LinkedHashMap;
 use rand::SeedableRng;
 use tokio_tar as tar;
 
@@ -280,7 +280,7 @@ pub async fn verify(path: &str) -> Result<(), crate::Error> {
     log::trace!("Deserializing config rules.");
     let config_rules: Vec<ConfigRuleEntry> = from_cbor_async_reader(config_rules).await?;
     log::trace!("Validating config rules against config spec.");
-    let mut cfgs = LinearMap::new();
+    let mut cfgs = LinkedHashMap::new();
     cfgs.insert(name, Cow::Borrowed(&config));
     for rule in &config_rules {
         rule.check(&config, &cfgs).with_ctx(|_| {

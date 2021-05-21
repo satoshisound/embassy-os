@@ -379,7 +379,7 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
             &mut tx,
             &PackageDataEntry::Installed {
                 installed: todo!(),
-                static_files: StaticFiles::local(pkg_id, manifest.assets.icon_type())?,
+                static_files: StaticFiles::local(pkg_id, version, manifest.assets.icon_type())?,
             },
         )
         .await?;

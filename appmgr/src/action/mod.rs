@@ -11,7 +11,7 @@ use crate::config::{Config, ConfigSpec};
 use crate::id::Id;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
-use crate::util::{IpPool, ValuePrimative};
+use crate::util::ValuePrimative;
 use crate::volume::Volumes;
 use crate::{Error, ResultExt};
 

@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use hashlink::LinkedHashMap;
@@ -12,7 +13,7 @@ use crate::action::{ActionImplementation, Actions};
 use crate::backup::BackupActions;
 use crate::config::action::ConfigActions;
 use crate::dependencies::Dependencies;
-use crate::id::{Id, InterfaceId, SYSTEM_ID};
+use crate::id::{Id, InterfaceId, InvalidId, SYSTEM_ID};
 use crate::migration::Migrations;
 use crate::net::host::Hosts;
 use crate::status::health_check::{HealthCheckResult, HealthChecks};
@@ -25,6 +26,12 @@ pub const SYSTEM_PACKAGE_ID: PackageId<&'static str> = PackageId(SYSTEM_ID);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PackageId<S: AsRef<str> = String>(Id<S>);
+impl FromStr for PackageId {
+    type Err = InvalidId;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(PackageId(Id::try_from(s.to_owned())?))
+    }
+}
 impl<S: AsRef<str>> AsRef<PackageId<S>> for PackageId<S> {
     fn as_ref(&self) -> &PackageId<S> {
         self

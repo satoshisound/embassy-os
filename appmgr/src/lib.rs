@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate pest_derive;
-
 pub const CONFIG_PATH: &'static str = "/etc/embassy/config.toml";
 pub const TOR_RC: &'static str = "/root/appmgr/tor/torrc";
 pub const SERVICES_YAML: &'static str = "tor/services.yaml";

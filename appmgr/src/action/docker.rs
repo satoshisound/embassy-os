@@ -11,63 +11,9 @@ use serde_json::Value;
 use crate::id::ImageId;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::{PackageId, SYSTEM_PACKAGE_ID};
-use crate::util::{Invoke, IpPool};
+use crate::util::{Invoke, IoFormat};
 use crate::volume::{VolumeId, Volumes};
 use crate::{Error, ResultExt};
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-#[serde(rename = "kebab-case")]
-pub enum DockerIOFormat {
-    Json,
-    Yaml,
-    Cbor,
-    Toml,
-}
-impl std::fmt::Display for DockerIOFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use DockerIOFormat::*;
-        match self {
-            Json => write!(f, "JSON"),
-            Yaml => write!(f, "YAML"),
-            Cbor => write!(f, "CBOR"),
-            Toml => write!(f, "TOML"),
-        }
-    }
-}
-impl DockerIOFormat {
-    pub fn to_vec<T: Serialize>(&self, value: &T) -> Result<Vec<u8>, Error> {
-        match self {
-            DockerIOFormat::Json => {
-                serde_json::to_vec(value).with_kind(crate::ErrorKind::Serialization)
-            }
-            DockerIOFormat::Yaml => {
-                serde_yaml::to_vec(value).with_kind(crate::ErrorKind::Serialization)
-            }
-            DockerIOFormat::Cbor => {
-                serde_cbor::to_vec(value).with_kind(crate::ErrorKind::Serialization)
-            }
-            DockerIOFormat::Toml => {
-                serde_toml::to_vec(value).with_kind(crate::ErrorKind::Serialization)
-            }
-        }
-    }
-    pub fn from_slice<T: for<'de> Deserialize<'de>>(&self, slice: &[u8]) -> Result<T, Error> {
-        match self {
-            DockerIOFormat::Json => {
-                serde_json::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
-            }
-            DockerIOFormat::Yaml => {
-                serde_yaml::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
-            }
-            DockerIOFormat::Cbor => {
-                serde_cbor::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
-            }
-            DockerIOFormat::Toml => {
-                serde_toml::from_slice(slice).with_kind(crate::ErrorKind::Deserialization)
-            }
-        }
-    }
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -81,7 +27,7 @@ pub struct DockerAction {
     #[serde(default)]
     pub mounts: LinkedHashMap<VolumeId, PathBuf>,
     #[serde(default)]
-    pub io_format: Option<DockerIOFormat>,
+    pub io_format: Option<IoFormat>,
     #[serde(default)]
     pub inject: bool, // TODO: only allow in Actions
     #[serde(default)]

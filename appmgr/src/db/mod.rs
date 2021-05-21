@@ -15,7 +15,7 @@ use crate::install::progress::InstallProgress;
 use crate::net::Network;
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::status::Status;
-use crate::util::{IpPool, Version};
+use crate::util::Version;
 use crate::Error;
 
 #[derive(Debug, Deserialize, Serialize, HasModel)]
@@ -49,12 +49,6 @@ pub struct ServerInfo {
     unread_notification_count: u64,
 }
 
-#[derive(Debug, Deserialize, Serialize, HasModel)]
-#[serde(rename_all = "kebab-case")]
-pub struct Resources {
-    ip_pool: IpPool,
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AllPackageData(pub LinkedHashMap<PackageId, PackageDataEntry>);
 impl Map for AllPackageData {
@@ -76,11 +70,27 @@ pub struct StaticFiles {
     icon: Url,
 }
 impl StaticFiles {
-    pub fn local(id: &PackageId, icon_type: &str) -> Result<Self, Error> {
+    pub fn local(id: &PackageId, version: &Version, icon_type: &str) -> Result<Self, Error> {
         Ok(StaticFiles {
-            license: format!("/public/package-data/{}/LICENSE.md", id).parse()?,
-            instructions: format!("/public/package-data/{}/INSTRUCTIONS.md", id).parse()?,
-            icon: format!("/public/package-data/{}/icon.{}", id, icon_type).parse()?,
+            license: format!(
+                "/public/package-data/{}/{}/LICENSE.md",
+                id,
+                version.as_str()
+            )
+            .parse()?,
+            instructions: format!(
+                "/public/package-data/{}/{}/INSTRUCTIONS.md",
+                id,
+                version.as_str()
+            )
+            .parse()?,
+            icon: format!(
+                "/public/package-data/{}/{}/icon.{}",
+                id,
+                version.as_str(),
+                icon_type
+            )
+            .parse()?,
         })
     }
     pub fn remote(id: &PackageId, version: &Version, icon_type: &str) -> Result<Self, Error> {

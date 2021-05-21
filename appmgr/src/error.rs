@@ -41,6 +41,7 @@ pub enum ErrorKind {
     Authorization = 34,
     AutoConfigure = 35,
     Action = 36,
+    RateLimited = 37,
 }
 impl ErrorKind {
     pub fn as_str(&self) -> &'static str {
@@ -82,6 +83,7 @@ impl ErrorKind {
             Authorization => "Unauthorized",
             AutoConfigure => "Auto-Configure Error",
             Action => "Action Failed",
+            RateLimited => "Rate Limited",
         }
     }
 }

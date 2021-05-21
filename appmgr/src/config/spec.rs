@@ -6,23 +6,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use hashlink::{LinkedHashMap, LinkedHashSet};
 use itertools::Itertools;
-use jsonpath_lib::Compiled;
-use linear_map::set::LinearSet;
-use linear_map::LinearMap;
-use patch_db::json_ptr::JsonPointer;
+use jsonpath_lib::Compiled as CompiledJsonPath;
 use patch_db::{DbHandle, OptionModel};
 use rand::{CryptoRng, Rng};
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::{Number, Value};
 
 use super::util::{self, CharSet, NumRange, UniqueBy, STATIC_NULL};
-use super::value::{Config, Value};
-use super::{MatchError, NoMatchWithPath, TimeoutError};
+use super::{Config, MatchError, NoMatchWithPath, TimeoutError, TypeOf};
 use crate::config::ConfigurationError;
 use crate::id::InterfaceId;
 use crate::s9pk::manifest::{Manifest, PackageId};
-use crate::util::PersistencePath;
 use crate::Error;
 
 // Config Value Specifications
@@ -35,9 +32,13 @@ pub trait ValueSpec {
     // since not all inVariant can be checked by the type
     fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath>;
     // update is to fill in values for environment pointers recursively
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError>;
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError>;
     // requires returns whether the app id is the target of a pointer within it
-    fn requires(&self, id: &str, value: &Value) -> bool;
+    fn requires(&self, id: &PackageId, value: &Value) -> bool;
     // defines if 2 values of this type are equal for the purpose of uniqueness
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool;
 }
@@ -142,10 +143,14 @@ where
     fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.inner.validate(manifest)
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
-        self.inner.update(value).await
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
+        self.inner.update(db, value).await
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         self.inner.requires(id, value)
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
@@ -174,10 +179,14 @@ where
     fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.inner.validate(manifest)
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
-        self.inner.update(value).await
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
+        self.inner.update(db, value).await
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         self.inner.requires(id, value)
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
@@ -239,10 +248,14 @@ where
     fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.inner.validate(manifest)
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
-        self.inner.update(value).await
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
+        self.inner.update(db, value).await
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         self.inner.requires(id, value)
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
@@ -341,19 +354,23 @@ impl ValueSpec for ValueSpecAny {
             ValueSpecAny::Pointer(a) => a.validate(manifest),
         }
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         match self {
-            ValueSpecAny::Boolean(a) => a.update(value).await,
-            ValueSpecAny::Enum(a) => a.update(value).await,
-            ValueSpecAny::List(a) => a.update(value).await,
-            ValueSpecAny::Number(a) => a.update(value).await,
-            ValueSpecAny::Object(a) => a.update(value).await,
-            ValueSpecAny::String(a) => a.update(value).await,
-            ValueSpecAny::Union(a) => a.update(value).await,
-            ValueSpecAny::Pointer(a) => a.update(value).await,
+            ValueSpecAny::Boolean(a) => a.update(db, value).await,
+            ValueSpecAny::Enum(a) => a.update(db, value).await,
+            ValueSpecAny::List(a) => a.update(db, value).await,
+            ValueSpecAny::Number(a) => a.update(db, value).await,
+            ValueSpecAny::Object(a) => a.update(db, value).await,
+            ValueSpecAny::String(a) => a.update(db, value).await,
+            ValueSpecAny::Union(a) => a.update(db, value).await,
+            ValueSpecAny::Pointer(a) => a.update(db, value).await,
         }
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         match self {
             ValueSpecAny::Boolean(a) => a.requires(id, value),
             ValueSpecAny::Enum(a) => a.requires(id, value),
@@ -416,10 +433,14 @@ impl ValueSpec for ValueSpecBoolean {
     fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
-    async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        _db: &mut Db,
+        _value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn requires(&self, _id: &str, _value: &Value) -> bool {
+    fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
         false
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
@@ -446,17 +467,17 @@ impl DefaultableWith for ValueSpecBoolean {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueSpecEnum {
-    pub values: LinearSet<String>,
-    pub value_names: LinearMap<String, String>,
+    pub values: LinkedHashSet<String>,
+    pub value_names: LinkedHashMap<String, String>,
 }
 impl<'de> serde::de::Deserialize<'de> for ValueSpecEnum {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct _ValueSpecEnum {
-            pub values: LinearSet<String>,
+            pub values: LinkedHashSet<String>,
             #[serde(default)]
-            pub value_names: LinearMap<String, String>,
+            pub value_names: LinkedHashMap<String, String>,
         }
 
         let mut r#enum = _ValueSpecEnum::deserialize(deserializer)?;
@@ -495,10 +516,14 @@ impl ValueSpec for ValueSpecEnum {
     fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
-    async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        _db: &mut Db,
+        _value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn requires(&self, _id: &str, _value: &Value) -> bool {
+    fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
         false
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
@@ -535,7 +560,7 @@ where
 {
     fn matches(&self, value: &Value) -> Result<(), NoMatchWithPath> {
         match value {
-            Value::List(l) => {
+            Value::Array(l) => {
                 if !self.range.contains(&l.len()) {
                     Err(NoMatchWithPath {
                         path: Vec::new(),
@@ -571,10 +596,14 @@ where
     fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.spec.validate(manifest)
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
-        if let Value::List(ref mut ls) = value {
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
+        if let Value::Array(ref mut ls) = value {
             for (i, val) in ls.into_iter().enumerate() {
-                match self.spec.update(val).await {
+                match self.spec.update(db, val).await {
                     Err(ConfigurationError::NoMatch(e)) => {
                         Err(ConfigurationError::NoMatch(e.prepend(format!("{}", i))))
                     }
@@ -588,8 +617,8 @@ where
             )))
         }
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
-        if let Value::List(ref ls) = value {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
+        if let Value::Array(ref ls) = value {
             ls.into_iter().any(|v| self.spec.requires(id, v))
         } else {
             false
@@ -597,7 +626,7 @@ where
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
         match (lhs, rhs) {
-            (Value::List(lhs), Value::List(rhs)) => {
+            (Value::Array(lhs), Value::Array(rhs)) => {
                 lhs.iter().zip_longest(rhs.iter()).all(|zip| match zip {
                     itertools::EitherOrBoth::Both(lhs, rhs) => lhs == rhs,
                     _ => false,
@@ -625,7 +654,7 @@ where
         for spec_member in spec.iter() {
             res.push(self.spec.gen_with(spec_member, rng, timeout)?);
         }
-        Ok(Value::List(res))
+        Ok(Value::Array(res))
     }
 }
 
@@ -664,16 +693,20 @@ impl ValueSpec for ValueSpecList {
             ValueSpecList::Union(a) => a.validate(manifest),
         }
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         match self {
-            ValueSpecList::Enum(a) => a.update(value).await,
-            ValueSpecList::Number(a) => a.update(value).await,
-            ValueSpecList::Object(a) => a.update(value).await,
-            ValueSpecList::String(a) => a.update(value).await,
-            ValueSpecList::Union(a) => a.update(value).await,
+            ValueSpecList::Enum(a) => a.update(db, value).await,
+            ValueSpecList::Number(a) => a.update(db, value).await,
+            ValueSpecList::Object(a) => a.update(db, value).await,
+            ValueSpecList::String(a) => a.update(db, value).await,
+            ValueSpecList::Union(a) => a.update(db, value).await,
         }
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         match self {
             ValueSpecList::Enum(a) => a.requires(id, value),
             ValueSpecList::Number(a) => a.requires(id, value),
@@ -706,7 +739,7 @@ impl Defaultable for ValueSpecList {
             ValueSpecList::Number(a) => a.gen(rng, timeout).map_err(crate::util::Never::absurd),
             ValueSpecList::Object(a) => {
                 let mut ret = match a.gen(rng, timeout).unwrap() {
-                    Value::List(l) => l,
+                    Value::Array(l) => l,
                     a => {
                         return Err(ConfigurationError::NoMatch(NoMatchWithPath::new(
                             MatchError::InvalidType("list", a.type_of()),
@@ -727,7 +760,7 @@ impl Defaultable for ValueSpecList {
                             .map_err(ConfigurationError::from)?,
                     );
                 }
-                Ok(Value::List(ret))
+                Ok(Value::Array(ret))
             }
             ValueSpecList::String(a) => a.gen(rng, timeout).map_err(ConfigurationError::from),
             ValueSpecList::Union(a) => a.gen(rng, timeout).map_err(ConfigurationError::from),
@@ -748,14 +781,15 @@ impl ValueSpec for ValueSpecNumber {
     fn matches(&self, value: &Value) -> Result<(), NoMatchWithPath> {
         match value {
             Value::Number(n) => {
-                if self.integral && n.floor() != *n {
-                    return Err(NoMatchWithPath::new(MatchError::NonIntegral(*n)));
+                let n = n.as_f64().unwrap();
+                if self.integral && n.floor() != n {
+                    return Err(NoMatchWithPath::new(MatchError::NonIntegral(n)));
                 }
                 if let Some(range) = &self.range {
-                    if !range.contains(n) {
+                    if !range.contains(&n) {
                         return Err(NoMatchWithPath::new(MatchError::OutOfRange(
                             range.clone(),
-                            *n,
+                            n,
                         )));
                     }
                 }
@@ -771,10 +805,14 @@ impl ValueSpec for ValueSpecNumber {
     fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
-    async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        _db: &mut Db,
+        _value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn requires(&self, _id: &str, _value: &Value) -> bool {
+    fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
         false
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
@@ -784,55 +822,56 @@ impl ValueSpec for ValueSpecNumber {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Serialize)]
-pub struct Number(pub f64);
-impl<'de> serde::de::Deserialize<'de> for Number {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::de::Deserializer<'de>,
-    {
-        use serde::de::*;
-        struct NumberVisitor;
-        impl<'de> Visitor<'de> for NumberVisitor {
-            type Value = Number;
+// TODO: remove
+// #[derive(Clone, Copy, Debug, Serialize)]
+// pub struct Number(pub f64);
+// impl<'de> serde::de::Deserialize<'de> for Number {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: serde::de::Deserializer<'de>,
+//     {
+//         use serde::de::*;
+//         struct NumberVisitor;
+//         impl<'de> Visitor<'de> for NumberVisitor {
+//             type Value = Number;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a number")
-            }
-            fn visit_i8<E: Error>(self, value: i8) -> Result<Self::Value, E> {
-                Ok(Number(value.into()))
-            }
-            fn visit_i16<E: Error>(self, value: i16) -> Result<Self::Value, E> {
-                Ok(Number(value.into()))
-            }
-            fn visit_i32<E: Error>(self, value: i32) -> Result<Self::Value, E> {
-                Ok(Number(value.into()))
-            }
-            fn visit_i64<E: Error>(self, value: i64) -> Result<Self::Value, E> {
-                Ok(Number(value as f64))
-            }
-            fn visit_u8<E: Error>(self, value: u8) -> Result<Self::Value, E> {
-                Ok(Number(value.into()))
-            }
-            fn visit_u16<E: Error>(self, value: u16) -> Result<Self::Value, E> {
-                Ok(Number(value.into()))
-            }
-            fn visit_u32<E: Error>(self, value: u32) -> Result<Self::Value, E> {
-                Ok(Number(value.into()))
-            }
-            fn visit_u64<E: Error>(self, value: u64) -> Result<Self::Value, E> {
-                Ok(Number(value as f64))
-            }
-            fn visit_f32<E: Error>(self, value: f32) -> Result<Self::Value, E> {
-                Ok(Number(value.into()))
-            }
-            fn visit_f64<E: Error>(self, value: f64) -> Result<Self::Value, E> {
-                Ok(Number(value))
-            }
-        }
-        deserializer.deserialize_any(NumberVisitor)
-    }
-}
+//             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+//                 formatter.write_str("a number")
+//             }
+//             fn visit_i8<E: Error>(self, value: i8) -> Result<Self::Value, E> {
+//                 Ok(Number(value.into()))
+//             }
+//             fn visit_i16<E: Error>(self, value: i16) -> Result<Self::Value, E> {
+//                 Ok(Number(value.into()))
+//             }
+//             fn visit_i32<E: Error>(self, value: i32) -> Result<Self::Value, E> {
+//                 Ok(Number(value.into()))
+//             }
+//             fn visit_i64<E: Error>(self, value: i64) -> Result<Self::Value, E> {
+//                 Ok(Number(value as f64))
+//             }
+//             fn visit_u8<E: Error>(self, value: u8) -> Result<Self::Value, E> {
+//                 Ok(Number(value.into()))
+//             }
+//             fn visit_u16<E: Error>(self, value: u16) -> Result<Self::Value, E> {
+//                 Ok(Number(value.into()))
+//             }
+//             fn visit_u32<E: Error>(self, value: u32) -> Result<Self::Value, E> {
+//                 Ok(Number(value.into()))
+//             }
+//             fn visit_u64<E: Error>(self, value: u64) -> Result<Self::Value, E> {
+//                 Ok(Number(value as f64))
+//             }
+//             fn visit_f32<E: Error>(self, value: f32) -> Result<Self::Value, E> {
+//                 Ok(Number(value.into()))
+//             }
+//             fn visit_f64<E: Error>(self, value: f64) -> Result<Self::Value, E> {
+//                 Ok(Number(value))
+//             }
+//         }
+//         deserializer.deserialize_any(NumberVisitor)
+//     }
+// }
 impl DefaultableWith for ValueSpecNumber {
     type DefaultSpec = Option<Number>;
     type Error = crate::util::Never;
@@ -843,7 +882,7 @@ impl DefaultableWith for ValueSpecNumber {
         _rng: &mut R,
         _timeout: &Option<Duration>,
     ) -> Result<Value, Self::Error> {
-        Ok(spec.map(|s| Value::Number(s.0)).unwrap_or(Value::Null))
+        Ok(spec.map(|s| Value::Number(s)).unwrap_or(Value::Null))
     }
 }
 
@@ -872,16 +911,20 @@ impl ValueSpec for ValueSpecObject {
     fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         self.spec.validate(manifest)
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         if let Value::Object(o) = value {
-            self.spec.update(o).await
+            self.spec.update(db, o).await
         } else {
             Err(ConfigurationError::NoMatch(NoMatchWithPath::new(
                 MatchError::InvalidType("object", value.type_of()),
             )))
         }
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         if let Value::Object(o) = value {
             self.spec.requires(id, o)
         } else {
@@ -929,11 +972,11 @@ impl Defaultable for ValueSpecObject {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ConfigSpec(pub LinearMap<String, ValueSpecAny>);
+pub struct ConfigSpec(pub LinkedHashMap<String, ValueSpecAny>);
 impl ConfigSpec {
     pub fn matches(&self, value: &Config) -> Result<(), NoMatchWithPath> {
         for (key, val) in self.0.iter() {
-            if let Some(v) = value.0.get(key) {
+            if let Some(v) = value.get(key) {
                 val.matches(v).map_err(|e| e.prepend(key.clone()))?;
             } else {
                 val.matches(&Value::Null)
@@ -948,11 +991,11 @@ impl ConfigSpec {
         rng: &mut R,
         timeout: &Option<Duration>,
     ) -> Result<Config, ConfigurationError> {
-        let mut res = LinearMap::new();
+        let mut res = Config::new();
         for (key, val) in self.0.iter() {
             res.insert(key.clone(), val.gen(rng, timeout)?);
         }
-        Ok(Config(res))
+        Ok(res)
     }
 
     pub fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
@@ -963,11 +1006,15 @@ impl ConfigSpec {
         Ok(())
     }
 
-    pub async fn update(&self, cfg: &mut Config) -> Result<(), ConfigurationError> {
-        for (k, v) in cfg.0.iter_mut() {
+    pub async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        cfg: &mut Config,
+    ) -> Result<(), ConfigurationError> {
+        for (k, v) in cfg.iter_mut() {
             match self.0.get(k) {
                 None => (),
-                Some(vs) => match vs.update(v).await {
+                Some(vs) => match vs.update(db, v).await {
                     Err(ConfigurationError::NoMatch(e)) => {
                         Err(ConfigurationError::NoMatch(e.prepend(k.clone())))
                     }
@@ -977,10 +1024,10 @@ impl ConfigSpec {
         }
         Ok(())
     }
-    pub fn requires(&self, id: &str, cfg: &Config) -> bool {
+    pub fn requires(&self, id: &PackageId, cfg: &Config) -> bool {
         self.0
             .iter()
-            .any(|(k, v)| v.requires(id, cfg.0.get(k).unwrap_or(&STATIC_NULL)))
+            .any(|(k, v)| v.requires(id, cfg.get(k).unwrap_or(&STATIC_NULL)))
     }
 }
 
@@ -1029,10 +1076,14 @@ impl ValueSpec for ValueSpecString {
     fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
-    async fn update(&self, _value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        _db: &mut Db,
+        _value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn requires(&self, _id: &str, _value: &Value) -> bool {
+    fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
         false
     }
     fn eq(&self, lhs: &Value, rhs: &Value) -> bool {
@@ -1116,14 +1167,14 @@ pub struct UnionTag {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
-    pub variant_names: LinearMap<String, String>,
+    pub variant_names: LinkedHashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueSpecUnion {
     pub tag: UnionTag,
-    pub Variant: LinearMap<String, ConfigSpec>,
+    pub variants: LinkedHashMap<String, ConfigSpec>,
     pub display_as: Option<String>,
     pub unique_by: UniqueBy,
 }
@@ -1140,22 +1191,22 @@ impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct _ValueSpecUnion {
-            pub Variant: LinearMap<String, ConfigSpec>,
+            pub variants: LinkedHashMap<String, ConfigSpec>,
             pub tag: _UnionTag,
             pub display_as: Option<String>,
             #[serde(default)]
             pub unique_by: UniqueBy,
         }
 
-        let union = _ValueSpecUnion::deserialize(deserializer)?;
+        let u = _ValueSpecUnion::deserialize(deserializer)?;
         Ok(ValueSpecUnion {
-            tag: match union.tag {
+            tag: match u.tag {
                 _UnionTag::Old(id) => UnionTag {
                     id: id.clone(),
                     name: id,
                     description: None,
-                    variant_names: union
-                        .Variant
+                    variant_names: u
+                        .variants
                         .keys()
                         .map(|k| (k.to_owned(), k.to_owned()))
                         .collect(),
@@ -1170,8 +1221,8 @@ impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
                     name,
                     description,
                     variant_names: {
-                        let mut iter = union.Variant.keys();
-                        while variant_names.len() < union.Variant.len() {
+                        let mut iter = u.variants.keys();
+                        while variant_names.len() < u.variants.len() {
                             if let Some(variant) = iter.next() {
                                 variant_names.insert(variant.to_owned(), variant.to_owned());
                             } else {
@@ -1182,9 +1233,9 @@ impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
                     },
                 },
             },
-            Variant: union.Variant,
-            display_as: union.display_as,
-            unique_by: union.unique_by,
+            variants: u.variants,
+            display_as: u.display_as,
+            unique_by: u.unique_by,
         })
     }
 }
@@ -1194,15 +1245,15 @@ impl ValueSpec for ValueSpecUnion {
     fn matches(&self, value: &Value) -> Result<(), NoMatchWithPath> {
         match value {
             Value::Object(o) => {
-                if let Some(Value::String(ref tag)) = o.0.get(&self.tag.id) {
-                    if let Some(obj_spec) = self.Variant.get(tag) {
+                if let Some(Value::String(ref tag)) = o.get(&self.tag.id) {
+                    if let Some(obj_spec) = self.variants.get(tag) {
                         let mut without_tag = o.clone();
-                        without_tag.0.remove(&self.tag.id);
+                        without_tag.remove(&self.tag.id);
                         obj_spec.matches(&without_tag)
                     } else {
                         Err(NoMatchWithPath::new(MatchError::Union(
                             tag.clone(),
-                            self.Variant.keys().cloned().collect(),
+                            self.variants.keys().cloned().collect(),
                         )))
                     }
                 } else {
@@ -1219,7 +1270,7 @@ impl ValueSpec for ValueSpecUnion {
         }
     }
     fn validate(&self, manifest: &Manifest) -> Result<(), NoMatchWithPath> {
-        for (name, variant) in &self.Variant {
+        for (name, variant) in &self.variants {
             if variant.0.get(&self.tag.id).is_some() {
                 return Err(NoMatchWithPath::new(MatchError::PropertyMatchesUnionTag(
                     self.tag.id.clone(),
@@ -1230,15 +1281,19 @@ impl ValueSpec for ValueSpecUnion {
         }
         Ok(())
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         if let Value::Object(o) = value {
-            match o.0.get(&self.tag.id) {
+            match o.get(&self.tag.id) {
                 None => Err(ConfigurationError::NoMatch(NoMatchWithPath::new(
                     MatchError::MissingTag(self.tag.id.clone()),
                 ))),
-                Some(Value::String(tag)) => match self.Variant.get(tag) {
+                Some(Value::String(tag)) => match self.variants.get(tag) {
                     None => Err(ConfigurationError::InvalidVariant(tag.clone())),
-                    Some(spec) => spec.update(o).await,
+                    Some(spec) => spec.update(db, o).await,
                 },
                 Some(other) => Err(ConfigurationError::NoMatch(
                     NoMatchWithPath::new(MatchError::InvalidType("string", other.type_of()))
@@ -1251,10 +1306,10 @@ impl ValueSpec for ValueSpecUnion {
             )))
         }
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         if let Value::Object(o) = value {
-            match o.0.get(&self.tag.id) {
-                Some(Value::String(tag)) => match self.Variant.get(tag) {
+            match o.get(&self.tag.id) {
+                Some(Value::String(tag)) => match self.variants.get(tag) {
                     None => false,
                     Some(spec) => spec.requires(id, o),
                 },
@@ -1281,18 +1336,18 @@ impl DefaultableWith for ValueSpecUnion {
         rng: &mut R,
         timeout: &Option<Duration>,
     ) -> Result<Value, Self::Error> {
-        let variant = if let Some(v) = self.Variant.get(spec) {
+        let variant = if let Some(v) = self.variants.get(spec) {
             v
         } else {
             return Err(ConfigurationError::InvalidVariant(spec.clone()));
         };
         let cfg_res = variant.gen(rng, timeout)?;
 
-        let mut tagged_cfg = LinearMap::new();
+        let mut tagged_cfg = Config::new();
         tagged_cfg.insert(self.tag.id.clone(), Value::String(spec.clone()));
-        tagged_cfg.extend(cfg_res.0.into_iter());
+        tagged_cfg.extend(cfg_res.into_iter());
 
-        Ok(Value::Object(Config(tagged_cfg)))
+        Ok(Value::Object(tagged_cfg))
     }
 }
 
@@ -1335,13 +1390,17 @@ impl ValueSpec for ValueSpecPointer {
             ValueSpecPointer::System(a) => a.validate(manifest),
         }
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
         match self {
-            ValueSpecPointer::Package(a) => a.update(value).await,
-            ValueSpecPointer::System(a) => a.update(value).await,
+            ValueSpecPointer::Package(a) => a.update(db, value).await,
+            ValueSpecPointer::System(a) => a.update(db, value).await,
         }
     }
-    fn requires(&self, id: &str, value: &Value) -> bool {
+    fn requires(&self, id: &PackageId, value: &Value) -> bool {
         match self {
             ValueSpecPointer::Package(a) => a.requires(id, value),
             ValueSpecPointer::System(a) => a.requires(id, value),
@@ -1437,12 +1496,12 @@ impl PackagePointerSpec {
                         .await
                         .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
                     if let Some(cfg) = cfg_res.config {
-                        let obj = serde_json::Value::Object(cfg.into());
+                        let obj = serde_json::Value::Object(cfg);
                         let selected = selector.compiled.select(&obj).ok().unwrap_or_else(Vec::new);
                         if *multi {
-                            Ok(Value::List(selected.into_iter().map(Value::from).collect()))
+                            Ok(Value::Array(selected.into_iter().cloned().collect()))
                         } else {
-                            Ok(Value::from(selected.get(0).unwrap_or(Value::Null)))
+                            Ok(selected.get(0).map(|v| (*v).clone()).unwrap_or(Value::Null))
                         }
                     } else {
                         Ok(Value::Null)
@@ -1481,12 +1540,16 @@ impl ValueSpec for PackagePointerSpec {
             _ => Ok(()),
         }
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
-        *value = self.deref().await?;
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
+        *value = self.deref(db).await?;
         Ok(())
     }
-    fn requires(&self, id: &str, _value: &Value) -> bool {
-        self.package_id == id
+    fn requires(&self, id: &PackageId, _value: &Value) -> bool {
+        &self.package_id == id
     }
     fn eq(&self, _lhs: &Value, _rhs: &Value) -> bool {
         false
@@ -1513,7 +1576,7 @@ impl fmt::Display for PackagePointerSpecVariant {
         match self {
             Self::TorAddress { interface } => write!(f, "tor-address: {}", interface),
             Self::LanAddress { interface } => write!(f, "lan-address: {}", interface),
-            Self::Config { selector } => write!(f, "config: {}", selector),
+            Self::Config { selector, .. } => write!(f, "config: {}", selector),
         }
     }
 }
@@ -1521,7 +1584,7 @@ impl fmt::Display for PackagePointerSpecVariant {
 #[derive(Clone, Debug)]
 pub struct ConfigSelector {
     src: String,
-    compiled: Compiled,
+    compiled: CompiledJsonPath,
 }
 impl fmt::Display for ConfigSelector {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1541,7 +1604,9 @@ impl<'de> Deserialize<'de> for ConfigSelector {
     where
         D: Deserializer<'de>,
     {
-        let src = Deserialize::deserialize(deserializer)?;
+        let src: String = Deserialize::deserialize(deserializer)?;
+        let compiled = CompiledJsonPath::compile(&src).map_err(serde::de::Error::custom)?;
+        Ok(Self { src, compiled })
     }
 }
 
@@ -1555,7 +1620,7 @@ impl fmt::Display for SystemPointerSpec {
     }
 }
 impl SystemPointerSpec {
-    async fn deref(&self) -> Result<Value, ConfigurationError> {
+    async fn deref<Db: DbHandle>(&self, db: &mut Db) -> Result<Value, ConfigurationError> {
         Ok(match self {})
     }
 }
@@ -1577,11 +1642,15 @@ impl ValueSpec for SystemPointerSpec {
     fn validate(&self, _manifest: &Manifest) -> Result<(), NoMatchWithPath> {
         Ok(())
     }
-    async fn update(&self, value: &mut Value) -> Result<(), ConfigurationError> {
-        *value = self.deref().await?;
+    async fn update<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        value: &mut Value,
+    ) -> Result<(), ConfigurationError> {
+        *value = self.deref(db).await?;
         Ok(())
     }
-    fn requires(&self, _id: &str, _value: &Value) -> bool {
+    fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
         false
     }
     fn eq(&self, _lhs: &Value, _rhs: &Value) -> bool {
@@ -1836,7 +1905,7 @@ mod test {
         let spec: ConfigSpec = serde_json::from_value(spec).unwrap();
         let mut deps = crate::dependencies::Dependencies::default();
         deps.0.insert(
-            "bitcoind".to_owned(),
+            "bitcoind".parse().un,
             crate::dependencies::DepInfo {
                 version: "^0.20.0".parse().unwrap(),
                 description: None,
@@ -1867,7 +1936,7 @@ mod test {
             assets: Vec::new(),
             hidden_service_version: crate::tor::HiddenServiceVersion::V3,
             dependencies: deps,
-            extra: LinearMap::new(),
+            extra: LinkedHashMap::new(),
             install_alert: None,
             restore_alert: None,
             uninstall_alert: None,
