@@ -4,12 +4,73 @@ import instructions from 'raw-loader!./md-sample.md'
 
 export module Mock {
 
-  export const MockManifest: Manifest = {
+  export const AvailableList: RR.GetAvailableListRes = [
+    {
+      id: 'bitcoind',
+      title: 'Bitcoin Core',
+      version: '0.21.1',
+      descriptionShort: 'A Bitcoin full node by Bitcoin Core.',
+      icon: 'assets/img/service-icons/bitcoind.png',
+    },
+    {
+      id: 'lnd',
+      title: 'Lightning Network Daemon',
+      version: '0.11.1',
+      descriptionShort: 'A Bitcoin full node by Bitcoin Core.',
+      icon: 'assets/img/service-icons/lnd.png',
+    },
+  ]
+
+  export const AvailableShow: {
+    [id: string]: {
+      [version: string]: RR.GetAvailableShowRes
+    }
+  } = {
+    'bitcoind': {
+      '0.19.0': {
+        categories: ['bitcoin', 'cryptocurrency'],
+        manifest: {
+          ...Mock.MockManifestBitcoind,
+          version: '0.19.0',
+          'release-notes': 'release notes for Bitcoin 0.19.0',
+        },
+      },
+      '0.20.0': {
+        categories: ['bitcoin', 'cryptocurrency'],
+        manifest: {
+          ...Mock.MockManifestBitcoind,
+          version: '0.20.0',
+          'release-notes': 'release notes for Bitcoin 0.20.0',
+        },
+      },
+      'latest': {
+        categories: ['bitcoin', 'cryptocurrency'],
+        manifest: Mock.MockManifestBitcoind,
+      },
+    },
+    'lnd': {
+      '0.11.0': {
+        categories: ['bitcoin', 'lightning', 'cryptocurrency'],
+        manifest: {
+          ...Mock.MockManifestLnd,
+          version: '0.11.0',
+          'release-notes': 'release notes for LND 0.11.0',
+
+        },
+      },
+      'latest': {
+        categories: ['bitcoin', 'lightning', 'cryptocurrency'],
+        manifest: Mock.MockManifestLnd,
+      },
+    },
+  }
+
+  export const MockManifestBitcoind: Manifest = {
     id: 'bitcoind',
     title: 'Bitcoin Core',
     version: '0.21.0',
     description: {
-      short: 'A Bitcoin full node by Bitcoin Core',
+      short: 'A Bitcoin full node by Bitcoin Core.',
       long: 'Bitcoin decentralized consensus protocol and monetary settlement network.',
     },
     'release-notes': 'Taproot, Schnorr, and more.',
@@ -134,6 +195,152 @@ export module Mock {
     dependencies: { },
   }
 
+  export const MockManifestLnd: Manifest = {
+    id: 'lnd',
+    title: 'Lightning Network Daemon',
+    version: '0.11.1',
+    description: {
+      short: 'A bolt spec compliant client.',
+      long: 'More info about LND. More info about LND. More info about LND.',
+    },
+    'release-notes': 'Dual funded channels!',
+    license: 'MIT',
+    'wrapper-repo': 'https://github.com/start9labs/lnd-wrapper',
+    'upstream-repo': 'https://github.com/lightningnetwork/lnd',
+    'support-site': 'https://lightning.engineering/',
+    'marketing-site': 'https://lightning.engineering/',
+    alerts: {
+      install: null,
+      uninstall: null,
+      restore: 'If this is a duplicate instance of the same LND node, you may loose your funds.',
+      start: 'Starting LND is good for your health.',
+      stop: null,
+    },
+    main: {
+      type: 'docker',
+      image: '',
+      system: true,
+      entrypoint: '',
+      args: [''],
+      mounts: { },
+      'io-format': DockerIoFormat.Yaml,
+      inject: false,
+      'shm-size': '',
+    },
+    'health-check': {
+      type: 'docker',
+      image: '',
+      system: true,
+      entrypoint: '',
+      args: [''],
+      mounts: { },
+      'io-format': DockerIoFormat.Yaml,
+      inject: false,
+      'shm-size': '',
+    },
+    config: null,
+    volumes: { },
+    'min-os-version': '0.2.12',
+    interfaces: {
+      rpc: {
+        name: 'RPC interface',
+        description: 'Good for connecting to your node at a distance.',
+        ui: true,
+        'tor-config': {
+          'hidden-service-version': 'v3',
+          'port-mapping': { },
+        },
+        'lan-config': {
+          44: {
+            ssl: true,
+            mapping: 33,
+          },
+        },
+        protocols: [],
+      },
+      grpc: {
+        name: 'GRPC',
+        description: 'Certain wallet use grpc.',
+        ui: false,
+        'tor-config': {
+          'hidden-service-version': 'v3',
+          'port-mapping': { },
+        },
+        'lan-config': {
+          66: {
+            ssl: true,
+            mapping: 55,
+          },
+        },
+        protocols: [],
+      },
+    },
+    backup: {
+      create: {
+        type: 'docker',
+        image: '',
+        system: true,
+        entrypoint: '',
+        args: [''],
+        mounts: { },
+        'io-format': DockerIoFormat.Yaml,
+        inject: false,
+        'shm-size': '',
+      },
+      restore: {
+        type: 'docker',
+        image: '',
+        system: true,
+        entrypoint: '',
+        args: [''],
+        mounts: { },
+        'io-format': DockerIoFormat.Yaml,
+        inject: false,
+        'shm-size': '',
+      },
+    },
+    migrations: null,
+    actions: {
+      resync: {
+        name: 'Resync Network Graph',
+        description: 'Your node will resync its network graph.',
+        warning: 'This will take a couple hours.',
+        'allowed-statuses': [PackageMainStatus.Running],
+        implementation: {
+          type: 'docker',
+          image: '',
+          system: true,
+          entrypoint: '',
+          args: [''],
+          mounts: { },
+          'io-format': DockerIoFormat.Yaml,
+          inject: false,
+          'shm-size': '',
+        },
+        'input-spec': {
+          label: {
+            type: 'string',
+            name: 'Name of Resync',
+            nullable: false,
+            masked: false,
+            copyable: false,
+          },
+        },
+      },
+    },
+    permissions: { },
+    dependencies: {
+      bitcoind: {
+        version: '0.21.0',
+        description: 'LND needs bitcoin to live.',
+        optional: null,
+        default: true,
+        config: [],
+        interfaces: [],
+      },
+    },
+  }
+
   export const bitcoind: PackageDataEntry = {
     state: PackageState.Installed,
     'static-files': {
@@ -142,7 +349,7 @@ export module Mock {
       instructions: instructions, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
     installed: {
-      manifest: MockManifest,
+      manifest: MockManifestBitcoind,
       status: {
         configured: true,
         main: {
@@ -170,7 +377,40 @@ export module Mock {
         },
       },
     },
-    'unverified-manifest': MockManifest,
+    'unverified-manifest': MockManifestBitcoind,
+  }
+
+  export const lnd: PackageDataEntry = {
+    state: PackageState.Installed,
+    'static-files': {
+      license: 'licenseURL',
+      icon: 'assets/img/service-icons/lnd.png',
+      instructions: instructions, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
+    },
+    installed: {
+      manifest: MockManifestLnd,
+      status: {
+        configured: true,
+        main: {
+          status: PackageMainStatus.Stopped,
+        },
+        dependencies: { },
+      },
+      'interface-info': {
+        ip: '10.0.0.1',
+        addresses: {
+          rpc: {
+            'tor-address': 'lnd-rpc-address.onion',
+            'lan-address': 'lnd-rpc-address.local',
+          },
+          grpc: {
+            'tor-address': 'lnd-grpc-address.onion',
+            'lan-address': 'lnd-grpc-address.local',
+          },
+        },
+      },
+    },
+    'unverified-manifest': MockManifestLnd,
   }
 
   export const DbDump: RR.GetDumpRes = {
@@ -198,6 +438,7 @@ export module Mock {
       },
       'package-data': {
         'bitcoind': bitcoind,
+        'lnd': lnd,
       },
       ui: {
         'server-name': 'My Embassy',

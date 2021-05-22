@@ -1,14 +1,18 @@
-<div *ngFor="let dep of depsToDisplay">
-  <marketplace-dependency-item *ngIf="depType === 'available'"  style="width: 100%"
-    [dep]="dep"
-    [hostApp]="hostApp"
-    [$loading$]="$loading$"
+<div *ngFor="let dependency of depsToDisplay">
+  <marketplace-dependency-item
+    *ngIf="type === 'available'"
+    style="width: 100%"
+    [dependency]="dependency"
+    [dependent]="dependent"
+    [loading]="loading"
   >
   </marketplace-dependency-item>
-  <installed-dependency-item *ngIf="depType === 'installed'"  style="width: 100%"
-    [dep]="dep"
-    [hostApp]="hostApp"
-    [$loading$]="$loading$"
+  <installed-dependency-item
+    *ngIf="type === 'installed'"
+    style="width: 100%"
+    [dependency]="dependency"
+    [dependent]="dependent"
+    [loading]="loading"
   >
   </installed-dependency-item>
 </div>

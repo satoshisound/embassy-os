@@ -1,5 +1,4 @@
 import { Component, Input } from '@angular/core'
-import { BehaviorSubject } from 'rxjs'
 // import { isOptional } from 'src/app/models/app-types'
 import { DependencyEntry, DependencyInfo, PackageDataEntry } from 'src/app/models/patch-db/data-model'
 
@@ -9,11 +8,11 @@ import { DependencyEntry, DependencyInfo, PackageDataEntry } from 'src/app/model
   styleUrls: ['./dependency-list.component.scss'],
 })
 export class DependencyListComponent {
-  @Input() depType: 'installed' | 'available' = 'available'
-  @Input() hostApp: PackageDataEntry
+  @Input() type: 'installed' | 'available'
+  @Input() dependent: PackageDataEntry
   @Input() dependencies: DependencyInfo
+  @Input() loading: boolean
   depsToDisplay: DependencyEntry[]
-  @Input() $loading$: BehaviorSubject<boolean> = new BehaviorSubject(true)
 
   constructor () { }
 
@@ -27,7 +26,7 @@ export class DependencyListComponent {
 
   // private filterDeps (): void {
   //   this.depsToDisplay = Object.values(this.dependencies).filter(dep =>
-  //     this.depType === 'available' ? !isOptional(dep) : true,
+  //     this.type === 'available' ? !isOptional(dep) : true,
   //   )
   // }
 }

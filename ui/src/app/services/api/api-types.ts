@@ -1,7 +1,7 @@
 import { Dump, Operation, Revision } from 'patch-db-client'
 import { PackagePropertiesVersioned } from 'src/app/util/properties.util'
 import { ConfigSpec } from 'src/app/pkg-config/config-types'
-import { DataModel, DependencyError } from 'src/app/models/patch-db/data-model'
+import { DataModel, DependencyError, Manifest, URL } from 'src/app/models/patch-db/data-model'
 
 export module RR {
 
@@ -152,20 +152,45 @@ export module RR {
   export type DryConfigureDependencyRes = object
 
 
-  // marketplace @TODO
+  // marketplace
 
-  // export type GetVersionLatestReq = { }
-  // export type GetVersionLatestRes = { versionLatest: string, releaseNotes: string }
+  export type GetMarketplaceDataReq = { }
+  export type GetMarketplaceDataRes = MarketplaceData
 
-  // export type GetAppAvailableReq = { }
-  // export type GetAppAvailableRes = ApiAppAvailableFull
+  export type GetMarketplaceEOSReq = { }
+  export type GetMarketplaceEOSRes = MarketplaceEOS
 
-  // export type GetAppAvailableVersionInfoRes = AppAvailableVersionSpecificInfo
-  // export type GetAppsAvailableRes = AppAvailablePreview[]
+  export type GetAvailableListReq = { category?: string, query?: string }
+  export type GetAvailableListRes = AvailablePreview[]
+
+  export type GetAvailableShowReq = { id: string, version?: string }
+  export type GetAvailableShowRes = AvailableShow
 }
 
 export type WithExpire<T> = { expireId?: string } & T
 export type WithRevision<T> = { response: T, revision?: Revision }
+
+export interface MarketplaceData {
+  categories: string[]
+}
+
+export interface MarketplaceEOS {
+  version: string
+  notes: string
+}
+
+export interface AvailablePreview {
+  id: string
+  title: string
+  version: string
+  icon: URL
+  descriptionShort: string
+}
+
+export interface AvailableShow {
+  categories: string[]
+  manifest: Manifest
+}
 
 export interface BreakageRes {
   patch: Operation[],
@@ -198,7 +223,7 @@ export interface ServerMetrics {
 }
 
 export interface DiskInfo {
-
+  [id: string]: DiskInfoEntry
 }
 
 export interface DiskInfoEntry {

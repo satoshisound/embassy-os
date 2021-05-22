@@ -308,6 +308,7 @@ export interface DependencyInfo {
 export interface DependencyEntry {
   version: string
   optional: string | null
+  default: boolean
   description: string | null
   config: ConfigRuleEntryWithSuggestions[]
   interfaces: any[] // @TODO placeholder

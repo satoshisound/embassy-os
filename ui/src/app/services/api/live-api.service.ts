@@ -203,37 +203,21 @@ export class LiveApiService extends ApiService {
     return this.http.rpcRequest({ method: 'package.dependency.configure.dry', params })
   }
 
-  // store
+  // marketplace
 
-  // async getAvailableApps (): Promise<AppAvailablePreview[]> {
-  //   const res = await this.http.rpcRequest<RR.GetAppsAvailableRes>({ method: 1 })
-  //   return res.map(a => {
-  //     const latestVersionTimestamp = new Date(a.latestVersionTimestamp)
-  //     if (isNaN(latestVersionTimestamp as any)) throw new Error(`Invalid latestVersionTimestamp ${a.latestVersionTimestamp}`)
-  //     return { ...a, latestVersionTimestamp }
-  //   })
-  // }
+  async getMarketplaceData (params: RR.GetMarketplaceDataReq): Promise<RR.GetMarketplaceDataRes> {
+    return this.http.rpcRequest({ method: 'marketplace.data', params })
+  }
 
-  // async getAvailableApp (appId: string): Promise<AppAvailableFull> {
-  //   return this.http.rpcRequest<RR.GetAppAvailableRes>({ method: 1, params: { appId } })
-  //     .then(res => {
-  //       return {
-  //         ...res,
-  //         versionViewing: res.versionLatest,
-  //       }
-  //     })
-  // }
+  async getEos (params: RR.GetMarketplaceEOSReq): Promise<RR.GetMarketplaceEOSRes> {
+    return this.http.rpcRequest({ method: 'marketplace.eos', params })
+  }
 
-  // async getAvailableAppVersionSpecificInfo (appId: string, versionSpec: string): Promise<AppAvailableVersionSpecificInfo> {
-  //   return this.http.rpcRequest<Replace<RR.GetAppAvailableVersionInfoRes, 'versionViewing', 'version'>>( { method: 1, params: { appId, versionSpec } })
-  //     .then(res => ({ ...res, versionViewing: res.version }))
-  //     .then(res => {
-  //       delete res['version']
-  //       return res
-  //     })
-  // }
+  async getAvailableList (params: RR.GetAvailableListReq): Promise<RR.GetAvailableListRes> {
+    return this.http.rpcRequest({ method: 'marketplace.available.list', params })
+  }
 
-  // async getVersionLatest (): Promise<RR.GetVersionLatestRes> {
-  //   return this.http.rpcRequest({ method: Method.GET, url: '/versionLatest' }, '')
-  // }
+  async getAvailableShow (params: RR.GetAvailableShowReq): Promise<RR.GetAvailableShowRes> {
+    return this.http.rpcRequest({ method: 'marketplace.available', params })
+  }
 }

@@ -58,7 +58,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: params.pointer, value: params.value },
+          {
+            op: PatchOp.REPLACE,
+            path: params.pointer,
+            value: params.value,
+          },
         ],
         expireId: null,
       },
@@ -120,7 +124,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: '/server-info/registry', value: params.url },
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/registry',
+            value: params.url,
+          },
         ],
         expireId: null,
       },
@@ -136,7 +144,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: '/server-info/unread-notification-count', value: 0 },
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/unread-notification-count',
+            value: 0,
+          },
         ],
         expireId: null,
       },
@@ -162,8 +174,16 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: '/server-info/wifi/selected', value: params.ssid },
-          { op: PatchOp.REPLACE, path: '/server-info/wifi/connected', value: params.ssid },
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/wifi/selected',
+            value: params.ssid,
+          },
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/wifi/connected',
+            value: params.ssid,
+          },
         ],
         expireId: null,
       },
@@ -177,8 +197,16 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: '/server-info/wifi/selected', value: null },
-          { op: PatchOp.REPLACE, path: '/server-info/wifi/connected', value: null },
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/wifi/selected',
+            value: null,
+          },
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/wifi/connected',
+            value: null,
+          },
         ],
         expireId: null,
       },
@@ -211,7 +239,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: '/server-info/status', value: ServerStatus.BackingUp },
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/status',
+            value: ServerStatus.BackingUp,
+          },
         ],
         expireId: null,
       },
@@ -254,10 +286,14 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/state`, value: PackageState.Installing },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/state`,
+            value: PackageState.Installing,
+          },
           {
             op: PatchOp.ADD,
-            path: `package-data/${params.id}/install-progress`,
+            path: `/package-data/${params.id}/install-progress`,
             value: {
               size: 100,
               downloaded: 10,
@@ -289,7 +325,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/state`, value: PackageState.Updating },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/state`,
+            value: PackageState.Updating,
+          },
         ],
         expireId: null,
       },
@@ -316,8 +356,16 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/installed/status/configured`, value: true },
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/installed/status/main`, value: PackageMainStatus.Running },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/installed/status/configured`,
+            value: true,
+          },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/installed/status/main/status`,
+            value: PackageMainStatus.Running,
+          },
         ],
         expireId: null,
       },
@@ -331,7 +379,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/installed/status/main`, value: PackageMainStatus.Restoring },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/installed/status/main/status`,
+            value: PackageMainStatus.Restoring,
+          },
         ],
         expireId: null,
       },
@@ -355,7 +407,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/installed/status/main`, value: PackageMainStatus.Running },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/installed/status/main/status`,
+            value: PackageMainStatus.Running,
+          },
         ],
         expireId: null,
       },
@@ -377,7 +433,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/installed/status/main`, value: PackageMainStatus.Stopping },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/installed/status/main/status`,
+            value: PackageMainStatus.Stopping,
+          },
         ],
         expireId: null,
       },
@@ -399,7 +459,11 @@ export class MockApiService extends ApiService {
       revision: {
         id: this.nextSequence(),
         patch: [
-          { op: PatchOp.REPLACE, path: `package-data/${params.id}/state`, value: PackageState.Removing },
+          {
+            op: PatchOp.REPLACE,
+            path: `/package-data/${params.id}/state`,
+            value: PackageState.Removing,
+          },
         ],
         expireId: null,
       },
@@ -411,39 +475,32 @@ export class MockApiService extends ApiService {
     return { }
   }
 
-  // store
+  // marketplace
 
-  // async getAvailableApps (): Promise<AppAvailablePreview[]> {
-  //   const res = await this.http.rpcRequest<RR.GetAppsAvailableRes>({ method: 1 })
-  //   return res.map(a => {
-  //     const latestVersionTimestamp = new Date(a.latestVersionTimestamp)
-  //     if (isNaN(latestVersionTimestamp as any)) throw new Error(`Invalid latestVersionTimestamp ${a.latestVersionTimestamp}`)
-  //     return { ...a, latestVersionTimestamp }
-  //   })
-  // }
+  async getMarketplaceData (params: RR.GetMarketplaceDataReq): Promise<RR.GetMarketplaceDataRes> {
+    await pauseFor(2000)
+    return {
+      categories: ['featured', 'bitcoin', 'lightning', 'data', 'messaging'],
+    }
+  }
 
-  // async getAvailableApp (appId: string): Promise<AppAvailableFull> {
-  //   return this.http.rpcRequest<RR.GetAppAvailableRes>({ method: 1, params: { appId } })
-  //     .then(res => {
-  //       return {
-  //         ...res,
-  //         versionViewing: res.versionLatest,
-  //       }
-  //     })
-  // }
+  async getEos (params: RR.GetMarketplaceEOSReq): Promise<RR.GetMarketplaceEOSRes> {
+    await pauseFor(2000)
+    return {
+      version: '1.0.0',
+      notes: 'Our biggest release ever.',
+    }
+  }
 
-  // async getAvailableAppVersionSpecificInfo (appId: string, versionSpec: string): Promise<AppAvailableVersionSpecificInfo> {
-  //   return this.http.rpcRequest<Replace<RR.GetAppAvailableVersionInfoRes, 'versionViewing', 'version'>>( { method: 1, params: { appId, versionSpec } })
-  //     .then(res => ({ ...res, versionViewing: res.version }))
-  //     .then(res => {
-  //       delete res['version']
-  //       return res
-  //     })
-  // }
+  async getAvailableList (params: RR.GetAvailableListReq): Promise<RR.GetAvailableListRes> {
+    await pauseFor(2000)
+    return Mock.AvailableList
+  }
 
-  // async getVersionLatest (): Promise<RR.GetVersionLatestRes> {
-  //   return this.http.rpcRequest({ method: Method.GET, url: '/versionLatest' }, '')
-  // }
+  async getAvailableShow (params: RR.GetAvailableShowReq): Promise<RR.GetAvailableShowRes> {
+    await pauseFor(2000)
+    return Mock.AvailableShow[params.id][params.version || 'latest']
+  }
 
   private nextSequence () {
     console.log('next')

@@ -111,21 +111,22 @@
       
             <!-- dependencies -->
             <ng-container *ngIf="!(manifest.dependencies | empty)">
-              <ion-item-divider id="dependencies">Dependencies
+              <ion-item-divider id="dependencies">
+                Dependencies
                 <ion-button style="position: relative; right: 10px;" size="small" fill="clear" color="medium"  (click)="presentPopover(dependencyDefintion(), $event)">
                   <ion-icon name="help-circle-outline"></ion-icon>
                 </ion-button>
               </ion-item-divider>
     
-              <dependency-list [$loading$]="$loadingDependencies$" depType="installed" [hostApp]="pkg" [dependencies]="manifest.dependencies"></dependency-list>
+              <dependency-list [loading]="loadingDependencies" type="installed" [dependent]="pkg" [dependencies]="manifest.dependencies"></dependency-list>
             </ng-container>
       
             <ion-item-divider></ion-item-divider>
       
             <ng-container *ngIf="!([FeStatus.Installing, FeStatus.Updating, FeStatus.BackingUp, FeStatus.Restoring] | includes : status)">
               <!-- uninstall -->
-              <ion-item style="--background: transparent" button (click)="uninstall()">
-                <ion-icon slot="start" name="trash-outline" color="medium"></ion-icon>
+              <ion-item button (click)="uninstall()">
+                <ion-icon slot="start" name="trash-outline" color="danger"></ion-icon>
                 <ion-label><ion-text color="danger">Uninstall</ion-text></ion-label>
               </ion-item>
             </ng-container>

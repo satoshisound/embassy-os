@@ -168,11 +168,15 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
   abstract dryConfigureDependency (params: RR.DryConfigureDependencyReq): Promise<RR.DryConfigureDependencyRes>
 
+  // marketplace
 
-  // abstract getVersionLatest (params: RR.GetVersionLatestReq): Promise<RR.GetVersionLatestRes>
-  // abstract getAvailableApps (): Promise<AppAvailablePreview[]>
-  // abstract getAvailableApp (appId: string): Promise<AppAvailableFull>
-  // abstract getAvailableAppVersionSpecificInfo (appId: string, versionSpec: string): Promise<AppAvailableVersionSpecificInfo>
+  abstract getMarketplaceData (params: RR.GetMarketplaceDataReq): Promise<RR.GetMarketplaceDataRes>
+
+  abstract getEos (params: RR.GetMarketplaceEOSReq): Promise<RR.GetMarketplaceEOSRes>
+
+  abstract getAvailableList (params: RR.GetAvailableListReq): Promise<RR.GetAvailableListRes>
+
+  abstract getAvailableShow (params: RR.GetAvailableShowReq): Promise<RR.GetAvailableShowRes>
 
   // Helper allowing quick decoration to sync the response patch and return the response contents.
   // Pass in a tempUpdate function which returns a UpdateTemp corresponding to a temporary

@@ -83,7 +83,6 @@ export class AppComponent {
     .subscribe(auth => {
       // VERIFIED
       if (auth === AuthState.VERIFIED) {
-        console.log('HERERERERERERERERE')
         this.http.authReqEnabled = true
         this.showMenu = true
         this.patch.start()
