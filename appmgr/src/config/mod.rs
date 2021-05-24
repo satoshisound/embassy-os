@@ -51,8 +51,6 @@ pub enum ConfigurationError {
     TimeoutError(#[from] TimeoutError),
     #[error("No Match: {0}")]
     NoMatch(#[from] NoMatchWithPath),
-    #[error("Invalid Variant: {0}")]
-    InvalidVariant(String),
     #[error("System Error: {0}")]
     SystemError(crate::Error),
 }
@@ -177,14 +175,15 @@ pub fn set(
     #[arg(long = "format")] format: Option<IoFormat>,
     #[arg(stdin, parse(parse_stdin_deserializable))] config: Config,
 ) -> Result<ExtendedContext<RpcContext, (PackageId, Config)>, Error> {
-    todo!()
+    Ok(ctx.map(|id| (id, config)))
 }
 
 #[command(display(display_serializable))]
 pub fn set_dry(
     #[context] ctx: ExtendedContext<RpcContext, (PackageId, Config)>,
 ) -> Result<BreakageRes, Error> {
-    todo!()
+    let (id, config) = ctx.extension;
+    configure(&id, config, None, true)
 }
 
 pub fn set_impl(ctx: ExtendedContext<RpcContext, (PackageId, Config)>) -> Result<(), Error> {

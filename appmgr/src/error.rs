@@ -148,6 +148,11 @@ impl From<patch_db::Error> for Error {
         Error::new(e, ErrorKind::Database)
     }
 }
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
+        Error::new(e, ErrorKind::Database)
+    }
+}
 impl From<ed25519_dalek::SignatureError> for Error {
     fn from(e: ed25519_dalek::SignatureError) -> Self {
         Error::new(e, ErrorKind::InvalidSignature)
