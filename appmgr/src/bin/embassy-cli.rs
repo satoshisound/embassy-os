@@ -1,19 +1,7 @@
-use std::time::Duration;
-
 use clap::Arg;
 use embassy::context::{CliContext, EitherContext};
-use embassy::db::model::Database;
-use embassy::status::{check_all, synchronize_all};
-use embassy::util::daemon;
-use embassy::{Error, ErrorKind};
-use futures::TryFutureExt;
-use patch_db::json_ptr::JsonPointer;
-use rpc_toolkit::hyper::StatusCode;
+use embassy::Error;
 use rpc_toolkit::run_cli;
-
-fn status_fn(_: i32) -> StatusCode {
-    StatusCode::OK
-}
 
 fn inner_main() -> Result<(), Error> {
     simple_logging::log_to_stderr(log::LevelFilter::Info);
