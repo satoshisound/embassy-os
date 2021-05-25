@@ -370,10 +370,34 @@ impl MainStatus {
         }
         Ok(())
     }
+    pub fn running(&self) -> bool {
+        match self {
+            MainStatus::Running { .. }
+            | MainStatus::BackingUp {
+                started: Some(_), ..
+            }
+            | MainStatus::Restoring { running: true } => true,
+            _ => false,
+        }
+    }
+    pub fn stop(&mut self) {
+        match self {
+            MainStatus::Running { .. } => {
+                *self = MainStatus::Stopping;
+            }
+            MainStatus::BackingUp { started, .. } => {
+                *started = None;
+            }
+            MainStatus::Restoring { running } => {
+                *running = false;
+            }
+            _ => (),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct DependencyErrors(IndexMap<PackageId, DependencyError>);
+pub struct DependencyErrors(pub IndexMap<PackageId, DependencyError>);
 impl Map for DependencyErrors {
     type Key = PackageId;
     type Value = DependencyError;

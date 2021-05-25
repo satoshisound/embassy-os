@@ -158,6 +158,7 @@ pub struct InstalledPackageDataEntry {
     #[model]
     pub status: Status,
     pub system_pointers: Vec<SystemPointerSpec>,
+    #[model]
     pub dependents: IndexMap<PackageId, Vec<PackagePointerSpecVariant>>,
     pub required_dependencies: IndexMap<PackageId, IndexSet<HealthCheckId>>,
     #[model]

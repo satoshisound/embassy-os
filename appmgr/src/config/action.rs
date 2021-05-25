@@ -78,6 +78,6 @@ impl ConfigActions {
 pub struct SetResult {
     #[serde(deserialize_with = "crate::util::deserialize_from_str_opt")]
     #[serde(serialize_with = "crate::util::serialize_display_opt")]
-    signal: Option<Signal>,
-    depends_on: IndexMap<PackageId, IndexSet<HealthCheckId>>,
+    pub signal: Option<Signal>,
+    pub depends_on: IndexMap<PackageId, IndexSet<HealthCheckId>>,
 }

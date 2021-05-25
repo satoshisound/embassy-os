@@ -13,9 +13,10 @@ use crate::config::spec::PackagePointerSpecVariant;
 use crate::context::{ExtendedContext, RpcContext};
 use crate::db::model::InstalledPackageDataEntryModel;
 use crate::db::util::WithRevision;
-use crate::dependencies::{BreakageRes, DependencyError};
+use crate::dependencies::{BreakageRes, DependencyError, TaggedDependencyError};
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
+use crate::status::MainStatus;
 use crate::util::{
     display_none, display_serializable, from_yaml_async_reader, parse_duration,
     parse_stdin_deserializable, to_yaml_async_writer, IoFormat,
@@ -30,7 +31,7 @@ pub use spec::{ConfigSpec, Defaultable};
 use util::NumRange;
 
 use self::action::ConfigRes;
-use self::spec::ValueSpecPointer;
+use self::spec::{PackagePointerSpec, ValueSpecPointer};
 
 pub type Config = serde_json::Map<String, Value>;
 pub trait TypeOf {
@@ -286,9 +287,10 @@ fn configure<'a, Db: DbHandle>(
     timeout: &'a Option<Duration>,
     dry_run: bool,
     overrides: &'a mut IndexMap<PackageId, Config>,
-    breakages: &'a mut IndexMap<PackageId, DependencyError>,
+    breakages: &'a mut IndexMap<PackageId, TaggedDependencyError>,
 ) -> BoxFuture<'a, Result<(), Error>> {
     async move {
+        // fetch data from db
         let pkg_model = crate::db::DatabaseModel::new()
             .package_data()
             .idx_model(id)
@@ -316,8 +318,9 @@ fn configure<'a, Db: DbHandle>(
             .dependencies()
             .get(&mut db)
             .await?;
-        let dependents = pkg_model.clone().dependents().get(&mut db).await?;
-        let volumes = pkg_model.manifest().volumes().get(&mut db).await?;
+        let volumes = pkg_model.clone().manifest().volumes().get(&mut db).await?;
+
+        // get current config and current spec
         let get_res = action.get(id, &*version, &*volumes, &*hosts).await?;
         let original = get_res
             .config
@@ -325,61 +328,143 @@ fn configure<'a, Db: DbHandle>(
             .map(Value::Object)
             .unwrap_or_default();
         let spec = get_res.spec;
+
+        // determine new config to use
         let config = if let Some(config) = config.or_else(|| get_res.config.clone()) {
             config
         } else {
             spec.gen(&mut rand::rngs::StdRng::from_entropy(), timeout)?
         };
-        spec.matches(&config)?;
-        spec.update(db, &*overrides, &mut config).await?;
-        if Some(&config) == get_res.config.as_ref() {
-            Ok(())
-        } else {
-            overrides.insert(id.clone(), config.clone());
-            let prev = get_res.config.map(Value::Object).unwrap_or_default();
-            let next = Value::Object(config.clone());
-            for (dependent, ptrs) in &*dependents {
-                let dependent_model = crate::db::DatabaseModel::new()
-                    .package_data()
-                    .idx_model(dependent)
-                    .and_then(|pkg| pkg.installed())
-                    .expect(db)
-                    .await?;
-                if let Some(cfg) = &*dependent_model
-                    .clone()
-                    .manifest()
-                    .dependencies()
-                    .idx_model(id)
-                    .expect(db)
-                    .await?
-                    .config()
-                    .get(db)
-                    .await?
-                {
-                    let version = dependent_model.manifest().version().get(db).await?;
-                    if let Err(error) = cfg.check(dependent, &*version, &config).await? {
-                        let dep_err = DependencyError::ConfigUnsatisfied { error };
-                        fn handle_broken_dependents<'a, Db: DbHandle>(
-                            db: &'a mut Db,
-                            model: InstalledPackageDataEntryModel,
-                            error: DependencyError,
-                            breakages: &mut IndexMap<PackageId, DependencyError>,
-                        ) -> BoxFuture<'a, Result<(), Error>> {
-                            async move {
-                                let status = model.status().get_mut(db).await?;
 
-                                todo!()
-                            }
-                            .boxed()
-                        }
-                        handle_broken_dependents(db, dependent_model, dep_err, breakages).await?;
+        spec.matches(&config)?; // check that new config matches spec
+        spec.update(db, &*overrides, &mut config).await?; // dereference pointers in the new config
+
+        if Some(&config) == get_res.config.as_ref() {
+            // if new config is identical to old config, there's nothing to do
+            return Ok(()); // TODO: maybe run it anyway??
+        }
+
+        // create backreferences to pointers
+        let mut sys = pkg_model.system_pointers().get_mut(db).await?;
+        sys.truncate(0);
+        let mut dep_ptrs = IndexMap::<PackageId, Vec<PackagePointerSpecVariant>>::new();
+        for ptr in spec.pointers(&config)? {
+            match ptr {
+                ValueSpecPointer::Package(PackagePointerSpec { package_id, target }) => {
+                    if let Some(dep_ptrs) = dep_ptrs.get_mut(&package_id) {
+                        dep_ptrs.push(target);
                     } else {
-                        for ptr in ptrs {
-                            if let PackagePointerSpecVariant::Config { selector, multi } = ptr {
-                                if selector.select(*multi, &next) != selector.select(*multi, &prev)
-                                {
-                                    configure(
-                                        db, hosts, dependent, None, timeout, dry_run, overrides,
+                        dep_ptrs.insert(package_id, vec![target]);
+                    }
+                }
+                ValueSpecPointer::System(s) => sys.push(s),
+            }
+        }
+        sys.save(db).await?;
+
+        let signal = if !dry_run {
+            // run config action
+            let res = action
+                .set(id, &*version, &*dependencies, &*volumes, hosts, &config)
+                .await?;
+
+            // track dependencies with no pointers
+            for pkg in res.depends_on.keys() {
+                if !dep_ptrs.contains_key(pkg) {
+                    dep_ptrs.insert(pkg.clone(), Vec::new());
+                }
+            }
+
+            // track dependency health checks
+            let deps = pkg_model.required_dependencies().get_mut(db).await?;
+            *deps = res.depends_on;
+            deps.save(db).await?;
+            res.signal
+        } else {
+            None
+        };
+
+        // update dependencies
+        for (dependency, pointers) in dep_ptrs {
+            if let Some(dependency_model) = crate::db::DatabaseModel::new()
+                .package_data()
+                .idx_model(&dependency)
+                .and_then(|pkg| pkg.installed())
+                .check(db)
+                .await?
+            {
+                dependency_model
+                    .dependents()
+                    .idx_model(id)
+                    .put(db, &pointers)
+                    .await?;
+            }
+        }
+
+        // cache current config for dependents
+        overrides.insert(id.clone(), config.clone());
+
+        // handle dependents
+        let dependents = pkg_model.clone().dependents().get(&mut db).await?;
+        let prev = get_res.config.map(Value::Object).unwrap_or_default();
+        let next = Value::Object(config.clone());
+        for (dependent, ptrs) in &*dependents {
+            fn handle_broken_dependents<'a, Db: DbHandle>(
+                db: &'a mut Db,
+                id: &'a PackageId,
+                dependency: &'a PackageId,
+                model: InstalledPackageDataEntryModel,
+                error: DependencyError,
+                breakages: &'a mut IndexMap<PackageId, TaggedDependencyError>,
+            ) -> BoxFuture<'a, Result<(), Error>> {
+                async move {
+                    let status = model.clone().status().get_mut(db).await?;
+
+                    let old = status.dependencies.0.remove(id);
+                    let newly_broken = old.is_none();
+                    status.dependencies.0.insert(
+                        id.clone(),
+                        if let Some(old) = old {
+                            old.merge_with(error)
+                        } else {
+                            error
+                        },
+                    );
+                    if newly_broken {
+                        breakages.insert(
+                            id.clone(),
+                            TaggedDependencyError {
+                                dependency: dependency.clone(),
+                                error: error.clone(),
+                            },
+                        );
+                        if status.main.running() {
+                            if model
+                                .clone()
+                                .manifest()
+                                .dependencies()
+                                .idx_model(dependency)
+                                .expect(db)
+                                .await?
+                                .get(db)
+                                .await?
+                                .critical
+                            {
+                                status.main.stop();
+                                let dependents = model.dependents().get(db).await?;
+                                for (dependent, _) in &*dependents {
+                                    let dependent_model = crate::db::DatabaseModel::new()
+                                        .package_data()
+                                        .idx_model(dependent)
+                                        .and_then(|pkg| pkg.installed())
+                                        .expect(db)
+                                        .await?;
+                                    handle_broken_dependents(
+                                        db,
+                                        dependent,
+                                        id,
+                                        dependent_model,
+                                        DependencyError::NotRunning,
                                         breakages,
                                     )
                                     .await?;
@@ -387,13 +472,83 @@ fn configure<'a, Db: DbHandle>(
                             }
                         }
                     }
+
+                    status.save(db).await?;
+
+                    Ok(())
+                }
+                .boxed()
+            }
+
+            // check if config passes dependent check
+            let dependent_model = crate::db::DatabaseModel::new()
+                .package_data()
+                .idx_model(dependent)
+                .and_then(|pkg| pkg.installed())
+                .expect(db)
+                .await?;
+            if let Some(cfg) = &*dependent_model
+                .clone()
+                .manifest()
+                .dependencies()
+                .idx_model(id)
+                .expect(db)
+                .await?
+                .config()
+                .get(db)
+                .await?
+            {
+                let version = dependent_model.manifest().version().get(db).await?;
+                if let Err(error) = cfg.check(dependent, &*version, &config).await? {
+                    let dep_err = DependencyError::ConfigUnsatisfied { error };
+                    handle_broken_dependents(
+                        db,
+                        dependent,
+                        id,
+                        dependent_model,
+                        dep_err,
+                        breakages,
+                    )
+                    .await?;
+                }
+
+                // handle backreferences
+                for ptr in ptrs {
+                    if let PackagePointerSpecVariant::Config { selector, multi } = ptr {
+                        if selector.select(*multi, &next) != selector.select(*multi, &prev) {
+                            if let Err(e) = configure(
+                                db, hosts, dependent, None, timeout, dry_run, overrides, breakages,
+                            )
+                            .await
+                            {
+                                if e.kind == crate::ErrorKind::ConfigRulesViolation {
+                                    let dependent_model = crate::db::DatabaseModel::new()
+                                        .package_data()
+                                        .idx_model(dependent)
+                                        .and_then(|pkg| pkg.installed())
+                                        .expect(db)
+                                        .await?;
+                                    handle_broken_dependents(
+                                        db,
+                                        dependent,
+                                        id,
+                                        dependent_model,
+                                        DependencyError::ConfigUnsatisfied {
+                                            error: format!("{}", e),
+                                        },
+                                        breakages,
+                                    )
+                                    .await?;
+                                } else {
+                                    return Err(e);
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            let res = action
-                .set(id, &*version, &*dependencies, &*volumes, hosts, &config)
-                .await?;
-            Ok(())
         }
+        Ok(())
     }
     .boxed()
 }

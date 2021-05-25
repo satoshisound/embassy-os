@@ -1536,15 +1536,11 @@ impl ValueSpec for ValueSpecPointer {
 pub struct PackagePointerSpec {
     pub package_id: PackageId,
     #[serde(flatten)]
-    pub target: Option<PackagePointerSpecVariant>,
+    pub target: PackagePointerSpecVariant,
 }
 impl fmt::Display for PackagePointerSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(target) = &self.target {
-            write!(f, "{}: {}", self.package_id, target)
-        } else {
-            write!(f, "{}", self.package_id)
-        }
+        write!(f, "{}: {}", self.package_id, self.target)
     }
 }
 impl PackagePointerSpec {
@@ -1554,7 +1550,7 @@ impl PackagePointerSpec {
         config_overrides: &IndexMap<PackageId, Config>,
     ) -> Result<Value, ConfigurationError> {
         match &self.target {
-            Some(PackagePointerSpecVariant::TorAddress { interface }) => {
+            PackagePointerSpecVariant::TorAddress { interface } => {
                 let addr = crate::db::DatabaseModel::new()
                     .package_data()
                     .idx_model(&self.package_id)
@@ -1568,7 +1564,7 @@ impl PackagePointerSpec {
                     .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
                 Ok(addr.to_owned().map(Value::String).unwrap_or(Value::Null))
             }
-            Some(PackagePointerSpecVariant::LanAddress { interface }) => {
+            PackagePointerSpecVariant::LanAddress { interface } => {
                 let addr = crate::db::DatabaseModel::new()
                     .package_data()
                     .idx_model(&self.package_id)
@@ -1582,7 +1578,7 @@ impl PackagePointerSpec {
                     .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
                 Ok(addr.to_owned().map(Value::String).unwrap_or(Value::Null))
             }
-            Some(PackagePointerSpecVariant::Config { selector, multi }) => {
+            PackagePointerSpecVariant::Config { selector, multi } => {
                 if let Some(cfg) = config_overrides.get(&self.package_id) {
                     Ok(selector.select(*multi, &Value::Object(cfg.clone())))
                 } else {
@@ -1632,7 +1628,6 @@ impl PackagePointerSpec {
                     }
                 }
             }
-            None => Ok(Value::Null),
         }
     }
 }

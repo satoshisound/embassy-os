@@ -26,11 +26,36 @@ pub enum DependencyError {
     }, // { "type": "incorrect-version", "expected": "0.1.0", "received": "^0.2.0" }
     ConfigUnsatisfied {
         error: String,
-    }, // { "type": "config-unsatisfied", "errors": ["Bitcoin Core must have pruning set to manual."] }
-    NotRunning, // { "type": "not-running" }
+    }, // { "type": "config-unsatisfied", "error": "Bitcoin Core must have pruning set to manual." }
+    NotRunning,   // { "type": "not-running" }
     HealthChecksFailed {
         failures: IndexMap<HealthCheckId, HealthCheckResult>,
     }, // { "type": "health-checks-failed", "checks": { "rpc": { "time": "2021-05-11T18:21:29Z", "result": "warming-up" } } }
+}
+impl DependencyError {
+    pub fn merge_with(self, other: DependencyError) -> DependencyError {
+        use DependencyError::*;
+        match (self, other) {
+            (NotInstalled, _) => NotInstalled,
+            (_, NotInstalled) => NotInstalled,
+            (IncorrectVersion { expected, received }, _) => IncorrectVersion { expected, received },
+            (_, IncorrectVersion { expected, received }) => IncorrectVersion { expected, received },
+            (ConfigUnsatisfied { error: e0 }, ConfigUnsatisfied { error: e1 }) => {
+                ConfigUnsatisfied {
+                    error: e0 + "\n" + &e1,
+                }
+            }
+            (ConfigUnsatisfied { error }, _) => ConfigUnsatisfied { error },
+            (_, ConfigUnsatisfied { error }) => ConfigUnsatisfied { error },
+            (NotRunning, _) => NotRunning,
+            (_, NotRunning) => NotRunning,
+            (HealthChecksFailed { failures: f0 }, HealthChecksFailed { failures: f1 }) => {
+                HealthChecksFailed {
+                    failures: f0.into_iter().chain(f1.into_iter()).collect(),
+                }
+            }
+        }
+    }
 }
 impl std::fmt::Display for DependencyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -66,9 +91,16 @@ impl std::fmt::Display for DependencyError {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+pub struct TaggedDependencyError {
+    pub dependency: PackageId,
+    pub error: DependencyError,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct BreakageRes {
     pub patch: DiffPatch,
-    pub breakages: IndexMap<PackageId, DependencyError>,
+    pub breakages: IndexMap<PackageId, TaggedDependencyError>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
