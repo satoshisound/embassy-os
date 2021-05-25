@@ -33,8 +33,13 @@ impl IpPool {
         let _ = self.0.return_id(id as u16);
     }
 }
+impl Default for IpPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-#[derive(Clone, Debug, Deserialize, Serialize, HasModel)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, HasModel)]
 pub struct Network {
     pub ip_pool: IpPool,
     pub hosts: Hosts,

@@ -173,7 +173,7 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
 
         Ok(res)
     }
-    let (status_sender, mut statuses_recv) = tokio::sync::mpsc::channel(status_manifest.len());
+    let (status_sender, mut statuses_recv) = tokio::sync::mpsc::channel(status_manifest.len() + 1);
     futures::stream::iter(
         status_manifest
             .clone()

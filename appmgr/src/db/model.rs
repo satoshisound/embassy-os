@@ -31,6 +31,29 @@ pub struct Database {
     pub network: Network,
     pub ui: Value,
 }
+impl Database {
+    pub fn init() -> Self {
+        // TODO
+        Database {
+            server_info: ServerInfo {
+                id: "c3ad21d8".to_owned(),
+                version: emver::Version::new(0, 3, 0, 0).into(),
+                lan_address: "https://start9-c3ad21d8.local".parse().unwrap(),
+                tor_address:
+                    "http://privacy34kn4ez3y3nijweec6w4g54i3g54sdv7r5mr6soma3w4begyd.onion"
+                        .parse()
+                        .unwrap(),
+                updating: false,
+                registry: "https://registry.start9.com".parse().unwrap(),
+                unread_notification_count: 0,
+            },
+            package_data: AllPackageData::default(),
+            broken_packages: Vec::new(),
+            network: Network::default(),
+            ui: Value::Object(Default::default()),
+        }
+    }
+}
 impl DatabaseModel {
     pub fn new() -> Self {
         Self::from(JsonPointer::default())
@@ -49,7 +72,7 @@ pub struct ServerInfo {
     unread_notification_count: u64,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct AllPackageData(pub IndexMap<PackageId, PackageDataEntry>);
 impl Map for AllPackageData {
     type Key = PackageId;

@@ -3,6 +3,7 @@ use std::path::Path;
 use futures::future::try_join_all;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::util::Invoke;
 use crate::{Error, ResultExt as _};
@@ -134,10 +135,6 @@ pub async fn list() -> Result<Disks, Error> {
     ))
 }
 
-pub async fn mount_main_disk(logicalname: &str, password: &str) -> Result<(), Error> {
-    todo!()
-}
-
 pub async fn mount<P: AsRef<Path>>(logicalname: &str, mount_point: P) -> Result<(), Error> {
     let is_mountpoint = tokio::process::Command::new("mountpoint")
         .arg(mount_point.as_ref())
@@ -161,6 +158,38 @@ pub async fn mount<P: AsRef<Path>>(logicalname: &str, mount_point: P) -> Result<
         std::str::from_utf8(&mount_output.stderr).unwrap_or("Unknown Error")
     );
     Ok(())
+}
+
+pub async fn mount_encfs<P0: AsRef<Path>, P1: AsRef<Path>>(
+    src: P0,
+    dst: P1,
+    password: &str,
+) -> Result<(), Error> {
+    let mut encfs = tokio::process::Command::new("encfs")
+        .arg("--standard")
+        .arg("--public")
+        .arg("-S")
+        .arg(src.as_ref())
+        .arg(dst.as_ref())
+        .stdin(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+    let mut stdin = encfs.stdin.take().unwrap();
+    let mut stderr = encfs.stderr.take().unwrap();
+    stdin.write_all(password.as_bytes()).await?;
+    stdin.flush().await?;
+    stdin.shutdown().await?;
+    drop(stdin);
+    let mut err = String::new();
+    stderr.read_to_string(&mut err).await?;
+    if !encfs.wait().await?.success() {
+        Err(Error::new(
+            anyhow::anyhow!("{}", err),
+            crate::ErrorKind::Filesystem,
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 pub async fn unmount<P: AsRef<Path>>(mount_point: P) -> Result<(), Error> {

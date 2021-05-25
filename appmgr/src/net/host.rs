@@ -10,7 +10,7 @@ use crate::{Error, HOST_IP};
 
 pub const TLD: &'static str = "embassy";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Hosts(pub IndexMap<PackageId, Ipv4Addr>);
 impl Hosts {
     pub fn docker_args(&self) -> Vec<OsString> {
