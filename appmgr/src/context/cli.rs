@@ -67,7 +67,7 @@ impl CliContext {
         }
         Ok(CliContext(Arc::new(CliContextSeed {
             host: base.host.unwrap_or(Host::Ipv4([127, 0, 0, 1].into())),
-            port: base.port.unwrap_or(5960),
+            port: base.port.unwrap_or(5959),
             client: if let Some(proxy) = base.proxy {
                 Client::builder()
                     .proxy(Proxy::all(proxy).with_kind(crate::ErrorKind::ParseUrl)?)

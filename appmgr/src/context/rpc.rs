@@ -62,7 +62,7 @@ impl RpcContext {
             RpcContextConfig::default()
         };
         let seed = Arc::new(RpcContextSeed {
-            bind: base.bind.unwrap_or(([127, 0, 0, 1], 5960).into()),
+            bind: base.bind.unwrap_or(([127, 0, 0, 1], 5959).into()),
             db: PatchDb::open(
                 base.db
                     .unwrap_or_else(|| Path::new("/mnt/embassy-os/embassy.db").to_owned()),

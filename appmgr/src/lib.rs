@@ -35,13 +35,18 @@ pub mod version;
 pub mod volume;
 
 pub use config::Config;
-use context::EitherContext;
+use context::{CliContext, EitherContext};
 pub use error::{Error, ErrorKind, ResultExt};
 use rpc_toolkit::command;
 use rpc_toolkit::yajrc::RpcError;
 pub use version::{init, self_update};
 
-#[command(subcommands(config::config))]
+#[command(subcommands(config::config, version::git_info))]
 pub fn main_api(#[context] ctx: EitherContext) -> Result<EitherContext, RpcError> {
+    Ok(ctx)
+}
+
+#[command(subcommands(version::git_info))]
+pub fn portable_api(#[context] ctx: EitherContext) -> Result<EitherContext, RpcError> {
     Ok(ctx)
 }

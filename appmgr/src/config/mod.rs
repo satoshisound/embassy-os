@@ -183,7 +183,7 @@ pub fn set(
     #[arg(long = "format")] format: Option<IoFormat>,
     #[arg(long = "timeout", parse(parse_duration))] timeout: Option<Duration>,
     #[arg(stdin, parse(parse_stdin_deserializable))] config: Option<Config>,
-    #[arg(rename = "expireId", long = "expire-id")] expire_id: Option<String>,
+    #[arg(rename = "expire-id", long = "expire-id")] expire_id: Option<String>,
 ) -> Result<
     ExtendedContext<EitherContext, (PackageId, Option<Config>, Option<Duration>, Option<String>)>,
     Error,
