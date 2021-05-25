@@ -198,7 +198,12 @@ export interface BreakageRes {
 }
 
 export interface Breakages {
-  [id: string]: DependencyError
+  [id: string]: TaggedDependencyError
+}
+
+export interface TaggedDependencyError {
+  dependency: string,
+  error: DependencyError,
 }
 
 export interface Log {
