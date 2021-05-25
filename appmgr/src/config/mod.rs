@@ -3,7 +3,7 @@ use std::time::Duration;
 use futures::future::{BoxFuture, FutureExt};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use patch_db::{DbHandle, DiffPatch};
+use patch_db::DbHandle;
 use rand::SeedableRng;
 use regex::Regex;
 use rpc_toolkit::command;
@@ -16,10 +16,8 @@ use crate::db::util::WithRevision;
 use crate::dependencies::{BreakageRes, DependencyError, TaggedDependencyError};
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
-use crate::status::MainStatus;
 use crate::util::{
-    display_none, display_serializable, from_yaml_async_reader, parse_duration,
-    parse_stdin_deserializable, to_yaml_async_writer, IoFormat,
+    display_none, display_serializable, parse_duration, parse_stdin_deserializable, IoFormat,
 };
 use crate::{Error, ResultExt as _};
 
