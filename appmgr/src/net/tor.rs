@@ -1,12 +1,12 @@
 use std::collections::{BTreeSet, HashMap};
 use std::net::Ipv4Addr;
 use std::os::unix::process::ExitStatusExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::util::{Invoke, PersistencePath, YamlUpdateHandle};
+use crate::util::Invoke;
 use crate::{Error, ResultExt as _};
 
 #[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
@@ -165,21 +165,6 @@ impl ServicesMap {
     }
 }
 
-pub async fn services_map(path: &PersistencePath) -> Result<ServicesMap, Error> {
-    let f = path.maybe_read(false).await.transpose()?;
-    if let Some(mut f) = f {
-        crate::util::from_yaml_async_reader(&mut *f).await
-    } else {
-        Ok(Default::default())
-    }
-}
-
-pub async fn services_map_mut(
-    path: PersistencePath,
-) -> Result<YamlUpdateHandle<ServicesMap>, Error> {
-    YamlUpdateHandle::new_or_default(path).await
-}
-
 pub async fn write_services(hidden_services: &ServicesMap) -> Result<(), Error> {
     tokio::fs::copy(crate::TOR_RC, ETC_TOR_RC)
         .await
@@ -250,16 +235,14 @@ pub async fn write_lan_services(hidden_services: &ServicesMap) -> Result<(), Err
             match &mapping.lan {
                 Some(LanOptions::Standard) => {
                     log::info!("Writing LAN certificates for {}", app_id);
-                    let base_path = PersistencePath::from_ref("apps").join(&app_id);
-                    let key_path = base_path.join("cert-local.key.pem").path();
-                    let conf_path = base_path.join("cert-local.csr.conf").path();
-                    let req_path = base_path.join("cert-local.csr").path();
-                    let cert_path = base_path.join("cert-local.crt.pem").path();
+                    let base_path: PathBuf = todo!(); //PersistencePath::from_ref("apps").join(&app_id);
+                    let key_path = base_path.join("cert-local.key.pem");
+                    let conf_path = base_path.join("cert-local.csr.conf");
+                    let req_path = base_path.join("cert-local.csr");
+                    let cert_path = base_path.join("cert-local.crt.pem");
                     let fullchain_path = base_path.join("cert-local.fullchain.crt.pem");
-                    if !fullchain_path.exists().await
-                        || tokio::fs::metadata(&key_path).await.is_err()
-                    {
-                        let mut fullchain_file = fullchain_path.write(None).await?;
+                    if !fullchain_path.exists() || tokio::fs::metadata(&key_path).await.is_err() {
+                        let mut fullchain_file = tokio::fs::File::create(&fullchain_path).await?;
                         tokio::process::Command::new("openssl")
                             .arg("ecparam")
                             .arg("-genkey")
@@ -327,10 +310,10 @@ pub async fn write_lan_services(hidden_services: &ServicesMap) -> Result<(), Err
                                 let ctx = format!("CA: {}", e);
                                 crate::Error::new(e.source.context(ctx), e.kind)
                             })?;
-                        log::info!("Writing fullchain to: {}", fullchain_path.path().display());
+                        log::info!("Writing fullchain to: {}", fullchain_path.display());
                         tokio::io::copy(
                             &mut tokio::fs::File::open(&cert_path).await?,
-                            &mut *fullchain_file,
+                            &mut fullchain_file,
                         )
                         .await?;
                         tokio::io::copy(
@@ -344,7 +327,7 @@ pub async fn write_lan_services(hidden_services: &ServicesMap) -> Result<(), Err
                                     "/root/agent/ca/intermediate/certs/embassy-int-ca.crt.pem",
                                 )
                             })?,
-                            &mut *fullchain_file,
+                            &mut fullchain_file,
                         )
                         .await?;
                         tokio::io::copy(
@@ -358,11 +341,10 @@ pub async fn write_lan_services(hidden_services: &ServicesMap) -> Result<(), Err
                                     "/root/agent/ca/certs/embassy-root-ca.cert.pem",
                                 )
                             })?,
-                            &mut *fullchain_file,
+                            &mut fullchain_file,
                         )
                         .await?;
-                        fullchain_file.commit().await?;
-                        log::info!("{} written successfully", fullchain_path.path().display());
+                        log::info!("{} written successfully", fullchain_path.display());
                     }
                     f.write_all(
                         format!(
@@ -499,8 +481,8 @@ pub async fn set_svc(
         crate::SERVICES_YAML
     );
     let is_listening = !service.ports.is_empty();
-    let path = PersistencePath::from_ref(crate::SERVICES_YAML);
-    let mut hidden_services = services_map_mut(path).await?;
+    // let path = PersistencePath::from_ref(crate::SERVICES_YAML);
+    let mut hidden_services: ServicesMap = todo!(); //services_map_mut(path).await?;
     let ver = service.hidden_service_version;
     let ip = hidden_services.add(name.to_owned(), service);
     log::info!("Adding Tor hidden service {} to {}.", name, ETC_TOR_RC);
@@ -564,8 +546,8 @@ pub async fn rm_svc(name: &str) -> Result<(), Error> {
         name,
         crate::SERVICES_YAML
     );
-    let path = PersistencePath::from_ref(crate::SERVICES_YAML);
-    let mut hidden_services = services_map_mut(path).await?;
+    // let path = PersistencePath::from_ref(crate::SERVICES_YAML);
+    let mut hidden_services: ServicesMap = todo!(); //services_map_mut(path).await?;
     hidden_services.remove(name);
     let hidden_service_path = Path::new(HIDDEN_SERVICE_DIR_ROOT).join(format!("app-{}", name));
     log::info!("Removing {}", hidden_service_path.display());
@@ -637,18 +619,18 @@ pub async fn change_key(
         "Failed to Reload Tor: {}",
         svc_exit.code().unwrap_or(0)
     );
-    let mut info = crate::apps::list_info_mut().await?;
-    if let Some(mut i) = info.get_mut(name) {
-        if i.tor_address.is_some() {
-            i.tor_address = Some(read_tor_address(name, Some(Duration::from_secs(30))).await?);
-        }
-    }
+    // let mut info = crate::apps::list_info_mut().await?;
+    // if let Some(mut i) = info.get_mut(name) {
+    //     if i.tor_address.is_some() {
+    //         i.tor_address = Some(read_tor_address(name, Some(Duration::from_secs(30))).await?);
+    //     }
+    // }
     Ok(())
 }
 
 pub async fn reload() -> Result<(), Error> {
-    let path = PersistencePath::from_ref(crate::SERVICES_YAML);
-    let hidden_services = services_map(&path).await?;
+    // let path = PersistencePath::from_ref(crate::SERVICES_YAML);
+    let hidden_services = todo!(); //services_map(&path).await?;
     log::info!("Syncing Tor hidden services to {}.", ETC_TOR_RC);
     write_services(&hidden_services).await?;
     log::info!("Reloading Tor.");
@@ -665,8 +647,8 @@ pub async fn reload() -> Result<(), Error> {
 }
 
 pub async fn restart() -> Result<(), Error> {
-    let path = PersistencePath::from_ref(crate::SERVICES_YAML);
-    let hidden_services = services_map(&path).await?;
+    // let path = PersistencePath::from_ref(crate::SERVICES_YAML);
+    let hidden_services = todo!(); //services_map(&path).await?;
     log::info!("Syncing Tor hidden services to {}.", ETC_TOR_RC);
     write_services(&hidden_services).await?;
     log::info!("Restarting Tor.");

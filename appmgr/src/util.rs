@@ -2,7 +2,7 @@ use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{exit, Stdio};
 use std::str::FromStr;
 use std::time::Duration;
@@ -349,9 +349,10 @@ impl<T> SNone<T> {
 impl<T> SOption<T> for SNone<T> {}
 
 #[derive(Debug, Serialize)]
+#[serde(untagged)]
 pub enum ValuePrimative {
     Null,
-    Boolean(bool), // TODO
+    Boolean(bool),
     String(String),
     Number(serde_json::Number),
 }
@@ -377,6 +378,12 @@ impl<'de> serde::de::Deserialize<'de> for ValuePrimative {
                 E: serde::de::Error,
             {
                 Ok(ValuePrimative::Null)
+            }
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ValuePrimative::Boolean(v))
             }
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
@@ -741,12 +748,12 @@ pub fn parse_duration(arg: &str, matches: &ArgMatches<'_>) -> Result<Duration, E
     })?;
     let (num, units) = arg.split_at(units_idx);
     match units {
-        "d" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()? * 86400)),
-        "d" => Ok(Duration::from_secs(num.parse()? * 86400)),
-        "h" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()? * 3600)),
-        "h" => Ok(Duration::from_secs(num.parse()? * 3600)),
-        "m" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()? * 60)),
-        "m" => Ok(Duration::from_secs(num.parse()? * 60)),
+        "d" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse::<f64>()? * 86400_f64)),
+        "d" => Ok(Duration::from_secs(num.parse::<u64>()? * 86400)),
+        "h" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse::<f64>()? * 3600_f64)),
+        "h" => Ok(Duration::from_secs(num.parse::<u64>()? * 3600)),
+        "m" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse::<f64>()? * 60_f64)),
+        "m" => Ok(Duration::from_secs(num.parse::<u64>()? * 60)),
         "s" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()?)),
         "s" => Ok(Duration::from_secs(num.parse()?)),
         "ms" => Ok(Duration::from_millis(num.parse()?)),

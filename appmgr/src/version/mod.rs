@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
+use patch_db::DbHandle;
 use tokio_compat_02::FutureExt;
 
 // mod v0_1_0;
@@ -28,6 +29,7 @@ use tokio_compat_02::FutureExt;
 // pub use v0_2_12::Version as Current;
 pub type Current = ();
 
+use crate::context::RpcContext;
 use crate::util::{to_yaml_async_writer, AsyncCompat};
 use crate::{Error, ResultExt as _};
 
@@ -64,13 +66,18 @@ where
 {
     type Previous: VersionT;
     fn new() -> Self;
-    fn semver(&self) -> &'static emver::Version;
-    async fn up(&self) -> Result<(), Error>;
-    async fn down(&self) -> Result<(), Error>;
-    async fn commit(&self) -> Result<(), Error> {
-        let mut out = PersistencePath::from_ref("version").write(None).await?;
-        to_yaml_async_writer(out.as_mut(), &self.semver()).await?;
-        out.commit().await?;
+    fn semver(&self) -> &'static crate::util::Version;
+    async fn up<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error>;
+    async fn down<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error>;
+    async fn commit<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error> {
+        let version = crate::db::DatabaseModel::new()
+            .server_info()
+            .version()
+            .get_mut(db)
+            .await?;
+        *version = self.semver().clone();
+        version.save(db).await?;
+
         Ok(())
     }
     async fn migrate_to<V: VersionT>(&self, version: &V) -> Result<(), Error> {
@@ -143,142 +150,9 @@ impl VersionT for () {
 }
 
 pub async fn init() -> Result<(), Error> {
-    let _lock = PersistencePath::from_ref("").lock(true).await?;
-    let vpath = PersistencePath::from_ref("version");
-    if let Some(mut f) = vpath.maybe_read(false).await.transpose()? {
-        let v: Version = crate::util::from_yaml_async_reader(&mut *f).await?;
-        match v {
-            Version::V0_0_0(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_1_0(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_1_1(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_1_2(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_1_3(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_1_4(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_1_5(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_0(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_1(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_2(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_3(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_4(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_5(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_6(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_7(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_8(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_9(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_10(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_11(v) => v.0.migrate_to(&Current::new()).await?,
-            // Version::V0_2_12(v) => v.0.migrate_to(&Current::new()).await?,
-            Version::Other(_) => (),
-            // TODO find some way to automate this?
-        }
-    } else {
-        ().migrate_to(&Current::new()).await?;
-    }
-    Ok(())
+    todo!()
 }
 
 pub async fn self_update(requirement: emver::VersionRange) -> Result<(), Error> {
-    let req_str: String = format!("{}", requirement)
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
-    let url = format!("{}/appmgr?spec={}", &*crate::SYS_REGISTRY_URL, req_str);
-    log::info!("Fetching new version from {}", url);
-    let response = reqwest::get(&url)
-        .compat()
-        .await
-        .with_kind(crate::ErrorKind::Network)?
-        .error_for_status()
-        .with_kind(crate::ErrorKind::Registry)?;
-    let tmp_appmgr_path = PersistencePath::from_ref("appmgr").tmp();
-    if let Some(parent) = tmp_appmgr_path.parent() {
-        if !parent.exists() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .with_kind(crate::ErrorKind::Filesystem)?;
-        }
-    }
-    let mut f = tokio::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(&tmp_appmgr_path)
-        .await
-        .with_ctx(|_| {
-            (
-                crate::ErrorKind::Filesystem,
-                tmp_appmgr_path.display().to_string(),
-            )
-        })?;
-    tokio::io::copy(
-        &mut AsyncCompat(
-            response
-                .bytes_stream()
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-                .into_async_read(),
-        ),
-        &mut f,
-    )
-    .await?;
-    drop(f);
-    crate::ensure_code!(
-        tokio::process::Command::new("chmod")
-            .arg("700")
-            .arg(&tmp_appmgr_path)
-            .output()
-            .await?
-            .status
-            .success(),
-        crate::ErrorKind::Filesystem,
-        "chmod failed"
-    );
-    let out = std::process::Command::new(&tmp_appmgr_path)
-        .arg("semver")
-        .stdout(std::process::Stdio::piped())
-        .spawn()?
-        .wait_with_output()
-        .with_ctx(|_| {
-            (
-                crate::ErrorKind::Unknown,
-                format!("{} semver", tmp_appmgr_path.display()),
-            )
-        })?;
-    let out_str = std::str::from_utf8(&out.stdout)?;
-    log::info!("Migrating to version {}", out_str);
-    let v: Version = serde_yaml::from_str(out_str)
-        .with_ctx(|_| (crate::ErrorKind::Deserialization, format!("{:?}", out_str)))?;
-    match v {
-        Version::V0_0_0(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_1_0(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_1_1(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_1_2(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_1_3(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_1_4(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_1_5(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_0(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_1(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_2(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_3(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_4(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_5(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_6(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_7(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_8(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_9(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_10(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_11(v) => Current::new().migrate_to(&v.0).await?,
-        // Version::V0_2_12(v) => Current::new().migrate_to(&v.0).await?,
-        Version::Other(_) => (),
-        // TODO find some way to automate this?
-    };
-    let cur_path = std::path::Path::new("/usr/local/bin/appmgr");
-    tokio::fs::rename(&tmp_appmgr_path, &cur_path)
-        .await
-        .with_ctx(|_| {
-            (
-                crate::ErrorKind::Filesystem,
-                format!("{} -> {}", tmp_appmgr_path.display(), cur_path.display()),
-            )
-        })?;
-
-    Ok(())
+    todo!()
 }

@@ -134,7 +134,9 @@ pub async fn list() -> Result<Disks, Error> {
     ))
 }
 
-pub async fn mount_main_disk(logicalname: &str, password: &str) -> Result<(), Error> {}
+pub async fn mount_main_disk(logicalname: &str, password: &str) -> Result<(), Error> {
+    todo!()
+}
 
 pub async fn mount<P: AsRef<Path>>(logicalname: &str, mount_point: P) -> Result<(), Error> {
     let is_mountpoint = tokio::process::Command::new("mountpoint")

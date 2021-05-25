@@ -9,6 +9,9 @@ use crate::s9pk::manifest::PackageId;
 use crate::{Error, ResultExt};
 
 pub mod host;
+#[cfg(feature = "avahi")]
+pub mod mdns;
+pub mod tor;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IpPool(IdPool);

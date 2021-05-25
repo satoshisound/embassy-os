@@ -25,8 +25,6 @@ pub mod dependencies;
 pub mod error;
 pub mod id;
 pub mod install;
-#[cfg(feature = "avahi")]
-pub mod lan;
 pub mod migration;
 pub mod net;
 pub mod registry;
@@ -36,18 +34,14 @@ pub mod util;
 pub mod version;
 pub mod volume;
 
-pub use config::{configure, Config};
+pub use config::Config;
 use context::EitherContext;
 pub use error::{Error, ErrorKind, ResultExt};
-pub use logs::{logs, notifications, stats, LogOptions};
-pub use pack::{pack, verify};
-pub use remove::remove;
 use rpc_toolkit::command;
 use rpc_toolkit::yajrc::RpcError;
-pub use update::update;
 pub use version::{init, self_update};
 
-#[command]
-pub fn main_api(#[context] ctx: EitherContext) -> Result<String, RpcError> {
-    Ok(todo!())
+#[command(subcommands(config::config))]
+pub fn main_api(#[context] ctx: EitherContext) -> Result<EitherContext, RpcError> {
+    Ok(ctx)
 }

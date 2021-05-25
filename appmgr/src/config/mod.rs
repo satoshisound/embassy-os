@@ -10,7 +10,7 @@ use rpc_toolkit::command;
 use serde_json::Value;
 
 use crate::config::spec::PackagePointerSpecVariant;
-use crate::context::{ExtendedContext, RpcContext};
+use crate::context::{EitherContext, ExtendedContext, RpcContext};
 use crate::db::model::InstalledPackageDataEntryModel;
 use crate::db::util::WithRevision;
 use crate::dependencies::{BreakageRes, DependencyError, TaggedDependencyError};
@@ -133,18 +133,18 @@ pub enum MatchError {
 
 #[command(subcommands(get, set))]
 pub fn config(
-    #[context] ctx: RpcContext,
+    #[context] ctx: EitherContext,
     #[arg] id: PackageId,
-) -> Result<ExtendedContext<RpcContext, PackageId>, Error> {
+) -> Result<ExtendedContext<EitherContext, PackageId>, Error> {
     Ok(ExtendedContext::from(ctx).map(|_| id))
 }
 
 #[command(display(display_serializable))]
 pub async fn get(
-    #[context] ctx: ExtendedContext<RpcContext, PackageId>,
+    #[context] ctx: ExtendedContext<EitherContext, PackageId>,
     #[arg(long = "format")] format: Option<IoFormat>,
 ) -> Result<ConfigRes, Error> {
-    let mut db = ctx.base().db.handle();
+    let mut db = ctx.base().as_rpc().unwrap().db.handle();
     let pkg_model = crate::db::DatabaseModel::new()
         .package_data()
         .idx_model(ctx.extension())
@@ -179,13 +179,13 @@ pub async fn get(
 
 #[command(subcommands(self(set_impl(async)), set_dry), display(display_none))]
 pub fn set(
-    #[context] ctx: ExtendedContext<RpcContext, PackageId>,
+    #[context] ctx: ExtendedContext<EitherContext, PackageId>,
     #[arg(long = "format")] format: Option<IoFormat>,
     #[arg(long = "timeout", parse(parse_duration))] timeout: Option<Duration>,
     #[arg(stdin, parse(parse_stdin_deserializable))] config: Option<Config>,
     #[arg(rename = "expireId", long = "expire-id")] expire_id: Option<String>,
 ) -> Result<
-    ExtendedContext<RpcContext, (PackageId, Option<Config>, Option<Duration>, Option<String>)>,
+    ExtendedContext<EitherContext, (PackageId, Option<Config>, Option<Duration>, Option<String>)>,
     Error,
 > {
     Ok(ctx.map(|id| (id, config, timeout, expire_id)))
@@ -194,12 +194,12 @@ pub fn set(
 #[command(display(display_serializable))]
 pub async fn set_dry(
     #[context] ctx: ExtendedContext<
-        RpcContext,
+        EitherContext,
         (PackageId, Option<Config>, Option<Duration>, Option<String>),
     >,
 ) -> Result<BreakageRes, Error> {
     let (ctx, (id, config, timeout, _)) = ctx.split();
-    let mut db = ctx.db.handle();
+    let mut db = ctx.as_rpc().unwrap().db.handle();
     let hosts = crate::db::DatabaseModel::new()
         .network()
         .hosts()
@@ -237,10 +237,13 @@ pub async fn set_dry(
 }
 
 pub async fn set_impl(
-    ctx: ExtendedContext<RpcContext, (PackageId, Option<Config>, Option<Duration>, Option<String>)>,
+    ctx: ExtendedContext<
+        EitherContext,
+        (PackageId, Option<Config>, Option<Duration>, Option<String>),
+    >,
 ) -> Result<WithRevision<()>, Error> {
     let (ctx, (id, config, timeout, expire_id)) = ctx.split();
-    let mut db = ctx.db.handle();
+    let mut db = ctx.as_rpc().unwrap().db.handle();
     let hosts = crate::db::DatabaseModel::new()
         .network()
         .hosts()
