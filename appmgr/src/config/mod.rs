@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use bollard::container::KillContainerOptions;
+use bollard::Docker;
 use futures::future::{BoxFuture, FutureExt};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -9,8 +11,9 @@ use regex::Regex;
 use rpc_toolkit::command;
 use serde_json::Value;
 
+use crate::action::docker::DockerAction;
 use crate::config::spec::PackagePointerSpecVariant;
-use crate::context::{EitherContext, ExtendedContext, RpcContext};
+use crate::context::{EitherContext, ExtendedContext};
 use crate::db::model::InstalledPackageDataEntryModel;
 use crate::db::util::WithRevision;
 use crate::dependencies::{BreakageRes, DependencyError, TaggedDependencyError};
@@ -142,7 +145,9 @@ pub fn config(
 #[command(display(display_serializable))]
 pub async fn get(
     #[context] ctx: ExtendedContext<EitherContext, PackageId>,
-    #[arg(long = "format")] format: Option<IoFormat>,
+    #[allow(unused_variables)]
+    #[arg(long = "format")]
+    format: Option<IoFormat>,
 ) -> Result<ConfigRes, Error> {
     let mut db = ctx.base().as_rpc().unwrap().db.handle();
     let pkg_model = crate::db::DatabaseModel::new()
@@ -180,7 +185,9 @@ pub async fn get(
 #[command(subcommands(self(set_impl(async)), set_dry), display(display_none))]
 pub fn set(
     #[context] ctx: ExtendedContext<EitherContext, PackageId>,
-    #[arg(long = "format")] format: Option<IoFormat>,
+    #[allow(unused_variables)]
+    #[arg(long = "format")]
+    format: Option<IoFormat>,
     #[arg(long = "timeout", parse(parse_duration))] timeout: Option<Duration>,
     #[arg(stdin, parse(parse_stdin_deserializable))] config: Option<Config>,
     #[arg(rename = "expire-id", long = "expire-id")] expire_id: Option<String>,
@@ -199,7 +206,8 @@ pub async fn set_dry(
     >,
 ) -> Result<BreakageRes, Error> {
     let (ctx, (id, config, timeout, _)) = ctx.split();
-    let mut db = ctx.as_rpc().unwrap().db.handle();
+    let rpc_ctx = ctx.as_rpc().unwrap();
+    let mut db = rpc_ctx.db.handle();
     let hosts = crate::db::DatabaseModel::new()
         .network()
         .hosts()
@@ -209,6 +217,7 @@ pub async fn set_dry(
     let mut breakages = IndexMap::new();
     configure(
         &mut tx,
+        &rpc_ctx.docker,
         &*hosts,
         &id,
         config,
@@ -243,7 +252,8 @@ pub async fn set_impl(
     >,
 ) -> Result<WithRevision<()>, Error> {
     let (ctx, (id, config, timeout, expire_id)) = ctx.split();
-    let mut db = ctx.as_rpc().unwrap().db.handle();
+    let rpc_ctx = ctx.as_rpc().unwrap();
+    let mut db = rpc_ctx.db.handle();
     let hosts = crate::db::DatabaseModel::new()
         .network()
         .hosts()
@@ -253,6 +263,7 @@ pub async fn set_impl(
     let mut breakages = IndexMap::new();
     configure(
         &mut tx,
+        &rpc_ctx.docker,
         &*hosts,
         &id,
         config,
@@ -282,6 +293,7 @@ pub async fn set_impl(
 
 fn configure<'a, Db: DbHandle>(
     db: &'a mut Db,
+    docker: &'a Docker,
     hosts: &'a Hosts,
     id: &'a PackageId,
     config: Option<Config>,
@@ -321,7 +333,6 @@ fn configure<'a, Db: DbHandle>(
             config: old_config,
             spec,
         } = action.get(id, &*version, &*volumes, &*hosts).await?;
-        let original = old_config.clone().map(Value::Object).unwrap_or_default();
 
         // determine new config to use
         let mut config = if let Some(config) = config.or_else(|| old_config.clone()) {
@@ -515,7 +526,8 @@ fn configure<'a, Db: DbHandle>(
                     if let PackagePointerSpecVariant::Config { selector, multi } = ptr {
                         if selector.select(*multi, &next) != selector.select(*multi, &prev) {
                             if let Err(e) = configure(
-                                db, hosts, dependent, None, timeout, dry_run, overrides, breakages,
+                                db, docker, hosts, dependent, None, timeout, dry_run, overrides,
+                                breakages,
                             )
                             .await
                             {
@@ -546,6 +558,29 @@ fn configure<'a, Db: DbHandle>(
                 }
             }
         }
+
+        if let Some(signal) = signal {
+            docker
+                .kill_container(
+                    &DockerAction::container_name(id, &*version),
+                    Some(KillContainerOptions {
+                        signal: signal.to_string(),
+                    }),
+                )
+                .await
+                // ignore container is not running https://docs.docker.com/engine/api/v1.41/#operation/ContainerKill
+                .or_else(|e| {
+                    if matches!(
+                        e,
+                        bollard::errors::Error::DockerResponseConflictError { .. }
+                    ) {
+                        Ok(())
+                    } else {
+                        Err(e)
+                    }
+                })?;
+        }
+
         Ok(())
     }
     .boxed()

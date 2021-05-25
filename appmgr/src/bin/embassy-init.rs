@@ -1,19 +1,10 @@
-use std::time::Duration;
-
-use embassy::context::{EitherContext, RpcContext};
-use embassy::status::synchronize_all;
-use embassy::util::daemon;
-use embassy::{Error, ErrorKind};
-use futures::TryFutureExt;
-use rpc_toolkit::hyper::StatusCode;
-use rpc_toolkit::rpc_server;
-
-fn status_fn(_: i32) -> StatusCode {
-    StatusCode::OK
-}
+use embassy::Error;
 
 async fn inner_main() -> Result<(), Error> {
-    todo!()
+    // os sync
+    embassy::volume::disk::mount("/dev/sda", "/mnt/embassy-os-crypt").await?;
+
+    Ok(())
 }
 
 fn main() {

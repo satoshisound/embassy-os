@@ -469,7 +469,7 @@ impl ValueSpec for ValueSpecBoolean {
     ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
+    fn pointers(&self, _value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         Ok(Vec::new())
     }
     fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
@@ -556,7 +556,7 @@ impl ValueSpec for ValueSpecEnum {
     ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
+    fn pointers(&self, _value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         Ok(Vec::new())
     }
     fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
@@ -654,7 +654,7 @@ where
             )))
         }
     }
-    fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
+    fn pointers(&self, _value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         Ok(Vec::new())
     }
     fn requires(&self, id: &PackageId, value: &Value) -> bool {
@@ -863,7 +863,7 @@ impl ValueSpec for ValueSpecNumber {
     ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
+    fn pointers(&self, _value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         Ok(Vec::new())
     }
     fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
@@ -1168,7 +1168,7 @@ impl ValueSpec for ValueSpecString {
     ) -> Result<(), ConfigurationError> {
         Ok(())
     }
-    fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
+    fn pointers(&self, _value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         Ok(Vec::new())
     }
     fn requires(&self, _id: &PackageId, _value: &Value) -> bool {
@@ -1520,7 +1520,7 @@ impl ValueSpec for ValueSpecPointer {
             ValueSpecPointer::System(a) => a.update(db, config_overrides, value).await,
         }
     }
-    fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
+    fn pointers(&self, _value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         Ok(vec![self.clone()])
     }
     fn requires(&self, id: &PackageId, value: &Value) -> bool {
@@ -1669,7 +1669,7 @@ impl ValueSpec for PackagePointerSpec {
         *value = self.deref(db, config_overrides).await?;
         Ok(())
     }
-    fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
+    fn pointers(&self, _value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         Ok(vec![ValueSpecPointer::Package(self.clone())])
     }
     fn requires(&self, id: &PackageId, _value: &Value) -> bool {

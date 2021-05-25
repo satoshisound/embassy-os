@@ -10,7 +10,6 @@ use rpc_toolkit::Context;
 use serde::Deserialize;
 use sqlx::SqlitePool;
 use tokio::fs::File;
-use tokio::sync::RwLock;
 
 use crate::util::{from_yaml_async_reader, AsyncFileExt};
 use crate::{Error, ResultExt};
@@ -27,25 +26,6 @@ pub struct RpcContextSeed {
     pub db: PatchDb,
     pub secret_store: SqlitePool,
     pub docker: Docker,
-}
-
-#[derive(Clone)]
-pub struct MaybeAuthedRpcContext(Arc<RwLock<Option<Arc<RpcContextSeed>>>>);
-impl MaybeAuthedRpcContext {
-    pub fn new() -> Self {
-        MaybeAuthedRpcContext(Arc::new(RwLock::new(None)))
-    }
-
-    pub async fn authed(&self) -> Result<RpcContext, Error> {
-        if let Some(ctx) = self.0.read().await.clone() {
-            Ok(RpcContext(ctx))
-        } else {
-            Err(Error::new(
-                anyhow::anyhow!("Encrypted disk has not been unlocked"),
-                crate::ErrorKind::Authorization,
-            ))
-        }
-    }
 }
 
 #[derive(Clone)]
