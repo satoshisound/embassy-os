@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{exit, Stdio};
 use std::str::FromStr;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -297,6 +298,20 @@ pub fn deserialize_from_str_opt<
         }
     }
     deserializer.deserialize_any(Visitor(std::marker::PhantomData))
+}
+
+pub fn serialize_display<T: std::fmt::Display, S: Serializer>(
+    t: &T,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    String::serialize(&t.to_string(), serializer)
+}
+
+pub fn serialize_display_opt<T: std::fmt::Display, S: Serializer>(
+    t: &Option<T>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    Option::<String>::serialize(&t.as_ref().map(|t| t.to_string()), serializer)
 }
 
 pub async fn daemon<F: Fn() -> Fut, Fut: Future<Output = ()> + Send + 'static>(
@@ -698,7 +713,11 @@ pub fn display_serializable<T: Serialize>(t: T, matches: &ArgMatches<'_>) {
         .expect("Error serializing result to stdout")
 }
 
-pub fn parse_stdin_deserializable<'de, T: Deserialize<'de>>(
+pub fn display_none<T>(_: T, _: &ArgMatches) {
+    ()
+}
+
+pub fn parse_stdin_deserializable<T: for<'de> Deserialize<'de>>(
     stdin: &mut std::io::Stdin,
     matches: &ArgMatches<'_>,
 ) -> Result<T, Error> {
@@ -711,4 +730,31 @@ pub fn parse_stdin_deserializable<'de, T: Deserialize<'de>>(
         None => IoFormat::default(),
     };
     format.from_reader(stdin)
+}
+
+pub fn parse_duration(arg: &str, matches: &ArgMatches<'_>) -> Result<Duration, Error> {
+    let units_idx = arg.find(|c: char| c.is_alphabetic()).ok_or_else(|| {
+        Error::new(
+            anyhow::anyhow!("Must specify units for duration"),
+            crate::ErrorKind::Deserialization,
+        )
+    })?;
+    let (num, units) = arg.split_at(units_idx);
+    match units {
+        "d" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()? * 86400)),
+        "d" => Ok(Duration::from_secs(num.parse()? * 86400)),
+        "h" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()? * 3600)),
+        "h" => Ok(Duration::from_secs(num.parse()? * 3600)),
+        "m" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()? * 60)),
+        "m" => Ok(Duration::from_secs(num.parse()? * 60)),
+        "s" if num.contains(".") => Ok(Duration::from_secs_f64(num.parse()?)),
+        "s" => Ok(Duration::from_secs(num.parse()?)),
+        "ms" => Ok(Duration::from_millis(num.parse()?)),
+        "us" => Ok(Duration::from_micros(num.parse()?)),
+        "ns" => Ok(Duration::from_nanos(num.parse()?)),
+        _ => Err(Error::new(
+            anyhow::anyhow!("Invalid units for duration"),
+            crate::ErrorKind::Deserialization,
+        )),
+    }
 }

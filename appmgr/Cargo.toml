@@ -38,15 +38,14 @@ base32 = "0.4.0"
 bollard = "0.10.1"
 chrono = { version = "0.4.19", features = ["serde"] }
 clap = "2.33"
-ctrlc = "3.1.7"
 digest = "0.9.0"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 emver = { version = "0.1.2", features = ["serde"] }
 futures = "0.3.8"
 git-version = "0.3.4"
-hashlink = { version = "0.7.0", features = ["serde_impl"] }
 http = "0.2.3"
 id-pool = { version = "0.2.1", features = ["u16", "serde"], default-features = false }
+indexmap = { version = "1.6.2", features = ["serde"] }
 itertools = "0.10.0"
 jsonpath_lib = "0.2.6"
 lazy_static = "1.4"

@@ -7,14 +7,14 @@ use bollard::models::{ContainerStateStatusEnum, ContainerSummaryInner};
 use bollard::Docker;
 use chrono::{DateTime, Utc};
 use futures::{StreamExt, TryFutureExt};
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use patch_db::{DbHandle, HasModel, Map, MapModel, Model, ModelData, ModelDataMut};
 use serde::{Deserialize, Serialize};
 
 use self::health_check::{HealthCheckId, HealthCheckResult};
 use crate::action::docker::DockerAction;
 use crate::context::RpcContext;
-use crate::db::{InstalledPackageDataEntryModel, PackageDataEntryModel};
+use crate::db::model::{InstalledPackageDataEntryModel, PackageDataEntryModel};
 use crate::dependencies::DependencyError;
 use crate::id::InterfaceId;
 use crate::net::host::Hosts;
@@ -158,7 +158,7 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
     }
     drop(db);
     async fn main_status<Db: DbHandle>(
-        status_model: Model<Status>,
+        status_model: StatusModel,
         manifest: Arc<ModelData<Manifest>>,
         hosts: Arc<Hosts>,
         mut db: Db,
@@ -206,7 +206,7 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
     let statuses = Arc::new(statuses);
     async fn dependency_status<Db: DbHandle>(
         statuses: Arc<HashMap<PackageId, Status>>,
-        status_model: Model<Status>,
+        status_model: StatusModel,
         manifest: Arc<ModelData<Manifest>>,
         mut db: Db,
     ) -> Result<(), Error> {
@@ -241,7 +241,7 @@ pub async fn check_all(ctx: &RpcContext) -> Result<(), Error> {
     Ok(())
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, HasModel)]
 pub struct Status {
     pub configured: bool,
     pub main: MainStatus,
@@ -256,11 +256,11 @@ pub enum MainStatus {
     Stopping,
     Running {
         started: DateTime<Utc>,
-        health: LinkedHashMap<HealthCheckId, HealthCheckResult>,
+        health: IndexMap<HealthCheckId, HealthCheckResult>,
     },
     BackingUp {
         started: Option<DateTime<Utc>>,
-        health: LinkedHashMap<HealthCheckId, HealthCheckResult>,
+        health: IndexMap<HealthCheckId, HealthCheckResult>,
     },
     Restoring {
         running: bool,
@@ -373,7 +373,7 @@ impl MainStatus {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct DependencyErrors(LinkedHashMap<PackageId, DependencyError>);
+pub struct DependencyErrors(IndexMap<PackageId, DependencyError>);
 impl Map for DependencyErrors {
     type Key = PackageId;
     type Value = DependencyError;

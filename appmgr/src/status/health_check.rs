@@ -2,7 +2,7 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use emver::Version;
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::action::ActionImplementation;
@@ -43,7 +43,7 @@ impl<S: AsRef<str>> AsRef<Path> for HealthCheckId<S> {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HealthChecks(pub LinkedHashMap<HealthCheckId, HealthCheck>);
+pub struct HealthChecks(pub IndexMap<HealthCheckId, HealthCheck>);
 impl HealthChecks {
     pub async fn check_all(
         &self,
@@ -52,7 +52,7 @@ impl HealthChecks {
         pkg_version: &Version,
         volumes: &Volumes,
         hosts: &Hosts,
-    ) -> Result<LinkedHashMap<HealthCheckId, HealthCheckResult>, Error> {
+    ) -> Result<IndexMap<HealthCheckId, HealthCheckResult>, Error> {
         let res = futures::future::try_join_all(self.0.iter().map(|(id, check)| async move {
             Ok::<_, Error>((
                 id.clone(),

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use emver::VersionRange;
-use hashlink::LinkedHashMap;
-use patch_db::{DbHandle, DiffPatch};
+use indexmap::{IndexMap, IndexSet};
+use patch_db::{DbHandle, DiffPatch, HasModel, Map, MapModel};
 use serde::{Deserialize, Serialize};
 
 use crate::action::ActionImplementation;
@@ -20,7 +20,6 @@ use crate::{Error, ResultExt as _};
 #[serde(tag = "type")]
 pub enum DependencyError {
     NotInstalled, // { "type": "not-installed" }
-    NotRunning,   // { "type": "not-running" }
     IncorrectVersion {
         expected: VersionRange,
         received: Version,
@@ -28,8 +27,9 @@ pub enum DependencyError {
     ConfigUnsatisfied {
         error: String,
     }, // { "type": "config-unsatisfied", "errors": ["Bitcoin Core must have pruning set to manual."] }
+    NotRunning, // { "type": "not-running" }
     HealthChecksFailed {
-        failures: LinkedHashMap<HealthCheckId, HealthCheckResult>,
+        failures: IndexMap<HealthCheckId, HealthCheckResult>,
     }, // { "type": "health-checks-failed", "checks": { "rpc": { "time": "2021-05-11T18:21:29Z", "result": "warming-up" } } }
 }
 impl std::fmt::Display for DependencyError {
@@ -37,7 +37,6 @@ impl std::fmt::Display for DependencyError {
         use DependencyError::*;
         match self {
             NotInstalled => write!(f, "Not Installed"),
-            NotRunning => write!(f, "Not Running"),
             IncorrectVersion { expected, received } => write!(
                 f,
                 "Incorrect Version: Expected {}, Received {}",
@@ -47,6 +46,7 @@ impl std::fmt::Display for DependencyError {
             ConfigUnsatisfied { error } => {
                 write!(f, "Configuration Requirements Not Satisfied: {}", error)
             }
+            NotRunning => write!(f, "Not Running"),
             HealthChecksFailed { failures } => {
                 write!(f, "Failed Health Check(s): ")?;
                 let mut comma = false;
@@ -68,11 +68,21 @@ impl std::fmt::Display for DependencyError {
 #[serde(rename_all = "kebab-case")]
 pub struct BreakageRes {
     pub patch: DiffPatch,
-    pub breakages: LinkedHashMap<PackageId, DependencyError>,
+    pub breakages: IndexMap<PackageId, DependencyError>,
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-pub struct Dependencies(pub LinkedHashMap<PackageId, DepInfo>);
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct Dependencies(pub IndexMap<PackageId, DepInfo>);
+impl Map for Dependencies {
+    type Key = PackageId;
+    type Value = DepInfo;
+    fn get(&self, key: &Self::Key) -> Option<&Self::Value> {
+        self.0.get(key)
+    }
+}
+impl HasModel for Dependencies {
+    type Model = MapModel<Self>;
+}
 impl Dependencies {
     pub async fn check_status(
         &self,
@@ -82,13 +92,15 @@ impl Dependencies {
     }
 }
 
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename_all = "kebab-case")]
 pub struct DepInfo {
     pub version: VersionRange,
     pub optional: Option<String>,
     pub description: Option<String>,
+    pub critical: bool,
     #[serde(default)]
+    #[model]
     pub config: Option<DependencyConfig>,
 }
 impl DepInfo {
@@ -159,7 +171,7 @@ impl DepInfo {
                 health,
             }
             | MainStatus::Running { health, .. } => {
-                let mut failures = LinkedHashMap::with_capacity(health.len());
+                let mut failures = IndexMap::with_capacity(health.len());
                 for (check, res) in health {
                     if !matches!(res.result, HealthCheckResultVariant::Success) {
                         failures.insert(check.clone(), res.clone());
@@ -175,7 +187,7 @@ impl DepInfo {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, HasModel)]
 #[serde(rename_all = "kebab-case")]
 pub struct DependencyConfig {
     check: ActionImplementation,
@@ -186,17 +198,13 @@ impl DependencyConfig {
         &self,
         dependent_id: &PackageId,
         dependent_version: &Version,
-        dependent_config: &Config,
-    ) -> Result<(), Error> {
-        self.check
-            .sandboxed(dependent_id, dependent_version, Some(dependent_config))
+        dependency_config: &Config,
+    ) -> Result<Result<(), String>, Error> {
+        Ok(self
+            .check
+            .sandboxed(dependent_id, dependent_version, Some(dependency_config))
             .await?
-            .map_err(|e| {
-                Error::new(
-                    anyhow::anyhow!("{}", e.1),
-                    crate::ErrorKind::ConfigRulesViolation,
-                )
-            })
+            .map_err(|(_, e)| e))
     }
     pub async fn auto_configure(
         &self,

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use linear_map::LinkedHashMap;
+use linear_map::IndexMap;
 
 use crate::dependencies::{DependencyError, TaggedDependencyError};
 use crate::{Error, ResultExt as _};
@@ -9,9 +9,9 @@ pub async fn remove(
     name: &str,
     purge: bool,
     dry_run: bool,
-) -> Result<LinkedHashMap<String, TaggedDependencyError>, Error> {
+) -> Result<IndexMap<String, TaggedDependencyError>, Error> {
     let manifest = crate::apps::manifest(name).await?;
-    let mut res = LinkedHashMap::new();
+    let mut res = IndexMap::new();
     crate::stop_dependents(name, dry_run, DependencyError::NotInstalled, &mut res).await?;
     if dry_run {
         return Ok(res);
@@ -24,7 +24,7 @@ pub async fn remove(
         .await
         .unwrap_or_else(|e| {
             log::error!("Error stopping app: {}", e);
-            LinkedHashMap::new()
+            IndexMap::new()
         });
     log::info!("Removing docker container.");
     if !std::process::Command::new("docker")

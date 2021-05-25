@@ -1,7 +1,7 @@
 use std::ffi::{OsStr, OsString};
 use std::net::Ipv4Addr;
 
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use patch_db::DbHandle;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,7 @@ use crate::{Error, HOST_IP};
 pub const TLD: &'static str = "embassy";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Hosts(pub LinkedHashMap<PackageId, Ipv4Addr>);
+pub struct Hosts(pub IndexMap<PackageId, Ipv4Addr>);
 impl Hosts {
     pub fn docker_args(&self) -> Vec<OsString> {
         let mut res = Vec::with_capacity(self.0.len() + 1);

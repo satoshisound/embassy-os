@@ -1,21 +1,24 @@
-use std::borrow::Cow;
-use std::path::Path;
 use std::time::Duration;
 
 use futures::future::{BoxFuture, FutureExt};
-use hashlink::{LinkedHashMap, LinkedHashSet};
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use patch_db::{DbHandle, DiffPatch};
 use rand::SeedableRng;
 use regex::Regex;
 use rpc_toolkit::command;
 use serde_json::Value;
 
-use crate::context::{EitherContext, ExtendedContext, RpcContext};
+use crate::config::spec::PackagePointerSpecVariant;
+use crate::context::{ExtendedContext, RpcContext};
+use crate::db::model::InstalledPackageDataEntryModel;
+use crate::db::util::WithRevision;
 use crate::dependencies::{BreakageRes, DependencyError};
+use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
 use crate::util::{
-    display_serializable, from_yaml_async_reader, parse_stdin_deserializable, to_yaml_async_writer,
-    IoFormat,
+    display_none, display_serializable, from_yaml_async_reader, parse_duration,
+    parse_stdin_deserializable, to_yaml_async_writer, IoFormat,
 };
 use crate::{Error, ResultExt as _};
 
@@ -27,6 +30,7 @@ pub use spec::{ConfigSpec, Defaultable};
 use util::NumRange;
 
 use self::action::ConfigRes;
+use self::spec::ValueSpecPointer;
 
 pub type Config = serde_json::Map<String, Value>;
 pub trait TypeOf {
@@ -52,9 +56,9 @@ pub enum ConfigurationError {
     #[error("No Match: {0}")]
     NoMatch(#[from] NoMatchWithPath),
     #[error("System Error: {0}")]
-    SystemError(crate::Error),
+    SystemError(Error),
 }
-impl From<ConfigurationError> for crate::Error {
+impl From<ConfigurationError> for Error {
     fn from(err: ConfigurationError) -> Self {
         let kind = match &err {
             ConfigurationError::SystemError(e) => e.kind,
@@ -90,13 +94,18 @@ impl std::fmt::Display for NoMatchWithPath {
         write!(f, "{}: {}", self.path.iter().rev().join("."), self.error)
     }
 }
+impl From<NoMatchWithPath> for Error {
+    fn from(e: NoMatchWithPath) -> Self {
+        ConfigurationError::from(e).into()
+    }
+}
 
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum MatchError {
     #[error("String {0:?} Does Not Match Pattern {1}")]
     Pattern(String, Regex),
     #[error("String {0:?} Is Not In Enum {1:?}")]
-    Enum(String, LinkedHashSet<String>),
+    Enum(String, IndexSet<String>),
     #[error("Field Is Not Nullable")]
     NotNullable,
     #[error("Length Mismatch: expected {0}, actual: {1}")]
@@ -108,7 +117,7 @@ pub enum MatchError {
     #[error("Number Is Not Integral: {0}")]
     NonIntegral(f64),
     #[error("Variant {0:?} Is Not In Union {1:?}")]
-    Union(String, LinkedHashSet<String>),
+    Union(String, IndexSet<String>),
     #[error("Variant Is Missing Tag {0:?}")]
     MissingTag(String),
     #[error("Property {0:?} Of Variant {1:?} Conflicts With Union Tag")]
@@ -139,7 +148,7 @@ pub async fn get(
     let mut db = ctx.base().db.handle();
     let pkg_model = crate::db::DatabaseModel::new()
         .package_data()
-        .idx_model(&ctx.extension)
+        .idx_model(ctx.extension())
         .and_then(|m| m.installed())
         .expect(&mut db)
         .await
@@ -153,7 +162,7 @@ pub async fn get(
         .to_owned()
         .ok_or_else(|| {
             Error::new(
-                anyhow::anyhow!("{} has no config", &ctx.extension),
+                anyhow::anyhow!("{} has no config", ctx.extension()),
                 crate::ErrorKind::NotFound,
             )
         })?;
@@ -165,236 +174,226 @@ pub async fn get(
         .get(&mut db)
         .await?;
     action
-        .get(&ctx.extension, &*version, &*volumes, &*hosts)
+        .get(ctx.extension(), &*version, &*volumes, &*hosts)
         .await
 }
 
-#[command(subcommands(self(set_impl), set_dry), display(display_serializable))]
+#[command(subcommands(self(set_impl(async)), set_dry), display(display_none))]
 pub fn set(
     #[context] ctx: ExtendedContext<RpcContext, PackageId>,
     #[arg(long = "format")] format: Option<IoFormat>,
-    #[arg(stdin, parse(parse_stdin_deserializable))] config: Config,
-) -> Result<ExtendedContext<RpcContext, (PackageId, Config)>, Error> {
-    Ok(ctx.map(|id| (id, config)))
+    #[arg(long = "timeout", parse(parse_duration))] timeout: Option<Duration>,
+    #[arg(stdin, parse(parse_stdin_deserializable))] config: Option<Config>,
+    #[arg(rename = "expireId", long = "expire-id")] expire_id: Option<String>,
+) -> Result<
+    ExtendedContext<RpcContext, (PackageId, Option<Config>, Option<Duration>, Option<String>)>,
+    Error,
+> {
+    Ok(ctx.map(|id| (id, config, timeout, expire_id)))
 }
 
 #[command(display(display_serializable))]
-pub fn set_dry(
-    #[context] ctx: ExtendedContext<RpcContext, (PackageId, Config)>,
+pub async fn set_dry(
+    #[context] ctx: ExtendedContext<
+        RpcContext,
+        (PackageId, Option<Config>, Option<Duration>, Option<String>),
+    >,
 ) -> Result<BreakageRes, Error> {
-    let (id, config) = ctx.extension;
-    configure(&id, config, None, true)
-}
-
-pub fn set_impl(ctx: ExtendedContext<RpcContext, (PackageId, Config)>) -> Result<(), Error> {
-    todo!()
-}
-
-#[derive(Clone, Debug, Default, serde::Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct ConfigurationRes {
-    pub changed: LinkedHashMap<String, Config>,
-    pub needs_restart: LinkedHashSet<String>,
-    pub stopped: LinkedHashMap<String, TaggedDependencyError>,
-}
-
-// returns apps with changed configurations
-pub async fn configure(
-    name: &str,
-    config: Option<Config>,
-    timeout: Option<Duration>,
-    dry_run: bool,
-) -> Result<ConfigurationRes, crate::Error> {
-    async fn handle_broken_dependent(
-        name: &str,
-        dependent: String,
-        dry_run: bool,
-        res: &mut ConfigurationRes,
-        error: DependencyError,
-    ) -> Result<(), crate::Error> {
-        crate::control::stop_dependents(
-            &dependent,
-            dry_run,
-            DependencyError::NotRunning,
-            &mut res.stopped,
-        )
+    let (ctx, (id, config, timeout, _)) = ctx.split();
+    let mut db = ctx.db.handle();
+    let hosts = crate::db::DatabaseModel::new()
+        .network()
+        .hosts()
+        .get(&mut db)
         .await?;
-        if crate::apps::status(&dependent, false).await?.status
-            != crate::apps::DockerStatus::Stopped
-        {
-            crate::control::stop_app(&dependent, false, dry_run).await?;
-            res.stopped.insert(
-                // TODO: maybe don't do this if its not running
-                dependent,
-                TaggedDependencyError {
-                    dependency: name.to_owned(),
-                    error,
-                },
-            );
-        }
-        Ok(())
-    }
-    fn configure_rec<'a>(
-        name: &'a str,
-        config: Option<Config>,
-        timeout: Option<Duration>,
-        dry_run: bool,
-        res: &'a mut ConfigurationRes,
-    ) -> BoxFuture<'a, Result<Config, crate::Error>> {
-        async move {
-            let info = crate::apps::list_info()
-                .await?
-                .remove(name)
-                .ok_or_else(|| anyhow::anyhow!("{} is not installed", name))
-                .with_kind(crate::ErrorKind::NotFound)?;
-            let mut rng = rand::rngs::StdRng::from_entropy();
-            let spec_path = PersistencePath::from_ref("apps")
-                .join(name)
-                .join("config_spec.yaml");
-            let rules_path = PersistencePath::from_ref("apps")
-                .join(name)
-                .join("config_rules.yaml");
-            let config_path = PersistencePath::from_ref("apps")
-                .join(name)
-                .join("config.yaml");
-            let spec: ConfigSpec =
-                from_yaml_async_reader(&mut *spec_path.read(false).await?).await?;
-            let rules: Vec<ConfigRuleEntry> =
-                from_yaml_async_reader(&mut *rules_path.read(false).await?).await?;
-            let old_config: Option<Config> =
-                if let Some(mut f) = config_path.maybe_read(false).await.transpose()? {
-                    Some(from_yaml_async_reader(&mut *f).await?)
-                } else {
-                    None
-                };
-            let mut config = if let Some(cfg) = config {
-                cfg
-            } else {
-                if let Some(old) = &old_config {
-                    old.clone()
-                } else {
-                    spec.gen(&mut rng, &timeout)
-                        .with_kind(crate::ErrorKind::ConfigSpecViolation)?
-                }
-            };
-            spec.matches(&config)
-                .with_kind(crate::ErrorKind::ConfigSpecViolation)?;
-            spec.update(&mut config)
-                .await
-                .with_kind(crate::ErrorKind::ConfigSpecViolation)?;
-            let mut cfgs = LinkedHashMap::new();
-            cfgs.insert(name, Cow::Borrowed(&config));
-            for rule in rules {
-                rule.check(&config, &cfgs)
-                    .with_kind(crate::ErrorKind::ConfigRulesViolation)?;
-            }
-            match old_config {
-                Some(old) if &old == &config && info.configured && !info.recoverable => {
-                    return Ok(config)
-                }
-                _ => (),
-            };
-            res.changed.insert(name.to_owned(), config.clone());
-            for dependent in crate::apps::dependents(name, false).await? {
-                match configure_rec(&dependent, None, timeout, dry_run, res).await {
-                    Ok(dependent_config) => {
-                        let man = crate::apps::manifest(&dependent).await?;
-                        if let Some(dep_info) = man.dependencies.0.get(name) {
-                            match dep_info
-                                .satisfied(
-                                    name,
-                                    Some(config.clone()),
-                                    &dependent,
-                                    &dependent_config,
-                                )
-                                .await?
-                            {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    handle_broken_dependent(name, dependent, dry_run, res, e)
-                                        .await?;
+    let mut tx = db.begin().await?;
+    let mut breakages = IndexMap::new();
+    configure(
+        &mut tx,
+        &*hosts,
+        &id,
+        config,
+        &timeout,
+        true,
+        &mut IndexMap::new(),
+        &mut breakages,
+    )
+    .await?;
+    crate::db::DatabaseModel::new()
+        .package_data()
+        .idx_model(&id)
+        .expect(&mut tx)
+        .await?
+        .installed()
+        .expect(&mut tx)
+        .await?
+        .status()
+        .configured()
+        .put(&mut tx, &true)
+        .await?;
+    Ok(BreakageRes {
+        patch: tx.abort().await?,
+        breakages,
+    })
+}
+
+pub async fn set_impl(
+    ctx: ExtendedContext<RpcContext, (PackageId, Option<Config>, Option<Duration>, Option<String>)>,
+) -> Result<WithRevision<()>, Error> {
+    let (ctx, (id, config, timeout, expire_id)) = ctx.split();
+    let mut db = ctx.db.handle();
+    let hosts = crate::db::DatabaseModel::new()
+        .network()
+        .hosts()
+        .get(&mut db)
+        .await?;
+    let mut tx = db.begin().await?;
+    let mut breakages = IndexMap::new();
+    configure(
+        &mut tx,
+        &*hosts,
+        &id,
+        config,
+        &timeout,
+        false,
+        &mut IndexMap::new(),
+        &mut breakages,
+    )
+    .await?;
+    crate::db::DatabaseModel::new()
+        .package_data()
+        .idx_model(&id)
+        .expect(&mut tx)
+        .await?
+        .installed()
+        .expect(&mut tx)
+        .await?
+        .status()
+        .configured()
+        .put(&mut tx, &true)
+        .await?;
+    Ok(WithRevision {
+        response: (),
+        revision: tx.commit(expire_id).await?,
+    })
+}
+
+fn configure<'a, Db: DbHandle>(
+    db: &'a mut Db,
+    hosts: &'a Hosts,
+    id: &'a PackageId,
+    config: Option<Config>,
+    timeout: &'a Option<Duration>,
+    dry_run: bool,
+    overrides: &'a mut IndexMap<PackageId, Config>,
+    breakages: &'a mut IndexMap<PackageId, DependencyError>,
+) -> BoxFuture<'a, Result<(), Error>> {
+    async move {
+        let pkg_model = crate::db::DatabaseModel::new()
+            .package_data()
+            .idx_model(id)
+            .and_then(|m| m.installed())
+            .expect(&mut db)
+            .await
+            .with_kind(crate::ErrorKind::NotFound)?;
+        let action = pkg_model
+            .clone()
+            .manifest()
+            .config()
+            .get(&mut db)
+            .await?
+            .to_owned()
+            .ok_or_else(|| {
+                Error::new(
+                    anyhow::anyhow!("{} has no config", id),
+                    crate::ErrorKind::NotFound,
+                )
+            })?;
+        let version = pkg_model.clone().manifest().version().get(&mut db).await?;
+        let dependencies = pkg_model
+            .clone()
+            .manifest()
+            .dependencies()
+            .get(&mut db)
+            .await?;
+        let dependents = pkg_model.clone().dependents().get(&mut db).await?;
+        let volumes = pkg_model.manifest().volumes().get(&mut db).await?;
+        let get_res = action.get(id, &*version, &*volumes, &*hosts).await?;
+        let original = get_res
+            .config
+            .clone()
+            .map(Value::Object)
+            .unwrap_or_default();
+        let spec = get_res.spec;
+        let config = if let Some(config) = config.or_else(|| get_res.config.clone()) {
+            config
+        } else {
+            spec.gen(&mut rand::rngs::StdRng::from_entropy(), timeout)?
+        };
+        spec.matches(&config)?;
+        spec.update(db, &*overrides, &mut config).await?;
+        if Some(&config) == get_res.config.as_ref() {
+            Ok(())
+        } else {
+            overrides.insert(id.clone(), config.clone());
+            let prev = get_res.config.map(Value::Object).unwrap_or_default();
+            let next = Value::Object(config.clone());
+            for (dependent, ptrs) in &*dependents {
+                let dependent_model = crate::db::DatabaseModel::new()
+                    .package_data()
+                    .idx_model(dependent)
+                    .and_then(|pkg| pkg.installed())
+                    .expect(db)
+                    .await?;
+                if let Some(cfg) = &*dependent_model
+                    .clone()
+                    .manifest()
+                    .dependencies()
+                    .idx_model(id)
+                    .expect(db)
+                    .await?
+                    .config()
+                    .get(db)
+                    .await?
+                {
+                    let version = dependent_model.manifest().version().get(db).await?;
+                    if let Err(error) = cfg.check(dependent, &*version, &config).await? {
+                        let dep_err = DependencyError::ConfigUnsatisfied { error };
+                        fn handle_broken_dependents<'a, Db: DbHandle>(
+                            db: &'a mut Db,
+                            model: InstalledPackageDataEntryModel,
+                            error: DependencyError,
+                            breakages: &mut IndexMap<PackageId, DependencyError>,
+                        ) -> BoxFuture<'a, Result<(), Error>> {
+                            async move {
+                                let status = model.status().get_mut(db).await?;
+
+                                todo!()
+                            }
+                            .boxed()
+                        }
+                        handle_broken_dependents(db, dependent_model, dep_err, breakages).await?;
+                    } else {
+                        for ptr in ptrs {
+                            if let PackagePointerSpecVariant::Config { selector, multi } = ptr {
+                                if selector.select(*multi, &next) != selector.select(*multi, &prev)
+                                {
+                                    configure(
+                                        db, hosts, dependent, None, timeout, dry_run, overrides,
+                                        breakages,
+                                    )
+                                    .await?;
                                 }
                             }
                         }
                     }
-                    Err(e) => {
-                        if e.kind == crate::ErrorKind::ConfigRulesViolation
-                            || e.kind == crate::ErrorKind::ConfigSpecViolation
-                        {
-                            if !dry_run {
-                                crate::apps::set_configured(&dependent, false).await?;
-                            }
-                            handle_broken_dependent(name, dependent, dry_run, res, todo!()).await?;
-                        } else {
-                            return Err(e);
-                        }
-                    }
                 }
             }
-            if !dry_run {
-                let mut file = config_path.write(None).await?;
-                to_yaml_async_writer(file.as_mut(), &config).await?;
-                file.commit().await?;
-                let volume_config = Path::new(crate::VOLUMES)
-                    .join(name)
-                    .join("start9")
-                    .join("config.yaml");
-                tokio::fs::copy(config_path.path(), &volume_config)
-                    .await
-                    .with_ctx(|_| {
-                        (
-                            crate::ErrorKind::Filesystem,
-                            format!(
-                                "{} -> {}",
-                                config_path.path().display(),
-                                volume_config.display()
-                            ),
-                        )
-                    })?;
-                crate::apps::set_configured(name, true).await?;
-                crate::apps::set_recoverable(name, false).await?;
-            }
-            if crate::apps::status(name, false).await?.status != crate::apps::DockerStatus::Stopped
-            {
-                if !dry_run {
-                    crate::apps::set_needs_restart(name, true).await?;
-                }
-                res.needs_restart.insert(name.to_string());
-            }
-            Ok(config)
+            let res = action
+                .set(id, &*version, &*dependencies, &*volumes, hosts, &config)
+                .await?;
+            Ok(())
         }
-        .boxed()
     }
-    let mut res = ConfigurationRes::default();
-    configure_rec(name, config, timeout, dry_run, &mut res).await?;
-    Ok(res)
-}
-
-pub async fn remove(name: &str) -> Result<(), crate::Error> {
-    let config_path = PersistencePath::from_ref("apps")
-        .join(name)
-        .join("config.yaml")
-        .path();
-    if config_path.exists() {
-        tokio::fs::remove_file(&config_path).await.with_ctx(|_| {
-            (
-                crate::ErrorKind::Filesystem,
-                config_path.display().to_string(),
-            )
-        })?;
-    }
-    let volume_config = Path::new(crate::VOLUMES)
-        .join(name)
-        .join("start9")
-        .join("config.yaml");
-    if volume_config.exists() {
-        tokio::fs::remove_file(&volume_config).await.with_ctx(|_| {
-            (
-                crate::ErrorKind::Filesystem,
-                volume_config.display().to_string(),
-            )
-        })?;
-    }
-    crate::apps::set_configured(name, false).await?;
-    Ok(())
+    .boxed()
 }

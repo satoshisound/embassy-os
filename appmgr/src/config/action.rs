@@ -1,14 +1,15 @@
 use emver::Version;
-use hashlink::LinkedHashMap;
+use indexmap::{IndexMap, IndexSet};
+use nix::sys::signal::Signal;
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
 
 use super::{Config, ConfigSpec};
 use crate::action::ActionImplementation;
 use crate::dependencies::Dependencies;
-use crate::id::InterfaceId;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
+use crate::status::health_check::HealthCheckId;
 use crate::volume::Volumes;
 use crate::Error;
 
@@ -47,9 +48,9 @@ impl ConfigActions {
         dependencies: &Dependencies,
         volumes: &Volumes,
         hosts: &Hosts,
-        input: Config,
-    ) -> Result<LinkedHashMap<PackageId, Vec<InterfaceId>>, Error> {
-        let res: LinkedHashMap<PackageId, Vec<InterfaceId>> = self
+        input: &Config,
+    ) -> Result<SetResult, Error> {
+        let res: SetResult = self
             .set
             .execute(pkg_id, pkg_version, volumes, hosts, Some(input), false)
             .await
@@ -61,9 +62,22 @@ impl ConfigActions {
                     )
                 })
             })?;
-        Ok(res
-            .into_iter()
-            .filter(|(pkg, _)| dependencies.0.contains_key(pkg))
-            .collect())
+        Ok(SetResult {
+            signal: res.signal,
+            depends_on: res
+                .depends_on
+                .into_iter()
+                .filter(|(pkg, _)| dependencies.0.contains_key(pkg))
+                .collect(),
+        })
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct SetResult {
+    #[serde(deserialize_with = "crate::util::deserialize_from_str_opt")]
+    #[serde(serialize_with = "crate::util::serialize_display_opt")]
+    signal: Option<Signal>,
+    depends_on: IndexMap<PackageId, IndexSet<HealthCheckId>>,
 }

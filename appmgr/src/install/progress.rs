@@ -10,7 +10,7 @@ use patch_db::{DbHandle, HasModel, OptionModel, PatchDb, PatchDbHandle};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite};
 
-use crate::db::PackageDataEntry;
+use crate::db::model::PackageDataEntry;
 use crate::Error;
 
 #[derive(Debug, Deserialize, Serialize, HasModel)]

@@ -32,7 +32,7 @@ pub enum ErrorKind {
     OpenSSL = 25,
     Tor = 26,
     ConfigGen = 27,
-    ParseInt = 28,
+    ParseNumber = 28,
     Database = 29,
     InvalidPackageId = 30,
     InvalidSignature = 31,
@@ -74,7 +74,7 @@ impl ErrorKind {
             OpenSSL => "OpenSSL Error",
             Tor => "Tor Daemon Error",
             ConfigGen => "Config Generation Error",
-            ParseInt => "Integer Parsing Error",
+            ParseNumber => "Number Parsing Error",
             Database => "Database Error",
             InvalidPackageId => "Invalid Package ID",
             InvalidSignature => "Invalid Signature",
@@ -140,7 +140,12 @@ impl From<rpc_toolkit::url::ParseError> for Error {
 }
 impl From<std::num::ParseIntError> for Error {
     fn from(e: std::num::ParseIntError) -> Self {
-        Error::new(e, ErrorKind::ParseInt)
+        Error::new(e, ErrorKind::ParseNumber)
+    }
+}
+impl From<std::num::ParseFloatError> for Error {
+    fn from(e: std::num::ParseFloatError) -> Self {
+        Error::new(e, ErrorKind::ParseNumber)
     }
 }
 impl From<patch_db::Error> for Error {

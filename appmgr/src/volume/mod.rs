@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use patch_db::{HasModel, Map, MapModel};
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -68,7 +68,7 @@ where
 pub struct CustomVolumeId<S: AsRef<str> = String>(Id<S>);
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Volumes(LinkedHashMap<VolumeId, Volume>);
+pub struct Volumes(IndexMap<VolumeId, Volume>);
 impl Volumes {
     pub fn get_path_for(&self, pkg_id: &PackageId, volume_id: &VolumeId) -> Option<PathBuf> {
         self.0
@@ -89,7 +89,7 @@ impl Volumes {
     }
 }
 impl Deref for Volumes {
-    type Target = LinkedHashMap<VolumeId, Volume>;
+    type Target = IndexMap<VolumeId, Volume>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }

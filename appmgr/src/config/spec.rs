@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use hashlink::{LinkedHashMap, LinkedHashSet};
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use jsonpath_lib::Compiled as CompiledJsonPath;
 use patch_db::{DbHandle, OptionModel};
@@ -35,6 +35,7 @@ pub trait ValueSpec {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError>;
     // returns all pointers that are live in the provided config
@@ -148,9 +149,10 @@ where
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
-        self.inner.update(db, value).await
+        self.inner.update(db, config_overrides, value).await
     }
     fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         self.inner.pointers(value)
@@ -187,9 +189,10 @@ where
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
-        self.inner.update(db, value).await
+        self.inner.update(db, config_overrides, value).await
     }
     fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         self.inner.pointers(value)
@@ -259,9 +262,10 @@ where
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
-        self.inner.update(db, value).await
+        self.inner.update(db, config_overrides, value).await
     }
     fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
         self.inner.pointers(value)
@@ -368,17 +372,18 @@ impl ValueSpec for ValueSpecAny {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         match self {
-            ValueSpecAny::Boolean(a) => a.update(db, value).await,
-            ValueSpecAny::Enum(a) => a.update(db, value).await,
-            ValueSpecAny::List(a) => a.update(db, value).await,
-            ValueSpecAny::Number(a) => a.update(db, value).await,
-            ValueSpecAny::Object(a) => a.update(db, value).await,
-            ValueSpecAny::String(a) => a.update(db, value).await,
-            ValueSpecAny::Union(a) => a.update(db, value).await,
-            ValueSpecAny::Pointer(a) => a.update(db, value).await,
+            ValueSpecAny::Boolean(a) => a.update(db, config_overrides, value).await,
+            ValueSpecAny::Enum(a) => a.update(db, config_overrides, value).await,
+            ValueSpecAny::List(a) => a.update(db, config_overrides, value).await,
+            ValueSpecAny::Number(a) => a.update(db, config_overrides, value).await,
+            ValueSpecAny::Object(a) => a.update(db, config_overrides, value).await,
+            ValueSpecAny::String(a) => a.update(db, config_overrides, value).await,
+            ValueSpecAny::Union(a) => a.update(db, config_overrides, value).await,
+            ValueSpecAny::Pointer(a) => a.update(db, config_overrides, value).await,
         }
     }
     fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
@@ -459,6 +464,7 @@ impl ValueSpec for ValueSpecBoolean {
     async fn update<Db: DbHandle>(
         &self,
         _db: &mut Db,
+        _config_overrides: &IndexMap<PackageId, Config>,
         _value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         Ok(())
@@ -493,17 +499,17 @@ impl DefaultableWith for ValueSpecBoolean {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueSpecEnum {
-    pub values: LinkedHashSet<String>,
-    pub value_names: LinkedHashMap<String, String>,
+    pub values: IndexSet<String>,
+    pub value_names: IndexMap<String, String>,
 }
 impl<'de> serde::de::Deserialize<'de> for ValueSpecEnum {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct _ValueSpecEnum {
-            pub values: LinkedHashSet<String>,
+            pub values: IndexSet<String>,
             #[serde(default)]
-            pub value_names: LinkedHashMap<String, String>,
+            pub value_names: IndexMap<String, String>,
         }
 
         let mut r#enum = _ValueSpecEnum::deserialize(deserializer)?;
@@ -545,6 +551,7 @@ impl ValueSpec for ValueSpecEnum {
     async fn update<Db: DbHandle>(
         &self,
         _db: &mut Db,
+        _config_overrides: &IndexMap<PackageId, Config>,
         _value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         Ok(())
@@ -628,11 +635,12 @@ where
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         if let Value::Array(ref mut ls) = value {
             for (i, val) in ls.into_iter().enumerate() {
-                match self.spec.update(db, val).await {
+                match self.spec.update(db, config_overrides, val).await {
                     Err(ConfigurationError::NoMatch(e)) => {
                         Err(ConfigurationError::NoMatch(e.prepend(format!("{}", i))))
                     }
@@ -728,14 +736,15 @@ impl ValueSpec for ValueSpecList {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         match self {
-            ValueSpecList::Enum(a) => a.update(db, value).await,
-            ValueSpecList::Number(a) => a.update(db, value).await,
-            ValueSpecList::Object(a) => a.update(db, value).await,
-            ValueSpecList::String(a) => a.update(db, value).await,
-            ValueSpecList::Union(a) => a.update(db, value).await,
+            ValueSpecList::Enum(a) => a.update(db, config_overrides, value).await,
+            ValueSpecList::Number(a) => a.update(db, config_overrides, value).await,
+            ValueSpecList::Object(a) => a.update(db, config_overrides, value).await,
+            ValueSpecList::String(a) => a.update(db, config_overrides, value).await,
+            ValueSpecList::Union(a) => a.update(db, config_overrides, value).await,
         }
     }
     fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
@@ -849,6 +858,7 @@ impl ValueSpec for ValueSpecNumber {
     async fn update<Db: DbHandle>(
         &self,
         _db: &mut Db,
+        _config_overrides: &IndexMap<PackageId, Config>,
         _value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         Ok(())
@@ -958,10 +968,11 @@ impl ValueSpec for ValueSpecObject {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         if let Value::Object(o) = value {
-            self.spec.update(db, o).await
+            self.spec.update(db, config_overrides, o).await
         } else {
             Err(ConfigurationError::NoMatch(NoMatchWithPath::new(
                 MatchError::InvalidType("object", value.type_of()),
@@ -1026,7 +1037,7 @@ impl Defaultable for ValueSpecObject {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ConfigSpec(pub LinkedHashMap<String, ValueSpecAny>);
+pub struct ConfigSpec(pub IndexMap<String, ValueSpecAny>);
 impl ConfigSpec {
     pub fn matches(&self, value: &Config) -> Result<(), NoMatchWithPath> {
         for (key, val) in self.0.iter() {
@@ -1063,12 +1074,13 @@ impl ConfigSpec {
     pub async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         cfg: &mut Config,
     ) -> Result<(), ConfigurationError> {
         for (k, v) in cfg.iter_mut() {
             match self.0.get(k) {
                 None => (),
-                Some(vs) => match vs.update(db, v).await {
+                Some(vs) => match vs.update(db, config_overrides, v).await {
                     Err(ConfigurationError::NoMatch(e)) => {
                         Err(ConfigurationError::NoMatch(e.prepend(k.clone())))
                     }
@@ -1148,6 +1160,7 @@ impl ValueSpec for ValueSpecString {
     async fn update<Db: DbHandle>(
         &self,
         _db: &mut Db,
+        _config_overrides: &IndexMap<PackageId, Config>,
         _value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         Ok(())
@@ -1239,14 +1252,14 @@ pub struct UnionTag {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
-    pub variant_names: LinkedHashMap<String, String>,
+    pub variant_names: IndexMap<String, String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueSpecUnion {
     pub tag: UnionTag,
-    pub variants: LinkedHashMap<String, ConfigSpec>,
+    pub variants: IndexMap<String, ConfigSpec>,
     pub display_as: Option<String>,
     pub unique_by: UniqueBy,
 }
@@ -1263,7 +1276,7 @@ impl<'de> serde::de::Deserialize<'de> for ValueSpecUnion {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct _ValueSpecUnion {
-            pub variants: LinkedHashMap<String, ConfigSpec>,
+            pub variants: IndexMap<String, ConfigSpec>,
             pub tag: _UnionTag,
             pub display_as: Option<String>,
             #[serde(default)]
@@ -1356,6 +1369,7 @@ impl ValueSpec for ValueSpecUnion {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         if let Value::Object(o) = value {
@@ -1367,7 +1381,7 @@ impl ValueSpec for ValueSpecUnion {
                     None => Err(ConfigurationError::NoMatch(NoMatchWithPath::new(
                         MatchError::Union(tag.clone(), self.variants.keys().cloned().collect()),
                     ))),
-                    Some(spec) => spec.update(db, o).await,
+                    Some(spec) => spec.update(db, config_overrides, o).await,
                 },
                 Some(other) => Err(ConfigurationError::NoMatch(
                     NoMatchWithPath::new(MatchError::InvalidType("string", other.type_of()))
@@ -1495,11 +1509,12 @@ impl ValueSpec for ValueSpecPointer {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         match self {
-            ValueSpecPointer::Package(a) => a.update(db, value).await,
-            ValueSpecPointer::System(a) => a.update(db, value).await,
+            ValueSpecPointer::Package(a) => a.update(db, config_overrides, value).await,
+            ValueSpecPointer::System(a) => a.update(db, config_overrides, value).await,
         }
     }
     fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
@@ -1533,7 +1548,11 @@ impl fmt::Display for PackagePointerSpec {
     }
 }
 impl PackagePointerSpec {
-    async fn deref<Db: DbHandle>(&self, db: &mut Db) -> Result<Value, ConfigurationError> {
+    async fn deref<Db: DbHandle>(
+        &self,
+        db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
+    ) -> Result<Value, ConfigurationError> {
         match &self.target {
             Some(PackagePointerSpecVariant::TorAddress { interface }) => {
                 let addr = crate::db::DatabaseModel::new()
@@ -1564,55 +1583,53 @@ impl PackagePointerSpec {
                 Ok(addr.to_owned().map(Value::String).unwrap_or(Value::Null))
             }
             Some(PackagePointerSpecVariant::Config { selector, multi }) => {
-                let manifest_model: OptionModel<_> = crate::db::DatabaseModel::new()
-                    .package_data()
-                    .idx_model(&self.package_id)
-                    .and_then(|pde| pde.installed())
-                    .map(|installed| installed.manifest())
-                    .into();
-                let version = manifest_model
-                    .clone()
-                    .map(|manifest| manifest.version())
-                    .get(db)
-                    .await
-                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
-                let cfg_actions = manifest_model
-                    .clone()
-                    .and_then(|manifest| manifest.config())
-                    .get(db)
-                    .await
-                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
-                let volumes = manifest_model
-                    .map(|manifest| manifest.volumes())
-                    .get(db)
-                    .await
-                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
-                let hosts = crate::db::DatabaseModel::new()
-                    .network()
-                    .hosts()
-                    .get(db)
-                    .await
-                    .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
-                if let (Some(version), Some(cfg_actions), Some(volumes)) =
-                    (&*version, &*cfg_actions, &*volumes)
-                {
-                    let cfg_res = cfg_actions
-                        .get(&self.package_id, version, volumes, &*hosts)
+                if let Some(cfg) = config_overrides.get(&self.package_id) {
+                    Ok(selector.select(*multi, &Value::Object(cfg.clone())))
+                } else {
+                    let manifest_model: OptionModel<_> = crate::db::DatabaseModel::new()
+                        .package_data()
+                        .idx_model(&self.package_id)
+                        .and_then(|pde| pde.installed())
+                        .map(|installed| installed.manifest())
+                        .into();
+                    let version = manifest_model
+                        .clone()
+                        .map(|manifest| manifest.version())
+                        .get(db)
                         .await
                         .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
-                    if let Some(cfg) = cfg_res.config {
-                        let obj = serde_json::Value::Object(cfg);
-                        let selected = selector.compiled.select(&obj).ok().unwrap_or_else(Vec::new);
-                        if *multi {
-                            Ok(Value::Array(selected.into_iter().cloned().collect()))
+                    let cfg_actions = manifest_model
+                        .clone()
+                        .and_then(|manifest| manifest.config())
+                        .get(db)
+                        .await
+                        .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                    let volumes = manifest_model
+                        .map(|manifest| manifest.volumes())
+                        .get(db)
+                        .await
+                        .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                    let hosts = crate::db::DatabaseModel::new()
+                        .network()
+                        .hosts()
+                        .get(db)
+                        .await
+                        .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                    if let (Some(version), Some(cfg_actions), Some(volumes)) =
+                        (&*version, &*cfg_actions, &*volumes)
+                    {
+                        let cfg_res = cfg_actions
+                            .get(&self.package_id, version, volumes, &*hosts)
+                            .await
+                            .map_err(|e| ConfigurationError::SystemError(Error::from(e)))?;
+                        if let Some(cfg) = cfg_res.config {
+                            Ok(selector.select(*multi, &Value::Object(cfg)))
                         } else {
-                            Ok(selected.get(0).map(|v| (*v).clone()).unwrap_or(Value::Null))
+                            Ok(Value::Null)
                         }
                     } else {
                         Ok(Value::Null)
                     }
-                } else {
-                    Ok(Value::Null)
                 }
             }
             None => Ok(Value::Null),
@@ -1648,9 +1665,10 @@ impl ValueSpec for PackagePointerSpec {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
-        *value = self.deref(db).await?;
+        *value = self.deref(db, config_overrides).await?;
         Ok(())
     }
     fn pointers(&self, value: &Value) -> Result<Vec<ValueSpecPointer>, NoMatchWithPath> {
@@ -1693,6 +1711,16 @@ impl fmt::Display for PackagePointerSpecVariant {
 pub struct ConfigSelector {
     src: String,
     compiled: CompiledJsonPath,
+}
+impl ConfigSelector {
+    pub fn select(&self, multi: bool, val: &Value) -> Value {
+        let selected = self.compiled.select(&val).ok().unwrap_or_else(Vec::new);
+        if multi {
+            Value::Array(selected.into_iter().cloned().collect())
+        } else {
+            selected.get(0).map(|v| (*v).clone()).unwrap_or(Value::Null)
+        }
+    }
 }
 impl fmt::Display for ConfigSelector {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1753,6 +1781,7 @@ impl ValueSpec for SystemPointerSpec {
     async fn update<Db: DbHandle>(
         &self,
         db: &mut Db,
+        _config_overrides: &IndexMap<PackageId, Config>,
         value: &mut Value,
     ) -> Result<(), ConfigurationError> {
         *value = self.deref(db).await?;
@@ -2014,47 +2043,7 @@ mod test {
           }
         });
         let spec: ConfigSpec = serde_json::from_value(spec).unwrap();
-        let mut deps = crate::dependencies::Dependencies::default();
-        deps.0.insert(
-            "bitcoind".parse().un,
-            crate::dependencies::DepInfo {
-                version: "^0.20.0".parse().unwrap(),
-                description: None,
-                mount_public: false,
-                mount_shared: false,
-                optional: Some("Could be external.".to_owned()),
-                config: Vec::new(),
-            },
-        );
-        spec.validate(&crate::manifest::ManifestV0 {
-            id: "test-app".to_owned(),
-            version: "0.1.0".parse().unwrap(),
-            title: "Test Package".to_owned(),
-            description: crate::manifest::Description {
-                short: "A test app.".to_owned(),
-                long: "A super cool test app for testing".to_owned(),
-            },
-            release_notes: "Some things changed".to_owned(),
-            ports: Vec::new(),
-            image: crate::manifest::ImageConfig::Tar,
-            shm_size_mb: None,
-            mount: "/root".parse().unwrap(),
-            public: None,
-            shared: None,
-            has_instructions: false,
-            os_version_required: ">=0.2.5".parse().unwrap(),
-            os_version_recommended: ">=0.2.5".parse().unwrap(),
-            assets: Vec::new(),
-            hidden_service_version: crate::tor::HiddenServiceVersion::V3,
-            dependencies: deps,
-            extra: LinkedHashMap::new(),
-            install_alert: None,
-            restore_alert: None,
-            uninstall_alert: None,
-            start_alert: None,
-            actions: Vec::new(),
-        })
-        .unwrap();
+        spec.validate(todo!()).unwrap();
         let config = spec
             .gen(&mut rand::rngs::StdRng::from_entropy(), &None)
             .unwrap();

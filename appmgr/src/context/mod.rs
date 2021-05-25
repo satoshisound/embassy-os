@@ -11,7 +11,7 @@ pub use rpc::RpcContext;
 #[derive(Debug, Clone)]
 pub struct ExtendedContext<T, U> {
     base: T,
-    pub extension: U,
+    extension: U,
 }
 impl<T, U> ExtendedContext<T, U> {
     pub fn map<F: FnOnce(U) -> V, V>(self, f: F) -> ExtendedContext<T, V> {
@@ -20,8 +20,14 @@ impl<T, U> ExtendedContext<T, U> {
             extension: f(self.extension),
         }
     }
+    pub fn split(self) -> (T, U) {
+        (self.base, self.extension)
+    }
     pub fn base(&self) -> &T {
         &self.base
+    }
+    pub fn extension(&self) -> &U {
+        &self.extension
     }
 }
 impl<T> From<T> for ExtendedContext<T, ()> {

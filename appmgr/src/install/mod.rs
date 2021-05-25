@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
-use hashlink::LinkedHashMap;
 use http::HeaderMap;
+use indexmap::IndexMap;
 use patch_db::json_ptr::JsonPointer;
 use patch_db::{
     DbHandle, HasModel, MapModel, Model, ModelData, OptionModel, PatchDbHandle, Revision,
@@ -25,7 +25,7 @@ use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
 use self::progress::{InstallProgress, InstallProgressTracker};
 use crate::context::RpcContext;
-use crate::db::{PackageDataEntry, StaticFiles};
+use crate::db::model::{PackageDataEntry, StaticFiles};
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::s9pk::reader::S9pkReader;
 use crate::util::{AsyncFileExt, Version};

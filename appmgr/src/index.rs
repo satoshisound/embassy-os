@@ -10,7 +10,7 @@ use crate::inspect::info_full;
 use crate::Error;
 
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-pub struct AppIndex(pub LinkedHashMap<String, IndexInfo>);
+pub struct AppIndex(pub IndexMap<String, IndexInfo>);
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]

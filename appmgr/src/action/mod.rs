@@ -2,7 +2,7 @@ use std::net::Ipv4Addr;
 use std::path::Path;
 
 use emver::Version;
-use hashlink::{LinkedHashMap, LinkedHashSet};
+use indexmap::{IndexMap, IndexSet};
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +53,7 @@ where
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Actions(pub LinkedHashMap<ActionId, Action>);
+pub struct Actions(pub IndexMap<ActionId, Action>);
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "version")]
@@ -85,7 +85,7 @@ pub struct Action {
     #[serde(default)]
     pub warning: Option<String>,
     pub implementation: ActionImplementation,
-    pub allowed_statuses: LinkedHashSet<DockerStatus>,
+    pub allowed_statuses: IndexSet<DockerStatus>,
     #[serde(default)]
     pub input_spec: ConfigSpec,
 }

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize, Serializer};
 use url::Url;
@@ -121,13 +121,14 @@ pub struct Manifest {
     pub actions: Actions,
     // #[serde(default)]
     // pub permissions: Permissions,
-    // #[serde(default)]
+    #[serde(default)]
+    #[model]
     pub dependencies: Dependencies,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct Interfaces(LinkedHashMap<InterfaceId, Interface>); // TODO
+pub struct Interfaces(IndexMap<InterfaceId, Interface>); // TODO
 impl Interfaces {
     pub async fn install(&self, ip: &Ipv4Addr) -> Result<(), Error> {
         todo!()
@@ -138,7 +139,7 @@ impl Interfaces {
 #[serde(rename_all = "kebab-case")]
 pub struct Interface {
     tor_config: Option<TorConfig>,
-    lan_config: Option<LinkedHashMap<u16, LanPortConfig>>,
+    lan_config: Option<IndexMap<u16, LanPortConfig>>,
     ui: bool,
     protocols: Vec<String>,
 }
@@ -148,7 +149,7 @@ pub struct Interface {
 pub struct TorConfig {
     #[serde(default)]
     hidden_service_version: HiddenServiceVersion,
-    port_mapping: LinkedHashMap<u16, u16>,
+    port_mapping: IndexMap<u16, u16>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

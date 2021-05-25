@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use futures::future::try_join_all;
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::util::Invoke;
@@ -10,14 +10,14 @@ use crate::{Error, ResultExt as _};
 pub const ROOT_DISK: &'static str = "/dev/mmcblk0";
 pub const MAIN_DISK: &'static str = "/dev/sda";
 
-pub struct Disks(LinkedHashMap<String, DiskInfo>);
+pub struct Disks(IndexMap<String, DiskInfo>);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DiskInfo {
     pub size: String,
     pub description: Option<String>,
-    pub partitions: LinkedHashMap<String, PartitionInfo>,
+    pub partitions: IndexMap<String, PartitionInfo>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

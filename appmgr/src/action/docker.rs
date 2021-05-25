@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
 use emver::Version;
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -25,7 +25,7 @@ pub struct DockerAction {
     #[serde(default)]
     pub args: Vec<String>,
     #[serde(default)]
-    pub mounts: LinkedHashMap<VolumeId, PathBuf>,
+    pub mounts: IndexMap<VolumeId, PathBuf>,
     #[serde(default)]
     pub io_format: Option<IoFormat>,
     #[serde(default)]
