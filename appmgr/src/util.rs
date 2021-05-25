@@ -626,7 +626,7 @@ impl std::str::FromStr for IoFormat {
 impl IoFormat {
     pub fn to_writer<W: std::io::Write, T: Serialize>(
         &self,
-        writer: W,
+        mut writer: W,
         value: &T,
     ) -> Result<(), Error> {
         match self {
@@ -669,7 +669,7 @@ impl IoFormat {
     }
     pub fn from_reader<R: std::io::Read, T: for<'de> Deserialize<'de>>(
         &self,
-        reader: R,
+        mut reader: R,
     ) -> Result<T, Error> {
         match self {
             IoFormat::Json | IoFormat::JsonPretty => {

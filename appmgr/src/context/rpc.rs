@@ -35,35 +35,7 @@ impl MaybeAuthedRpcContext {
     pub fn new() -> Self {
         MaybeAuthedRpcContext(Arc::new(RwLock::new(None)))
     }
-    pub async fn init(&self) -> Result<(), Error> {
-        let mut seed = self.0.write().await;
-        let cfg_path = Path::new(crate::CONFIG_PATH);
-        let base = if let Some(f) = File::maybe_open(cfg_path)
-            .await
-            .with_ctx(|_| (crate::ErrorKind::Filesystem, cfg_path.display().to_string()))?
-        {
-            from_yaml_async_reader(f).await?
-        } else {
-            RpcContextConfig::default()
-        };
-        *seed = Some(Arc::new(RpcContextSeed {
-            bind: base.bind.unwrap_or(([127, 0, 0, 1], 5960).into()),
-            db: PatchDb::open(
-                base.db
-                    .unwrap_or_else(|| Path::new("/mnt/embassy-os/embassy.db").to_owned()),
-            )
-            .await?,
-            secret_store: SqlitePool::connect(&format!(
-                "sqlite://{}",
-                base.secret_store
-                    .unwrap_or_else(|| Path::new("/mnt/embassy-os/secrets.db").to_owned())
-                    .display()
-            ))
-            .await?,
-            docker: Docker::connect_with_unix_defaults()?,
-        }));
-        Ok(())
-    }
+
     pub async fn authed(&self) -> Result<RpcContext, Error> {
         if let Some(ctx) = self.0.read().await.clone() {
             Ok(RpcContext(ctx))
@@ -78,6 +50,36 @@ impl MaybeAuthedRpcContext {
 
 #[derive(Clone)]
 pub struct RpcContext(Arc<RpcContextSeed>);
+impl RpcContext {
+    pub async fn init() -> Result<Self, Error> {
+        let cfg_path = Path::new(crate::CONFIG_PATH);
+        let base = if let Some(f) = File::maybe_open(cfg_path)
+            .await
+            .with_ctx(|_| (crate::ErrorKind::Filesystem, cfg_path.display().to_string()))?
+        {
+            from_yaml_async_reader(f).await?
+        } else {
+            RpcContextConfig::default()
+        };
+        let seed = Arc::new(RpcContextSeed {
+            bind: base.bind.unwrap_or(([127, 0, 0, 1], 5960).into()),
+            db: PatchDb::open(
+                base.db
+                    .unwrap_or_else(|| Path::new("/mnt/embassy-os/embassy.db").to_owned()),
+            )
+            .await?,
+            secret_store: SqlitePool::connect(&format!(
+                "sqlite://{}",
+                base.secret_store
+                    .unwrap_or_else(|| Path::new("/mnt/embassy-os/secrets.db").to_owned())
+                    .display()
+            ))
+            .await?,
+            docker: Docker::connect_with_unix_defaults()?,
+        });
+        Ok(Self(seed))
+    }
+}
 impl Context for RpcContext {
     fn host(&self) -> Host<&str> {
         match self.0.bind.ip() {

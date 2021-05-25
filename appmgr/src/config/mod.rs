@@ -296,14 +296,14 @@ fn configure<'a, Db: DbHandle>(
             .package_data()
             .idx_model(id)
             .and_then(|m| m.installed())
-            .expect(&mut db)
+            .expect(db)
             .await
             .with_kind(crate::ErrorKind::NotFound)?;
         let action = pkg_model
             .clone()
             .manifest()
             .config()
-            .get(&mut db)
+            .get(db)
             .await?
             .to_owned()
             .ok_or_else(|| {
@@ -312,26 +312,19 @@ fn configure<'a, Db: DbHandle>(
                     crate::ErrorKind::NotFound,
                 )
             })?;
-        let version = pkg_model.clone().manifest().version().get(&mut db).await?;
-        let dependencies = pkg_model
-            .clone()
-            .manifest()
-            .dependencies()
-            .get(&mut db)
-            .await?;
-        let volumes = pkg_model.clone().manifest().volumes().get(&mut db).await?;
+        let version = pkg_model.clone().manifest().version().get(db).await?;
+        let dependencies = pkg_model.clone().manifest().dependencies().get(db).await?;
+        let volumes = pkg_model.clone().manifest().volumes().get(db).await?;
 
         // get current config and current spec
-        let get_res = action.get(id, &*version, &*volumes, &*hosts).await?;
-        let original = get_res
-            .config
-            .clone()
-            .map(Value::Object)
-            .unwrap_or_default();
-        let spec = get_res.spec;
+        let ConfigRes {
+            config: old_config,
+            spec,
+        } = action.get(id, &*version, &*volumes, &*hosts).await?;
+        let original = old_config.clone().map(Value::Object).unwrap_or_default();
 
         // determine new config to use
-        let config = if let Some(config) = config.or_else(|| get_res.config.clone()) {
+        let mut config = if let Some(config) = config.or_else(|| old_config.clone()) {
             config
         } else {
             spec.gen(&mut rand::rngs::StdRng::from_entropy(), timeout)?
@@ -340,13 +333,13 @@ fn configure<'a, Db: DbHandle>(
         spec.matches(&config)?; // check that new config matches spec
         spec.update(db, &*overrides, &mut config).await?; // dereference pointers in the new config
 
-        if Some(&config) == get_res.config.as_ref() {
+        if Some(&config) == old_config.as_ref() {
             // if new config is identical to old config, there's nothing to do
             return Ok(()); // TODO: maybe run it anyway??
         }
 
         // create backreferences to pointers
-        let mut sys = pkg_model.system_pointers().get_mut(db).await?;
+        let mut sys = pkg_model.clone().system_pointers().get_mut(db).await?;
         sys.truncate(0);
         let mut dep_ptrs = IndexMap::<PackageId, Vec<PackagePointerSpecVariant>>::new();
         for ptr in spec.pointers(&config)? {
@@ -377,7 +370,11 @@ fn configure<'a, Db: DbHandle>(
             }
 
             // track dependency health checks
-            let deps = pkg_model.required_dependencies().get_mut(db).await?;
+            let mut deps = pkg_model
+                .clone()
+                .required_dependencies()
+                .get_mut(db)
+                .await?;
             *deps = res.depends_on;
             deps.save(db).await?;
             res.signal
@@ -406,8 +403,8 @@ fn configure<'a, Db: DbHandle>(
         overrides.insert(id.clone(), config.clone());
 
         // handle dependents
-        let dependents = pkg_model.clone().dependents().get(&mut db).await?;
-        let prev = get_res.config.map(Value::Object).unwrap_or_default();
+        let dependents = pkg_model.clone().dependents().get(db).await?;
+        let prev = old_config.map(Value::Object).unwrap_or_default();
         let next = Value::Object(config.clone());
         for (dependent, ptrs) in &*dependents {
             fn handle_broken_dependents<'a, Db: DbHandle>(
@@ -419,16 +416,16 @@ fn configure<'a, Db: DbHandle>(
                 breakages: &'a mut IndexMap<PackageId, TaggedDependencyError>,
             ) -> BoxFuture<'a, Result<(), Error>> {
                 async move {
-                    let status = model.clone().status().get_mut(db).await?;
+                    let mut status = model.clone().status().get_mut(db).await?;
 
                     let old = status.dependencies.0.remove(id);
                     let newly_broken = old.is_none();
                     status.dependencies.0.insert(
                         id.clone(),
                         if let Some(old) = old {
-                            old.merge_with(error)
+                            old.merge_with(error.clone())
                         } else {
-                            error
+                            error.clone()
                         },
                     );
                     if newly_broken {
@@ -499,7 +496,7 @@ fn configure<'a, Db: DbHandle>(
                 .get(db)
                 .await?
             {
-                let version = dependent_model.manifest().version().get(db).await?;
+                let version = dependent_model.clone().manifest().version().get(db).await?;
                 if let Err(error) = cfg.check(dependent, &*version, &config).await? {
                     let dep_err = DependencyError::ConfigUnsatisfied { error };
                     handle_broken_dependents(

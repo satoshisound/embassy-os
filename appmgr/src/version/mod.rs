@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
+use lazy_static::lazy_static;
 use patch_db::DbHandle;
 use tokio_compat_02::FutureExt;
 
@@ -70,40 +71,58 @@ where
     async fn up<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error>;
     async fn down<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error>;
     async fn commit<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error> {
-        let version = crate::db::DatabaseModel::new()
+        crate::db::DatabaseModel::new()
             .server_info()
             .version()
-            .get_mut(db)
+            .put(db, self.semver())
             .await?;
-        *version = self.semver().clone();
-        version.save(db).await?;
 
         Ok(())
     }
-    async fn migrate_to<V: VersionT>(&self, version: &V) -> Result<(), Error> {
+    async fn migrate_to<V: VersionT, Db: DbHandle>(
+        &self,
+        version: &V,
+        db: &mut Db,
+    ) -> Result<(), Error> {
         match self.semver().cmp(version.semver()) {
-            Ordering::Greater => self.rollback_to_unchecked(version).await,
-            Ordering::Less => version.migrate_from_unchecked(self).await,
+            Ordering::Greater => self.rollback_to_unchecked(version, db).await,
+            Ordering::Less => version.migrate_from_unchecked(self, db).await,
             Ordering::Equal => Ok(()),
         }
     }
-    async fn migrate_from_unchecked<V: VersionT>(&self, version: &V) -> Result<(), Error> {
+    async fn migrate_from_unchecked<V: VersionT, Db: DbHandle>(
+        &self,
+        version: &V,
+        db: &mut Db,
+    ) -> Result<(), Error> {
         let previous = Self::Previous::new();
         if version.semver() != previous.semver() {
-            previous.migrate_from_unchecked(version).await?;
+            previous.migrate_from_unchecked(version, db).await?;
         }
-        log::info!("{} -> {}", previous.semver(), self.semver());
-        self.up().await?;
-        self.commit().await?;
+        log::info!(
+            "{} -> {}",
+            previous.semver().as_str(),
+            self.semver().as_str()
+        );
+        self.up(db).await?;
+        self.commit(db).await?;
         Ok(())
     }
-    async fn rollback_to_unchecked<V: VersionT>(&self, version: &V) -> Result<(), Error> {
+    async fn rollback_to_unchecked<V: VersionT, Db: DbHandle>(
+        &self,
+        version: &V,
+        db: &mut Db,
+    ) -> Result<(), Error> {
         let previous = Self::Previous::new();
-        log::info!("{} -> {}", self.semver(), previous.semver());
-        self.down().await?;
-        previous.commit().await?;
+        log::info!(
+            "{} -> {}",
+            self.semver().as_str(),
+            previous.semver().as_str()
+        );
+        self.down(db).await?;
+        previous.commit(db).await?;
         if version.semver() != previous.semver() {
-            previous.rollback_to_unchecked(version).await?;
+            previous.rollback_to_unchecked(version, db).await?;
         }
         Ok(())
     }
@@ -122,7 +141,7 @@ where
     T: VersionT,
 {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let v = emver::Version::deserialize(deserializer)?;
+        let v = crate::util::Version::deserialize(deserializer)?;
         let version = T::new();
         if &v == version.semver() {
             Ok(Wrapper(version))
@@ -131,20 +150,22 @@ where
         }
     }
 }
-const V0_0_0: emver::Version = emver::Version::new(0, 0, 0, 0);
+lazy_static! {
+    static ref V0_0_0: crate::util::Version = emver::Version::new(0, 0, 0, 0).into();
+}
 #[async_trait]
 impl VersionT for () {
     type Previous = ();
     fn new() -> Self {
         ()
     }
-    fn semver(&self) -> &'static emver::Version {
-        &V0_0_0
+    fn semver(&self) -> &'static crate::util::Version {
+        &*V0_0_0
     }
-    async fn up(&self) -> Result<(), Error> {
+    async fn up<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error> {
         Ok(())
     }
-    async fn down(&self) -> Result<(), Error> {
+    async fn down<Db: DbHandle>(&self, db: &mut Db) -> Result<(), Error> {
         Ok(())
     }
 }

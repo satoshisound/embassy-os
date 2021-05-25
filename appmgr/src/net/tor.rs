@@ -536,7 +536,6 @@ pub async fn set_svc(
             .or_else(|| { svc_exit.signal().map(|a| 128 + a) })
             .unwrap_or(0)
     );
-    hidden_services.commit().await?;
     Ok((ip, addr, key))
 }
 
@@ -580,7 +579,6 @@ pub async fn rm_svc(name: &str) -> Result<(), Error> {
             .or_else(|| { svc_exit.signal().map(|a| 128 + a) })
             .unwrap_or(0)
     );
-    hidden_services.commit().await?;
     Ok(())
 }
 

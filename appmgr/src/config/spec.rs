@@ -936,7 +936,10 @@ impl DefaultableWith for ValueSpecNumber {
         _rng: &mut R,
         _timeout: &Option<Duration>,
     ) -> Result<Value, Self::Error> {
-        Ok(spec.map(|s| Value::Number(s)).unwrap_or(Value::Null))
+        Ok(spec
+            .clone()
+            .map(|s| Value::Number(s))
+            .unwrap_or(Value::Null))
     }
 }
 
@@ -1098,7 +1101,7 @@ impl ConfigSpec {
                 None => (),
                 Some(vs) => match vs.pointers(v) {
                     Err(e) => return Err(e.prepend(k.clone())),
-                    Ok(a) => res.append(&mut a),
+                    Ok(mut a) => res.append(&mut a),
                 },
             };
         }
@@ -1747,12 +1750,12 @@ impl<'de> Deserialize<'de> for ConfigSelector {
 pub enum SystemPointerSpec {}
 impl fmt::Display for SystemPointerSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SYSTEM: {}", match self {})
+        write!(f, "SYSTEM: {}", match *self {})
     }
 }
 impl SystemPointerSpec {
     async fn deref<Db: DbHandle>(&self, db: &mut Db) -> Result<Value, ConfigurationError> {
-        Ok(match self {})
+        Ok(match *self {})
     }
 }
 impl Defaultable for SystemPointerSpec {
