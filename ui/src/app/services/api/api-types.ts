@@ -112,19 +112,16 @@ export module RR {
   export type InstallPackageReq = WithExpire<{ id: string, version: string }> // package.install
   export type InstallPackageRes = WithRevision<null>
 
-  export type DryUpdatePackageReq = UpdatePackageReq // package.update.dry
+  export type DryUpdatePackageReq = { id: string, version: string } // package.update.dry
   export type DryUpdatePackageRes = BreakageRes
-
-  export type UpdatePackageReq = WithExpire<{ id: string, version: string }> // package.update
-  export type UpdatePackageRes = WithRevision<null>
 
   export type GetPackageConfigReq = { id: string } // package.config.get
   export type GetPackageConfigRes = { spec: ConfigSpec, config: object }
 
-  export type DrySetPackageConfigReq = SetPackageConfigReq // package.config.set.dry
+  export type DrySetPackageConfigReq = { id: string, config: object } // package.config.set.dry
   export type DrySetPackageConfigRes = BreakageRes
 
-  export type SetPackageConfigReq = WithExpire<{ id: string, config: object }> // package.config.set
+  export type SetPackageConfigReq = WithExpire<DrySetPackageConfigReq> // package.config.set
   export type SetPackageConfigRes = WithRevision<null>
 
   export type RestorePackageReq = WithExpire<{ id: string, logicalname: string, password: string }> // package.backup.restore
@@ -167,7 +164,7 @@ export module RR {
   export type GetAvailableShowRes = AvailableShow
 }
 
-export type WithExpire<T> = { expireId?: string } & T
+export type WithExpire<T> = { 'expire-id'?: string } & T
 export type WithRevision<T> = { response: T, revision?: Revision }
 
 export interface MarketplaceData {
@@ -258,7 +255,7 @@ export interface SSHKeys {
 export interface SSHKeyEntry {
   alg: string
   hostname: string
-  pubkey: string
+  hash: string
 }
 
 export type ServerNotifications = ServerNotification<any>[]
