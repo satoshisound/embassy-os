@@ -42,6 +42,8 @@ pub enum ErrorKind {
     AutoConfigure = 35,
     Action = 36,
     RateLimited = 37,
+    InvalidRequest = 38,
+    MigrationFailed = 39,
 }
 impl ErrorKind {
     pub fn as_str(&self) -> &'static str {
@@ -84,6 +86,8 @@ impl ErrorKind {
             AutoConfigure => "Auto-Configure Error",
             Action => "Action Failed",
             RateLimited => "Rate Limited",
+            InvalidRequest => "Invalid Request",
+            MigrationFailed => "Migration Failed",
         }
     }
 }

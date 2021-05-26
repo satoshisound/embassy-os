@@ -4,6 +4,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::util::Version;
 use crate::Error;
 
 pub const SYSTEM_ID: Id<&'static str> = Id("SYSTEM");
@@ -137,15 +138,13 @@ impl<S: AsRef<str>> ImageId<S> {
     pub fn for_package<PkgId: AsRef<crate::s9pk::manifest::PackageId<S0>>, S0: AsRef<str>>(
         &self,
         pkg_id: PkgId,
-        pkg_version: Option<&emver::Version>,
+        pkg_version: Option<&Version>,
     ) -> String {
         format!(
             "start9/{}/{}:{}",
             pkg_id.as_ref(),
             self.0,
-            pkg_version
-                .map(|v| -> Box<dyn std::fmt::Display> { Box::new(v) })
-                .unwrap_or_else(|| Box::new("latest"))
+            pkg_version.map(|v| { v.as_str() }).unwrap_or("latest")
         )
     }
 }

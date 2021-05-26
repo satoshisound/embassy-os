@@ -11,7 +11,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use futures::TryStreamExt;
 use http::HeaderMap;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use patch_db::json_ptr::JsonPointer;
 use patch_db::{
     DbHandle, HasModel, MapModel, Model, ModelData, OptionModel, PatchDbHandle, Revision,
@@ -25,9 +25,10 @@ use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
 use self::progress::{InstallProgress, InstallProgressTracker};
 use crate::context::RpcContext;
-use crate::db::model::{PackageDataEntry, StaticFiles};
+use crate::db::model::{InstalledPackageDataEntry, PackageDataEntry, StaticFiles};
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::s9pk::reader::S9pkReader;
+use crate::status::{DependencyErrors, MainStatus, Status};
 use crate::util::{AsyncFileExt, Version};
 use crate::Error;
 
@@ -56,20 +57,33 @@ pub async fn download_install_s9pk(
 
     let res = (|| async {
         let progress = InstallProgress::new(s9pk.content_length());
-        pkg_data_entry
-            .put(
-                &mut db,
-                &PackageDataEntry::Installing {
+        let static_files =
+            StaticFiles::remote(pkg_id, version, unverified_manifest.assets.icon_type())?;
+        let mut pde = pkg_data_entry.get_mut(&mut db).await?;
+        match pde.take() {
+            Some(PackageDataEntry::Installed { installed, .. }) => {
+                *pde = Some(PackageDataEntry::Updating {
                     install_progress: progress.clone(),
-                    static_files: StaticFiles::remote(
-                        pkg_id,
-                        version,
-                        unverified_manifest.assets.icon_type(),
-                    )?,
+                    static_files,
+                    installed,
                     unverified_manifest: unverified_manifest.clone(),
-                },
-            )
-            .await?;
+                })
+            }
+            None => {
+                *pde = Some(PackageDataEntry::Installing {
+                    install_progress: progress.clone(),
+                    static_files,
+                    unverified_manifest: unverified_manifest.clone(),
+                })
+            }
+            _ => {
+                return Err(Error::new(
+                    anyhow::anyhow!("Cannot install over an app in a transient state"),
+                    crate::ErrorKind::InvalidRequest,
+                ))
+            }
+        }
+        pde.save(&mut db).await?;
         let progress_model = pkg_data_entry.and_then(|pde| pde.install_progress());
 
         async fn check_cache(
@@ -365,7 +379,7 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
         pkg_id,
         version.as_str()
     );
-    manifest.interfaces.install(&ip).await?;
+    let interface_info = manifest.interfaces.install(ip).await?;
     log::info!(
         "Install {}@{}: Installed interfaces",
         pkg_id,
@@ -374,15 +388,83 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
 
     log::info!("Install {}@{}: Complete", pkg_id, version.as_str());
 
-    model
-        .put(
-            &mut tx,
-            &PackageDataEntry::Installed {
-                installed: todo!(),
-                static_files: StaticFiles::local(pkg_id, version, manifest.assets.icon_type())?,
-            },
-        )
-        .await?;
+    let static_files = StaticFiles::local(pkg_id, version, manifest.assets.icon_type())?;
+    let mut installed = InstalledPackageDataEntry {
+        status: Status {
+            configured: false,
+            main: MainStatus::Stopped,
+            dependencies: DependencyErrors::default(),
+        },
+        system_pointers: Vec::new(),
+        dependents: {
+            // search required dependencies
+            todo!()
+        },
+        required_dependencies: manifest
+            .dependencies
+            .0
+            .iter()
+            .filter_map(|(id, info)| {
+                if info.optional.is_none() {
+                    Some((id.clone(), IndexSet::new()))
+                } else {
+                    None
+                }
+            })
+            .collect(),
+        interface_info,
+        manifest,
+    };
+    let pde = model.get_mut(&mut tx).await?;
+    if let PackageDataEntry::Updating {
+        installed: prev, ..
+    } = &*pde
+    {
+        let mut configured = prev.status.configured;
+        let mut required_dependencies = prev.required_dependencies.clone();
+        if let Some(res) = prev
+            .manifest
+            .migrations
+            .to(
+                version,
+                pkg_id,
+                &prev.manifest.version,
+                &prev.manifest.volumes,
+                &network.hosts,
+            )
+            .await?
+        {
+            configured &= res.configured;
+            required_dependencies = res.depends_on;
+        }
+        // cleanup(pkg_id, Some(prev)).await?;
+        if let Some(res) = installed
+            .manifest
+            .migrations
+            .from(
+                &prev.manifest.version,
+                pkg_id,
+                version,
+                &installed.manifest.volumes,
+                &network.hosts,
+            )
+            .await?
+        {
+            configured &= res.configured;
+            required_dependencies = res.depends_on;
+        }
+        if configured {
+            installed.status.configured = true;
+            installed.required_dependencies = required_dependencies;
+            todo!("set as running if viable");
+            todo!("update dependents");
+        }
+    }
+    *pde = PackageDataEntry::Installed {
+        installed,
+        static_files,
+    };
+    pde.save(&mut tx).await?;
 
     tx.commit(None).await?;
 

@@ -3,7 +3,6 @@ use std::ffi::{OsStr, OsString};
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
-use emver::Version;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -11,7 +10,7 @@ use serde_json::Value;
 use crate::id::ImageId;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::{PackageId, SYSTEM_PACKAGE_ID};
-use crate::util::{Invoke, IoFormat};
+use crate::util::{Invoke, IoFormat, Version};
 use crate::volume::{VolumeId, Volumes};
 use crate::{Error, ResultExt};
 

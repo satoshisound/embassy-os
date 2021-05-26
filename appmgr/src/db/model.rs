@@ -150,6 +150,7 @@ pub enum PackageDataEntry {
     #[serde(rename_all = "kebab-case")]
     Updating {
         static_files: StaticFiles,
+        unverified_manifest: Manifest,
         installed: InstalledPackageDataEntry,
         install_progress: Arc<InstallProgress>,
     },

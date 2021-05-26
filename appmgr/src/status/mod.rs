@@ -396,7 +396,7 @@ impl MainStatus {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DependencyErrors(pub IndexMap<PackageId, DependencyError>);
 impl Map for DependencyErrors {
     type Key = PackageId;

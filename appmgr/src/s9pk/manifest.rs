@@ -12,6 +12,7 @@ use url::Url;
 use crate::action::{ActionImplementation, Actions};
 use crate::backup::BackupActions;
 use crate::config::action::ConfigActions;
+use crate::db::model::InterfaceInfo;
 use crate::dependencies::Dependencies;
 use crate::id::{Id, InterfaceId, InvalidId, SYSTEM_ID};
 use crate::migration::Migrations;
@@ -130,7 +131,7 @@ pub struct Manifest {
 #[serde(rename_all = "kebab-case")]
 pub struct Interfaces(IndexMap<InterfaceId, Interface>); // TODO
 impl Interfaces {
-    pub async fn install(&self, ip: &Ipv4Addr) -> Result<(), Error> {
+    pub async fn install(&self, ip: Ipv4Addr) -> Result<InterfaceInfo, Error> {
         todo!()
     }
 }
