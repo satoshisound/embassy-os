@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use anyhow::anyhow;
 use patch_db::Revision;
 use rpc_toolkit::yajrc::RpcError;
 
@@ -238,7 +239,7 @@ where
 macro_rules! ensure_code {
     ($x:expr, $c:expr, $fmt:expr $(, $arg:expr)*) => {
         if !($x) {
-            return Err(crate::Error::new(anyhow::anyhow!($fmt, $($arg, )*), $c));
+            return Err(crate::Error::new(anyhow!($fmt, $($arg, )*), $c));
         }
     };
 }

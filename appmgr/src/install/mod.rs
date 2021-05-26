@@ -78,7 +78,7 @@ pub async fn download_install_s9pk(
             }
             _ => {
                 return Err(Error::new(
-                    anyhow::anyhow!("Cannot install over an app in a transient state"),
+                    anyhow!("Cannot install over an app in a transient state"),
                     crate::ErrorKind::InvalidRequest,
                 ))
             }
@@ -341,7 +341,7 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
     let ip = network.register_host(&manifest.id)?;
     manifest
         .main
-        .install(pkg_id, version.as_ref(), &manifest.volumes, ip)
+        .install(pkg_id, version, &manifest.volumes, ip)
         .await?;
     network.save(&mut tx).await?;
     log::info!("Install {}@{}: Installed main", pkg_id, version);

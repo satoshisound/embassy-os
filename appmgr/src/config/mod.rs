@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use anyhow::anyhow;
 use bollard::container::KillContainerOptions;
 use bollard::Docker;
 use futures::future::{BoxFuture, FutureExt};
@@ -166,7 +167,7 @@ pub async fn get(
         .to_owned()
         .ok_or_else(|| {
             Error::new(
-                anyhow::anyhow!("{} has no config", ctx.extension()),
+                anyhow!("{} has no config", ctx.extension()),
                 crate::ErrorKind::NotFound,
             )
         })?;
@@ -319,10 +320,7 @@ fn configure<'a, Db: DbHandle>(
             .await?
             .to_owned()
             .ok_or_else(|| {
-                Error::new(
-                    anyhow::anyhow!("{} has no config", id),
-                    crate::ErrorKind::NotFound,
-                )
+                Error::new(anyhow!("{} has no config", id), crate::ErrorKind::NotFound)
             })?;
         let version = pkg_model.clone().manifest().version().get(db).await?;
         let dependencies = pkg_model.clone().manifest().dependencies().get(db).await?;

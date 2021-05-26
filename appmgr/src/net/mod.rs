@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
 
+use anyhow::anyhow;
 use id_pool::IdPool;
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
@@ -52,7 +53,7 @@ impl Network {
             let ip = self
                 .ip_pool
                 .get()
-                .ok_or_else(|| anyhow::anyhow!("No available IP addresses"))
+                .ok_or_else(|| anyhow!("No available IP addresses"))
                 .with_kind(crate::ErrorKind::Network)?;
             self.hosts.0.insert(id.clone(), ip);
             Ok(ip)

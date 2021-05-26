@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 
+use anyhow::anyhow;
 use ed25519_dalek::{PublicKey, Signature};
 use tokio::io::{AsyncRead, AsyncReadExt};
 
@@ -36,7 +37,7 @@ impl Header {
         reader.read_exact(&mut magic).await?;
         if magic != MAGIC {
             return Err(Error::new(
-                anyhow::anyhow!("Incorrect Magic"),
+                anyhow!("Incorrect Magic"),
                 crate::ErrorKind::ParseS9pk,
             ));
         }
@@ -44,7 +45,7 @@ impl Header {
         reader.read_exact(&mut version).await?;
         if version[0] != VERSION {
             return Err(Error::new(
-                anyhow::anyhow!("Unknown Version"),
+                anyhow!("Unknown Version"),
                 crate::ErrorKind::ParseS9pk,
             ));
         }

@@ -4,6 +4,7 @@ use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use anyhow::anyhow;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::util::Invoke;
@@ -229,7 +230,7 @@ pub async fn write_lan_services(hidden_services: &ServicesMap) -> Result<(), Err
         let hostname_str = hostname
             .trim()
             .strip_suffix(".onion")
-            .ok_or_else(|| anyhow::anyhow!("{}", hostname))
+            .ok_or_else(|| anyhow!("{}", hostname))
             .with_kind(crate::ErrorKind::InvalidOnionAddress)?;
         for mapping in &service.ports {
             match &mapping.lan {

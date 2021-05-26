@@ -7,6 +7,7 @@ use std::process::{exit, Stdio};
 use std::str::FromStr;
 use std::time::Duration;
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -320,7 +321,7 @@ pub async fn daemon<F: Fn() -> Fut, Fut: Future<Output = ()> + Send + 'static>(
 ) -> Result<Never, anyhow::Error> {
     loop {
         match tokio::spawn(f()).await {
-            Err(e) if e.is_panic() => return Err(anyhow::anyhow!("daemon panicked!")),
+            Err(e) if e.is_panic() => return Err(anyhow!("daemon panicked!")),
             _ => (),
         }
         tokio::time::sleep(cooldown).await
@@ -747,7 +748,7 @@ pub fn parse_stdin_deserializable<T: for<'de> Deserialize<'de>>(
 pub fn parse_duration(arg: &str, matches: &ArgMatches<'_>) -> Result<Duration, Error> {
     let units_idx = arg.find(|c: char| c.is_alphabetic()).ok_or_else(|| {
         Error::new(
-            anyhow::anyhow!("Must specify units for duration"),
+            anyhow!("Must specify units for duration"),
             crate::ErrorKind::Deserialization,
         )
     })?;
@@ -765,7 +766,7 @@ pub fn parse_duration(arg: &str, matches: &ArgMatches<'_>) -> Result<Duration, E
         "us" => Ok(Duration::from_micros(num.parse()?)),
         "ns" => Ok(Duration::from_nanos(num.parse()?)),
         _ => Err(Error::new(
-            anyhow::anyhow!("Invalid units for duration"),
+            anyhow!("Invalid units for duration"),
             crate::ErrorKind::Deserialization,
         )),
     }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::anyhow;
 use emver::VersionRange;
 use indexmap::{IndexMap, IndexSet};
 use patch_db::{DbHandle, DiffPatch, HasModel, Map, MapModel};
@@ -247,6 +248,6 @@ impl DependencyConfig {
         self.auto_configure
             .sandboxed(dependent_id, dependent_version, Some(old))
             .await?
-            .map_err(|e| Error::new(anyhow::anyhow!("{}", e.1), crate::ErrorKind::AutoConfigure))
+            .map_err(|e| Error::new(anyhow!("{}", e.1), crate::ErrorKind::AutoConfigure))
     }
 }

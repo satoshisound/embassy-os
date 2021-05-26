@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
-use emver::Version;
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -9,6 +8,7 @@ use crate::action::ActionImplementation;
 use crate::id::Id;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
+use crate::util::Version;
 use crate::volume::Volumes;
 use crate::Error;
 

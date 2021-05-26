@@ -1,4 +1,4 @@
-use emver::Version;
+use anyhow::anyhow;
 use indexmap::{IndexMap, IndexSet};
 use nix::sys::signal::Signal;
 use patch_db::HasModel;
@@ -10,6 +10,7 @@ use crate::dependencies::Dependencies;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
 use crate::status::health_check::HealthCheckId;
+use crate::util::Version;
 use crate::volume::Volumes;
 use crate::Error;
 
@@ -37,7 +38,7 @@ impl ConfigActions {
             .execute(pkg_id, pkg_version, volumes, hosts, None::<()>, false)
             .await
             .and_then(|res| {
-                res.map_err(|e| Error::new(anyhow::anyhow!("{}", e.1), crate::ErrorKind::ConfigGen))
+                res.map_err(|e| Error::new(anyhow!("{}", e.1), crate::ErrorKind::ConfigGen))
             })
     }
 
@@ -56,10 +57,7 @@ impl ConfigActions {
             .await
             .and_then(|res| {
                 res.map_err(|e| {
-                    Error::new(
-                        anyhow::anyhow!("{}", e.1),
-                        crate::ErrorKind::ConfigRulesViolation,
-                    )
+                    Error::new(anyhow!("{}", e.1), crate::ErrorKind::ConfigRulesViolation)
                 })
             })?;
         Ok(SetResult {

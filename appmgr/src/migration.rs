@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use emver::VersionRange;
 use indexmap::{IndexMap, IndexSet};
 use patch_db::HasModel;
@@ -37,10 +38,7 @@ impl Migrations {
                         .execute(pkg_id, pkg_version, volumes, hosts, Some(version), false)
                         .await?
                         .map_err(|e| {
-                            Error::new(
-                                anyhow::anyhow!("{}", e.1),
-                                crate::ErrorKind::MigrationFailed,
-                            )
+                            Error::new(anyhow!("{}", e.1), crate::ErrorKind::MigrationFailed)
                         })?,
                 )
             } else {
@@ -65,10 +63,7 @@ impl Migrations {
                         .execute(pkg_id, pkg_version, volumes, hosts, Some(version), false)
                         .await?
                         .map_err(|e| {
-                            Error::new(
-                                anyhow::anyhow!("{}", e.1),
-                                crate::ErrorKind::MigrationFailed,
-                            )
+                            Error::new(anyhow!("{}", e.1), crate::ErrorKind::MigrationFailed)
                         })?,
                 )
             } else {

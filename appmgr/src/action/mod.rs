@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 use std::path::Path;
 
-use emver::Version;
+use anyhow::anyhow;
 use indexmap::{IndexMap, IndexSet};
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use crate::config::{Config, ConfigSpec};
 use crate::id::Id;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
-use crate::util::ValuePrimative;
+use crate::util::{ValuePrimative, Version};
 use crate::volume::Volumes;
 use crate::{Error, ResultExt};
 
@@ -104,7 +104,7 @@ impl Action {
         self.implementation
             .execute(pkg_id, pkg_version, volumes, hosts, Some(input), true)
             .await?
-            .map_err(|e| Error::new(anyhow::anyhow!("{}", e.1), crate::ErrorKind::Action))
+            .map_err(|e| Error::new(anyhow!("{}", e.1), crate::ErrorKind::Action))
     }
 }
 

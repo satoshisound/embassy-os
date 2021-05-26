@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use anyhow::anyhow;
 use futures::future::try_join_all;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -183,10 +184,7 @@ pub async fn mount_encfs<P0: AsRef<Path>, P1: AsRef<Path>>(
     let mut err = String::new();
     stderr.read_to_string(&mut err).await?;
     if !encfs.wait().await?.success() {
-        Err(Error::new(
-            anyhow::anyhow!("{}", err),
-            crate::ErrorKind::Filesystem,
-        ))
+        Err(Error::new(anyhow!("{}", err), crate::ErrorKind::Filesystem))
     } else {
         Ok(())
     }

@@ -1,10 +1,11 @@
-use emver::Version;
+use anyhow::anyhow;
 use patch_db::HasModel;
 use serde::{Deserialize, Serialize};
 
 use crate::action::ActionImplementation;
 use crate::net::host::Hosts;
 use crate::s9pk::manifest::PackageId;
+use crate::util::Version;
 use crate::volume::{Volume, VolumeId, Volumes};
 use crate::{Error, ResultExt};
 
@@ -26,7 +27,7 @@ impl BackupActions {
         self.create
             .execute(pkg_id, pkg_version, &volumes, hosts, None::<()>, false)
             .await?
-            .map_err(|e| anyhow::anyhow!("{}", e.1))
+            .map_err(|e| anyhow!("{}", e.1))
             .with_kind(crate::ErrorKind::Backup)?;
         Ok(())
     }
@@ -43,7 +44,7 @@ impl BackupActions {
         self.restore
             .execute(pkg_id, pkg_version, &volumes, hosts, None::<()>, false)
             .await?
-            .map_err(|e| anyhow::anyhow!("{}", e.1))
+            .map_err(|e| anyhow!("{}", e.1))
             .with_kind(crate::ErrorKind::Restore)?;
         Ok(())
     }
