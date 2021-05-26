@@ -107,7 +107,7 @@ pub async fn download_install_s9pk(
                         log::warn!(
                             "Install {}@{}: Could not open cache: {}",
                             pkg_id,
-                            version.as_str(),
+                            version,
                             e
                         );
                         None
@@ -233,26 +233,18 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
         })?;
     let progress_model = model.clone().install_progress();
 
-    log::info!(
-        "Install {}@{}: Unpacking Manifest",
-        pkg_id,
-        version.as_str()
-    );
+    log::info!("Install {}@{}: Unpacking Manifest", pkg_id, version);
     let manifest = progress
         .track_read_during(progress_model.clone(), &ctx.db, db, || rdr.manifest())
         .await?;
-    log::info!("Install {}@{}: Unpacked Manifest", pkg_id, version.as_str());
+    log::info!("Install {}@{}: Unpacked Manifest", pkg_id, version);
 
     let public_dir_path = Path::new(PKG_PUBLIC_DIR)
         .join(pkg_id)
         .join(version.as_str());
     tokio::fs::create_dir_all(&public_dir_path).await?;
 
-    log::info!(
-        "Install {}@{}: Unpacking LICENSE.md",
-        pkg_id,
-        version.as_str()
-    );
+    log::info!("Install {}@{}: Unpacking LICENSE.md", pkg_id, version);
     progress
         .track_read_during(progress_model.clone(), &ctx.db, db, || async {
             let license_path = public_dir_path.join("LICENSE.md");
@@ -262,17 +254,9 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
             Ok(())
         })
         .await?;
-    log::info!(
-        "Install {}@{}: Unpacked LICENSE.md",
-        pkg_id,
-        version.as_str()
-    );
+    log::info!("Install {}@{}: Unpacked LICENSE.md", pkg_id, version);
 
-    log::info!(
-        "Install {}@{}: Unpacking INSTRUCTIONS.md",
-        pkg_id,
-        version.as_str()
-    );
+    log::info!("Install {}@{}: Unpacking INSTRUCTIONS.md", pkg_id, version);
     progress
         .track_read_during(progress_model.clone(), &ctx.db, db, || async {
             let instructions_path = public_dir_path.join("INSTRUCTIONS.md");
@@ -282,17 +266,13 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
             Ok(())
         })
         .await?;
-    log::info!(
-        "Install {}@{}: Unpacked INSTRUCTIONS.md",
-        pkg_id,
-        version.as_str()
-    );
+    log::info!("Install {}@{}: Unpacked INSTRUCTIONS.md", pkg_id, version);
 
     let icon_path = Path::new("icon").with_extension(&manifest.assets.icon_type());
     log::info!(
         "Install {}@{}: Unpacking {}",
         pkg_id,
-        version.as_str(),
+        version,
         icon_path.display()
     );
     progress
@@ -307,15 +287,11 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
     log::info!(
         "Install {}@{}: Unpacked {}",
         pkg_id,
-        version.as_str(),
+        version,
         icon_path.display()
     );
 
-    log::info!(
-        "Install {}@{}: Unpacking Docker Images",
-        pkg_id,
-        version.as_str(),
-    );
+    log::info!("Install {}@{}: Unpacking Docker Images", pkg_id, version);
     progress
         .track_read_during(progress_model.clone(), &ctx.db, db, || async {
             let mut load = tokio::process::Command::new("docker")
@@ -348,11 +324,7 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
             }
         })
         .await?;
-    log::info!(
-        "Install {}@{}: Unpacked Docker Images",
-        pkg_id,
-        version.as_str(),
-    );
+    log::info!("Install {}@{}: Unpacked Docker Images", pkg_id, version,);
 
     progress.read_complete.store(true, Ordering::SeqCst);
 
@@ -365,28 +337,20 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
         .get_mut(&mut tx)
         .await?;
 
-    log::info!("Install {}@{}: Installing main", pkg_id, version.as_str());
+    log::info!("Install {}@{}: Installing main", pkg_id, version);
     let ip = network.register_host(&manifest.id)?;
     manifest
         .main
         .install(pkg_id, version.as_ref(), &manifest.volumes, ip)
         .await?;
     network.save(&mut tx).await?;
-    log::info!("Install {}@{}: Installed main", pkg_id, version.as_str());
+    log::info!("Install {}@{}: Installed main", pkg_id, version);
 
-    log::info!(
-        "Install {}@{}: Installing interfaces",
-        pkg_id,
-        version.as_str()
-    );
+    log::info!("Install {}@{}: Installing interfaces", pkg_id, version);
     let interface_info = manifest.interfaces.install(ip).await?;
-    log::info!(
-        "Install {}@{}: Installed interfaces",
-        pkg_id,
-        version.as_str()
-    );
+    log::info!("Install {}@{}: Installed interfaces", pkg_id, version);
 
-    log::info!("Install {}@{}: Complete", pkg_id, version.as_str());
+    log::info!("Install {}@{}: Complete", pkg_id, version);
 
     let static_files = StaticFiles::local(pkg_id, version, manifest.assets.icon_type())?;
     let mut installed = InstalledPackageDataEntry {

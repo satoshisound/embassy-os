@@ -486,6 +486,11 @@ impl Version {
         self.string.as_str()
     }
 }
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.string)
+    }
+}
 impl From<emver::Version> for Version {
     fn from(v: emver::Version) -> Self {
         Version {

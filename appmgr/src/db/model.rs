@@ -95,44 +95,18 @@ pub struct StaticFiles {
 impl StaticFiles {
     pub fn local(id: &PackageId, version: &Version, icon_type: &str) -> Result<Self, Error> {
         Ok(StaticFiles {
-            license: format!(
-                "/public/package-data/{}/{}/LICENSE.md",
-                id,
-                version.as_str()
-            )
-            .parse()?,
-            instructions: format!(
-                "/public/package-data/{}/{}/INSTRUCTIONS.md",
-                id,
-                version.as_str()
-            )
-            .parse()?,
-            icon: format!(
-                "/public/package-data/{}/{}/icon.{}",
-                id,
-                version.as_str(),
-                icon_type
-            )
-            .parse()?,
+            license: format!("/public/package-data/{}/{}/LICENSE.md", id, version).parse()?,
+            instructions: format!("/public/package-data/{}/{}/INSTRUCTIONS.md", id, version)
+                .parse()?,
+            icon: format!("/public/package-data/{}/{}/icon.{}", id, version, icon_type).parse()?,
         })
     }
     pub fn remote(id: &PackageId, version: &Version, icon_type: &str) -> Result<Self, Error> {
         Ok(StaticFiles {
-            license: format!("/registry/packages/{}/{}/LICENSE.md", id, version.as_str())
+            license: format!("/registry/packages/{}/{}/LICENSE.md", id, version).parse()?,
+            instructions: format!("/registry/packages/{}/{}/INSTRUCTIONS.md", id, version)
                 .parse()?,
-            instructions: format!(
-                "/registry/packages/{}/{}/INSTRUCTIONS.md",
-                id,
-                version.as_str()
-            )
-            .parse()?,
-            icon: format!(
-                "/registry/packages/{}/{}/icon.{}",
-                id,
-                version.as_str(),
-                icon_type
-            )
-            .parse()?,
+            icon: format!("/registry/packages/{}/{}/icon.{}", id, version, icon_type).parse()?,
         })
     }
 }
