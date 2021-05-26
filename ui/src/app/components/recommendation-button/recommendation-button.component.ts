@@ -2,7 +2,6 @@ import { Component, Input } from '@angular/core'
 import { Router } from '@angular/router'
 import { PopoverController } from '@ionic/angular'
 import { filter, take } from 'rxjs/operators'
-import { Cleanup } from 'src/app/util/cleanup'
 import { capitalizeFirstLetter } from 'src/app/util/misc.util'
 import { InformationPopoverComponent } from '../information-popover/information-popover.component'
 
@@ -11,12 +10,13 @@ import { InformationPopoverComponent } from '../information-popover/information-
   templateUrl: './recommendation-button.component.html',
   styleUrls: ['./recommendation-button.component.scss'],
 })
-export class RecommendationButtonComponent extends Cleanup {
+export class RecommendationButtonComponent {
   @Input() rec: Recommendation
   @Input() raise?: { id: string }
-  constructor (private readonly router: Router, private readonly popoverController: PopoverController) {
-    super()
-  }
+  constructor (
+    private readonly router: Router,
+    private readonly popoverController: PopoverController,
+  ) { }
 
   ngOnInit () {
     if (!this.raise) return

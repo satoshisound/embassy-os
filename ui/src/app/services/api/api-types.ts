@@ -157,7 +157,7 @@ export module RR {
   export type GetMarketplaceEOSReq = { }
   export type GetMarketplaceEOSRes = MarketplaceEOS
 
-  export type GetAvailableListReq = { category?: string, query?: string }
+  export type GetAvailableListReq = { category?: string, query?: string, page: number, 'per-page': number }
   export type GetAvailableListRes = AvailablePreview[]
 
   export type GetAvailableShowReq = { id: string, version?: string }
@@ -173,6 +173,7 @@ export interface MarketplaceData {
 
 export interface MarketplaceEOS {
   version: string
+  headline: string
   notes: string
 }
 
@@ -185,8 +186,10 @@ export interface AvailablePreview {
 }
 
 export interface AvailableShow {
-  categories: string[]
+  icon: URL
   manifest: Manifest
+  categories: string[]
+  versions: string[]
 }
 
 export interface BreakageRes {

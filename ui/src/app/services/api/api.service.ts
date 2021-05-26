@@ -126,11 +126,6 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
   abstract dryUpdatePackage (params: RR.DryUpdatePackageReq): Promise<RR.DryUpdatePackageRes>
 
-  protected abstract updatePackageRaw (params: RR.UpdatePackageReq): Promise<RR.UpdatePackageRes>
-  updatePackage = (params: RR.UpdatePackageReq) => this.syncResponse(
-    () => this.installPackageRaw(params),
-  )()
-
   abstract getPackageConfig (params: RR.GetPackageConfigReq): Promise<RR.GetPackageConfigRes>
 
   abstract drySetPackageConfig (params: RR.DrySetPackageConfigReq): Promise<RR.DrySetPackageConfigRes>

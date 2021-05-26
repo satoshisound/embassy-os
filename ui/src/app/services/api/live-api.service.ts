@@ -155,10 +155,6 @@ export class LiveApiService extends ApiService {
     return this.http.rpcRequest({ method: 'package.update.dry', params })
   }
 
-  async updatePackageRaw (params: RR.UpdatePackageReq): Promise<RR.UpdatePackageRes> {
-    return this.http.rpcRequest({ method: 'package.update', params })
-  }
-
   async getPackageConfig (params: RR.GetPackageConfigReq): Promise<RR.GetPackageConfigRes> {
     return this.http.rpcRequest({ method: 'package.config.get', params })
   }

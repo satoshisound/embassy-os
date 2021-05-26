@@ -95,7 +95,20 @@ export class MockApiService extends ApiService {
 
   async updateServerRaw (params: RR.UpdateServerReq): Promise<RR.UpdateServerRes> {
     await pauseFor(2000)
-    return null
+    return {
+      response: null,
+      revision: {
+        id: this.nextSequence(),
+        patch: [
+          {
+            op: PatchOp.REPLACE,
+            path: '/server-info/status',
+            value: ServerStatus.Updating,
+          },
+        ],
+        expireId: null,
+      },
+    }
   }
 
   async restartServer (params: RR.RestartServerReq): Promise<RR.RestartServerRes> {
@@ -318,24 +331,6 @@ export class MockApiService extends ApiService {
     }
   }
 
-  async updatePackageRaw (params: RR.UpdatePackageReq): Promise<RR.UpdatePackageRes> {
-    await pauseFor(2000)
-    return {
-      response: null,
-      revision: {
-        id: this.nextSequence(),
-        patch: [
-          {
-            op: PatchOp.REPLACE,
-            path: `/package-data/${params.id}/state`,
-            value: PackageState.Updating,
-          },
-        ],
-        expireId: null,
-      },
-    }
-  }
-
   async getPackageConfig (params: RR.GetPackageConfigReq): Promise<RR.GetPackageConfigRes> {
     await pauseFor(2000)
     return Mock.PackageConfig
@@ -486,10 +481,7 @@ export class MockApiService extends ApiService {
 
   async getEos (params: RR.GetMarketplaceEOSReq): Promise<RR.GetMarketplaceEOSRes> {
     await pauseFor(2000)
-    return {
-      version: '1.0.0',
-      notes: 'Our biggest release ever.',
-    }
+    return Mock.MarketplaceEos
   }
 
   async getAvailableList (params: RR.GetAvailableListReq): Promise<RR.GetAvailableListRes> {

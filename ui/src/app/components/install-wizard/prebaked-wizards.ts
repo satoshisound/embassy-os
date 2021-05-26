@@ -136,7 +136,7 @@ export class WizardBaker {
             action,
             verb: 'beginning update for',
             title,
-            executeAction: () => this.apiService.updatePackage({ id, version }),
+            executeAction: () => this.apiService.installPackage({ id, version }),
           },
         },
         bottomBar: {
@@ -247,7 +247,7 @@ export class WizardBaker {
             action,
             verb: 'beginning downgrade for',
             title,
-            executeAction: () => this.apiService.updatePackage({ id, version }),
+            executeAction: () => this.apiService.installPackage({ id, version }),
           },
         },
         bottomBar: {

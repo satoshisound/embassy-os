@@ -5,12 +5,11 @@ import { ApiService } from 'src/app/services/api/api.service'
 import { isEmptyObject } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
 import { TrackingModalController } from 'src/app/services/tracking-modal-controller.service'
-import { BehaviorSubject, from, fromEvent, of } from 'rxjs'
+import { BehaviorSubject, from, fromEvent, of, Subscription } from 'rxjs'
 import { catchError, concatMap, map, take, tap } from 'rxjs/operators'
 import { Recommendation } from 'src/app/components/recommendation-button/recommendation-button.component'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
 import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
-import { Cleanup } from 'src/app/util/cleanup'
 import { InformationPopoverComponent } from 'src/app/components/information-popover/information-popover.component'
 import { ConfigSpec } from 'src/app/pkg-config/config-types'
 import { ConfigCursor } from 'src/app/pkg-config/config-cursor'
@@ -22,7 +21,7 @@ import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
   templateUrl: './app-config.page.html',
   styleUrls: ['./app-config.page.scss'],
 })
-export class AppConfigPage extends Cleanup {
+export class AppConfigPage {
   error: { text: string, moreInfo?:
     { title: string, description: string, buttonText: string }
   }
@@ -45,6 +44,8 @@ export class AppConfigPage extends Cleanup {
   spec: ConfigSpec
   config: object
 
+  subs: Subscription[]
+
   constructor (
     private readonly navCtrl: NavController,
     private readonly route: ActivatedRoute,
@@ -56,12 +57,12 @@ export class AppConfigPage extends Cleanup {
     private readonly trackingModalCtrl: TrackingModalController,
     private readonly popoverController: PopoverController,
     private readonly patch: PatchDbModel,
-  ) { super() }
+  ) { }
 
   async ngOnInit () {
     const pkgId = this.route.snapshot.paramMap.get('pkgId') as string
 
-    this.cleanup(
+    this.subs = [
       this.route.params.pipe(take(1)).subscribe(params => {
         if (params.edit) {
           window.history.back()
@@ -82,7 +83,7 @@ export class AppConfigPage extends Cleanup {
           this.navCtrl.back()
         }
       }),
-    )
+    ]
 
     this.patch.watch$('package-data', pkgId, 'installed')
     .pipe(
@@ -123,6 +124,10 @@ export class AppConfigPage extends Cleanup {
         this.error = { text: e.message }
       },
     })
+  }
+
+  ngOnDestroy () {
+    this.subs.forEach(sub => sub.unsubscribe())
   }
 
   async presentPopover (title: string, description: string, ev: any) {

@@ -43,7 +43,7 @@ export class NotificationsPage {
   async getNotifications (): Promise<ServerNotifications> {
     let notifications: ServerNotifications = []
     try {
-      notifications = await this.apiService.getNotifications({ page: this.page, 'per-page': this.perPage})
+      notifications = await this.apiService.getNotifications({ page: this.page, 'per-page': this.perPage })
       this.needInfinite = notifications.length >= this.perPage
       this.page++
       this.error = ''

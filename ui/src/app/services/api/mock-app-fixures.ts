@@ -1,8 +1,14 @@
 import { DockerIoFormat, Manifest, PackageDataEntry, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
 import { NotificationLevel, RR, ServerNotification, ServerNotifications } from './api-types'
-import instructions from 'raw-loader!./md-sample.md'
+import markdown from 'raw-loader!./md-sample.md'
 
 export module Mock {
+
+  export const MarketplaceEos: RR.GetMarketplaceEOSRes = {
+    version: '1.0.0',
+    headline: 'Our biggest release ever.',
+    notes: markdown,
+  }
 
   export const AvailableList: RR.GetAvailableListRes = [
     {
@@ -21,57 +27,13 @@ export module Mock {
     },
   ]
 
-  export const AvailableShow: {
-    [id: string]: {
-      [version: string]: RR.GetAvailableShowRes
-    }
-  } = {
-    'bitcoind': {
-      '0.19.0': {
-        categories: ['bitcoin', 'cryptocurrency'],
-        manifest: {
-          ...Mock.MockManifestBitcoind,
-          version: '0.19.0',
-          'release-notes': 'release notes for Bitcoin 0.19.0',
-        },
-      },
-      '0.20.0': {
-        categories: ['bitcoin', 'cryptocurrency'],
-        manifest: {
-          ...Mock.MockManifestBitcoind,
-          version: '0.20.0',
-          'release-notes': 'release notes for Bitcoin 0.20.0',
-        },
-      },
-      'latest': {
-        categories: ['bitcoin', 'cryptocurrency'],
-        manifest: Mock.MockManifestBitcoind,
-      },
-    },
-    'lnd': {
-      '0.11.0': {
-        categories: ['bitcoin', 'lightning', 'cryptocurrency'],
-        manifest: {
-          ...Mock.MockManifestLnd,
-          version: '0.11.0',
-          'release-notes': 'release notes for LND 0.11.0',
-
-        },
-      },
-      'latest': {
-        categories: ['bitcoin', 'lightning', 'cryptocurrency'],
-        manifest: Mock.MockManifestLnd,
-      },
-    },
-  }
-
   export const MockManifestBitcoind: Manifest = {
     id: 'bitcoind',
     title: 'Bitcoin Core',
     version: '0.21.0',
     description: {
       short: 'A Bitcoin full node by Bitcoin Core.',
-      long: 'Bitcoin decentralized consensus protocol and monetary settlement network.',
+      long: 'Bitcoin is a decentralized consensus protocol and settlement network.',
     },
     'release-notes': 'Taproot, Schnorr, and more.',
     license: 'MIT',
@@ -341,15 +303,91 @@ export module Mock {
     },
   }
 
+  export const AvailableShow: {
+    [id: string]: {
+      [version: string]: RR.GetAvailableShowRes
+    }
+  } = {
+    'bitcoind': {
+      '0.19.0': {
+        icon: 'assets/img/service-icons/bitcoind.png',
+        manifest: {
+          ...Mock.MockManifestBitcoind,
+          version: '0.19.0',
+          'release-notes': 'release notes for Bitcoin 0.19.0',
+        },
+        categories: ['bitcoin', 'cryptocurrency'],
+        versions: ['0.19.0', '0.20.0', '0.21.0'],
+      },
+      '0.20.0': {
+        icon: 'assets/img/service-icons/bitcoind.png',
+        manifest: {
+          ...Mock.MockManifestBitcoind,
+          version: '0.20.0',
+          'release-notes': 'release notes for Bitcoin 0.20.0',
+        },
+        categories: ['bitcoin', 'cryptocurrency'],
+        versions: ['0.19.0', '0.20.0', '0.21.0'],
+      },
+      '0.21.0': {
+        icon: 'assets/img/service-icons/bitcoind.png',
+        manifest: {
+          ...Mock.MockManifestBitcoind,
+          version: '0.21.0',
+          'release-notes': 'release notes for Bitcoin 0.20.0',
+        },
+        categories: ['bitcoin', 'cryptocurrency'],
+        versions: ['0.19.0', '0.20.0', '0.21.0'],
+      },
+      'latest': {
+        icon: 'assets/img/service-icons/bitcoind.png',
+        manifest: Mock.MockManifestBitcoind,
+        categories: ['bitcoin', 'cryptocurrency'],
+        versions: ['0.19.0', '0.20.0', '0.21.0'],
+      },
+    },
+    'lnd': {
+      '0.11.0': {
+        icon: 'assets/img/service-icons/lnd.png',
+        manifest: {
+          ...Mock.MockManifestLnd,
+          version: '0.11.0',
+          'release-notes': 'release notes for LND 0.11.0',
+        },
+        categories: ['bitcoin', 'lightning', 'cryptocurrency'],
+        versions: ['0.11.0', '0.11.1'],
+      },
+      '0.11.1': {
+        icon: 'assets/img/service-icons/lnd.png',
+        manifest: {
+          ...Mock.MockManifestLnd,
+          version: '0.11.1',
+          'release-notes': 'release notes for LND 0.11.0',
+        },
+        categories: ['bitcoin', 'lightning', 'cryptocurrency'],
+        versions: ['0.11.0', '0.11.1'],
+      },
+      'latest': {
+        icon: 'assets/img/service-icons/lnd.png',
+        manifest: Mock.MockManifestLnd,
+        categories: ['bitcoin', 'lightning', 'cryptocurrency'],
+        versions: ['0.11.0', '0.11.1'],
+      },
+    },
+  }
+
   export const bitcoind: PackageDataEntry = {
     state: PackageState.Installed,
     'static-files': {
       license: 'licenseURL',
       icon: 'assets/img/service-icons/bitcoind.png',
-      instructions: instructions, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
+      instructions: markdown, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
     installed: {
-      manifest: MockManifestBitcoind,
+      manifest: {
+        ...MockManifestBitcoind,
+        version: '0.20.0',
+      },
       status: {
         configured: true,
         main: {
@@ -385,7 +423,7 @@ export module Mock {
     'static-files': {
       license: 'licenseURL',
       icon: 'assets/img/service-icons/lnd.png',
-      instructions: instructions, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
+      instructions: markdown, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
     installed: {
       manifest: MockManifestLnd,
@@ -567,21 +605,21 @@ export module Mock {
   export const SshKeys: RR.GetSSHKeysRes = {
     '28:d2:7e:78:61:b4:bf:g2:de:24:15:96:4e:d4:15:53': {
       alg: 'ed25519',
-      pubkey: 'VeryLongSSHPublicKey',
       hostname: 'Matt Key',
+      hash: 'VeryLongHashOfSSHKey1',
     },
     '12:f8:7e:78:61:b4:bf:e2:de:24:15:96:4e:d4:72:53': {
       alg: 'ed25519',
-      pubkey: 'VeryLongSSHPublicKey',
       hostname: 'Aiden Key',
+      hash: 'VeryLongHashOfSSHKey2',
     },
   }
 
   export const SshKey: RR.AddSSHKeyRes = {
     '44:44:7e:78:61:b4:bf:g2:de:24:15:96:4e:d4:15:53': {
       alg: 'ed25519',
-      pubkey: 'VeryLongSSHPublicKey',
       hostname: 'Lucy Key',
+      hash: 'VeryLongHashOfSSHKey3',
     },
   }
 

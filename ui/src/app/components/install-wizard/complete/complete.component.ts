@@ -38,7 +38,8 @@ export class CompleteComponent implements OnInit, Loadable {
 
   load () {
     markAsLoadingDuring$(this.$loading$, from(this.params.executeAction())).pipe(takeUntil(this.$cancel$)).subscribe(
-      { error: e => this.transitions.error(new Error(`${this.params.action} failed: ${e.message || e}`)),
+      {
+        error: e => this.transitions.error(new Error(`${this.params.action} failed: ${e.message || e}`)),
         complete: () => this.params.skipCompletionDialogue && this.transitions.final(),
       },
     )
