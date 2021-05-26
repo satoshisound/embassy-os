@@ -1080,10 +1080,14 @@ impl ConfigSpec {
         config_overrides: &IndexMap<PackageId, Config>,
         cfg: &mut Config,
     ) -> Result<(), ConfigurationError> {
-        for (k, v) in cfg.iter_mut() {
-            match self.0.get(k) {
-                None => (),
-                Some(vs) => match vs.update(db, config_overrides, v).await {
+        for (k, vs) in self.0.iter() {
+            match cfg.get_mut(k) {
+                None => {
+                    let mut v = Value::Null;
+                    vs.update(db, config_overrides, &mut v).await?;
+                    cfg.insert(k.clone(), v);
+                }
+                Some(v) => match vs.update(db, config_overrides, v).await {
                     Err(ConfigurationError::NoMatch(e)) => {
                         Err(ConfigurationError::NoMatch(e.prepend(k.clone())))
                     }
