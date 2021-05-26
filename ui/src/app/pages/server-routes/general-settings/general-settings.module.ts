@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { IonicModule } from '@ionic/angular'
-import { ServerConfigPage } from './server-config.page'
+import { GeneralSettingsPage } from './general-settings.page'
 import { Routes, RouterModule } from '@angular/router'
 import { SharingModule } from 'src/app/modules/sharing.module'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
@@ -9,7 +9,7 @@ import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-b
 const routes: Routes = [
   {
     path: '',
-    component: ServerConfigPage,
+    component: GeneralSettingsPage,
   },
 ]
 
@@ -22,7 +22,7 @@ const routes: Routes = [
     PwaBackComponentModule,
   ],
   declarations: [
-    ServerConfigPage,
+    GeneralSettingsPage,
   ],
 })
-export class ServerConfigPageModule { }
+export class GeneralSettingsPageModule { }

@@ -22,7 +22,7 @@ export module Mock {
       id: 'lnd',
       title: 'Lightning Network Daemon',
       version: '0.11.1',
-      descriptionShort: 'A Bitcoin full node by Bitcoin Core.',
+      descriptionShort: 'A BOLT-compliant, lightning network node.',
       icon: 'assets/img/service-icons/lnd.png',
     },
   ]

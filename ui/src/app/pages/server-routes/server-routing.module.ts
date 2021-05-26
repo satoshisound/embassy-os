@@ -23,8 +23,8 @@ const routes: Routes = [
     loadChildren: () => import('./server-logs/server-logs.module').then(m => m.ServerLogsPageModule),
   },
   {
-    path: 'config',
-    loadChildren: () => import('./server-config/server-config.module').then(m => m.ServerConfigPageModule),
+    path: 'settings',
+    loadChildren: () => import('./general-settings/general-settings.module').then(m => m.GeneralSettingsPageModule),
   },
   {
     path: 'wifi',
