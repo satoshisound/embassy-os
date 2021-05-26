@@ -28,7 +28,7 @@ pub struct DockerAction {
     #[serde(default)]
     pub io_format: Option<IoFormat>,
     #[serde(default)]
-    pub inject: bool, // TODO: only allow in Actions
+    pub inject: bool,
     #[serde(default)]
     pub shm_size_mb: Option<usize>, // TODO: use postfix sizing? like 1k vs 1m vs 1g
 }

@@ -77,5 +77,4 @@ impl Migrations {
 #[serde(rename_all = "kebab-case")]
 pub struct MigrationRes {
     pub configured: bool,
-    pub depends_on: IndexMap<PackageId, IndexSet<HealthCheckId>>,
 }

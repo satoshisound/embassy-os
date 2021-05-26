@@ -3,13 +3,12 @@ use std::sync::Arc;
 
 use indexmap::{IndexMap, IndexSet};
 use patch_db::json_ptr::JsonPointer;
-use patch_db::{DbHandle, HasModel, Map, MapModel, Model, ModelData, OptionModel};
+use patch_db::{HasModel, Map, MapModel, OptionModel};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::config::action::ConfigRes;
-use crate::config::spec::{PackagePointerSpecVariant, SystemPointerSpec, ValueSpecPointer};
+use crate::config::spec::{PackagePointerSpecVariant, SystemPointerSpec};
 use crate::id::InterfaceId;
 use crate::install::progress::InstallProgress;
 use crate::net::Network;
@@ -157,10 +156,18 @@ pub struct InstalledPackageDataEntry {
     pub status: Status,
     pub system_pointers: Vec<SystemPointerSpec>,
     #[model]
-    pub dependents: IndexMap<PackageId, Vec<PackagePointerSpecVariant>>,
-    pub required_dependencies: IndexMap<PackageId, IndexSet<HealthCheckId>>,
+    pub current_dependents: IndexMap<PackageId, CurrentDependencyInfo>,
+    #[model]
+    pub current_dependencies: IndexMap<PackageId, CurrentDependencyInfo>,
     #[model]
     pub interface_info: InterfaceInfo,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, HasModel)]
+#[serde(rename_all = "kebab-case")]
+pub struct CurrentDependencyInfo {
+    pub pointers: Vec<PackagePointerSpecVariant>,
+    pub health_checks: IndexSet<HealthCheckId>,
 }
 
 #[derive(Debug, Deserialize, Serialize, HasModel)]

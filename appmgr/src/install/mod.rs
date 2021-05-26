@@ -25,7 +25,9 @@ use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
 use self::progress::{InstallProgress, InstallProgressTracker};
 use crate::context::RpcContext;
-use crate::db::model::{InstalledPackageDataEntry, PackageDataEntry, StaticFiles};
+use crate::db::model::{
+    CurrentDependencyInfo, InstalledPackageDataEntry, PackageDataEntry, StaticFiles,
+};
 use crate::s9pk::manifest::{Manifest, PackageId};
 use crate::s9pk::reader::S9pkReader;
 use crate::status::{DependencyErrors, MainStatus, Status};
@@ -209,7 +211,6 @@ pub async fn download_install_s9pk(
     }
 }
 
-// TODO: Generic over updating
 pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
     ctx: &RpcContext,
     mut db: &mut PatchDbHandle,
@@ -343,6 +344,7 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
         .main
         .install(pkg_id, version, &manifest.volumes, ip)
         .await?;
+    let hosts = network.hosts.clone();
     network.save(&mut tx).await?;
     log::info!("Install {}@{}: Installed main", pkg_id, version);
 
@@ -353,39 +355,66 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
     log::info!("Install {}@{}: Complete", pkg_id, version);
 
     let static_files = StaticFiles::local(pkg_id, version, manifest.assets.icon_type())?;
-    let mut installed = InstalledPackageDataEntry {
+    let installed = InstalledPackageDataEntry {
+        manifest: manifest.clone(),
         status: Status {
             configured: false,
             main: MainStatus::Stopped,
             dependencies: DependencyErrors::default(),
         },
         system_pointers: Vec::new(),
-        dependents: {
+        current_dependents: {
             // search required dependencies
-            todo!()
+            let mut deps = IndexMap::new();
+            for package in crate::db::DatabaseModel::new()
+                .package_data()
+                .keys(&mut tx)
+                .await?
+            {
+                if let Some(dep) = crate::db::DatabaseModel::new()
+                    .package_data()
+                    .idx_model(&package)
+                    .expect(&mut tx)
+                    .await?
+                    .installed()
+                    .and_then(|i| i.current_dependencies().idx_model(pkg_id))
+                    .get(&mut tx)
+                    .await?
+                    .to_owned()
+                {
+                    deps.insert(package, dep);
+                }
+            }
+            deps
         },
-        required_dependencies: manifest
+        current_dependencies: manifest
             .dependencies
             .0
             .iter()
             .filter_map(|(id, info)| {
                 if info.optional.is_none() {
-                    Some((id.clone(), IndexSet::new()))
+                    Some((id.clone(), CurrentDependencyInfo::default()))
                 } else {
                     None
                 }
             })
             .collect(),
         interface_info,
-        manifest,
     };
-    let pde = model.get_mut(&mut tx).await?;
+    let mut pde = model.get_mut(&mut tx).await?;
+    let prev = std::mem::replace(
+        &mut *pde,
+        PackageDataEntry::Installed {
+            installed,
+            static_files,
+        },
+    );
+    pde.save(&mut tx).await?;
     if let PackageDataEntry::Updating {
         installed: prev, ..
-    } = &*pde
+    } = prev
     {
         let mut configured = prev.status.configured;
-        let mut required_dependencies = prev.required_dependencies.clone();
         if let Some(res) = prev
             .manifest
             .migrations
@@ -394,41 +423,42 @@ pub async fn install_s9pk<R: AsyncRead + AsyncSeek + Unpin>(
                 pkg_id,
                 &prev.manifest.version,
                 &prev.manifest.volumes,
-                &network.hosts,
+                &hosts,
             )
             .await?
         {
             configured &= res.configured;
-            required_dependencies = res.depends_on;
         }
         // cleanup(pkg_id, Some(prev)).await?;
-        if let Some(res) = installed
-            .manifest
+        if let Some(res) = manifest
             .migrations
             .from(
                 &prev.manifest.version,
                 pkg_id,
                 version,
-                &installed.manifest.volumes,
-                &network.hosts,
+                &manifest.volumes,
+                &hosts,
             )
             .await?
         {
             configured &= res.configured;
-            required_dependencies = res.depends_on;
         }
         if configured {
-            installed.status.configured = true;
-            installed.required_dependencies = required_dependencies;
+            crate::config::configure(
+                &mut tx,
+                &ctx.docker,
+                &hosts,
+                pkg_id,
+                None,
+                &None,
+                false,
+                &mut IndexMap::new(),
+                &mut IndexMap::new(),
+            )
+            .await?;
             todo!("set as running if viable");
-            todo!("update dependents");
         }
     }
-    *pde = PackageDataEntry::Installed {
-        installed,
-        static_files,
-    };
-    pde.save(&mut tx).await?;
 
     tx.commit(None).await?;
 

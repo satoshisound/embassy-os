@@ -15,7 +15,7 @@ use serde_json::Value;
 use crate::action::docker::DockerAction;
 use crate::config::spec::PackagePointerSpecVariant;
 use crate::context::{EitherContext, ExtendedContext};
-use crate::db::model::InstalledPackageDataEntryModel;
+use crate::db::model::{CurrentDependencyInfo, InstalledPackageDataEntryModel};
 use crate::db::util::WithRevision;
 use crate::dependencies::{BreakageRes, DependencyError, TaggedDependencyError};
 use crate::net::host::Hosts;
@@ -292,7 +292,7 @@ pub async fn set_impl(
     })
 }
 
-fn configure<'a, Db: DbHandle>(
+pub fn configure<'a, Db: DbHandle>(
     db: &'a mut Db,
     docker: &'a Docker,
     hosts: &'a Hosts,
@@ -342,22 +342,33 @@ fn configure<'a, Db: DbHandle>(
         spec.matches(&config)?; // check that new config matches spec
         spec.update(db, &*overrides, &mut config).await?; // dereference pointers in the new config
 
-        if Some(&config) == old_config.as_ref() {
-            // if new config is identical to old config, there's nothing to do
-            return Ok(()); // TODO: maybe run it anyway??
-        }
-
         // create backreferences to pointers
         let mut sys = pkg_model.clone().system_pointers().get_mut(db).await?;
         sys.truncate(0);
-        let mut dep_ptrs = IndexMap::<PackageId, Vec<PackagePointerSpecVariant>>::new();
+        let mut current_dependencies: IndexMap<PackageId, CurrentDependencyInfo> = dependencies
+            .0
+            .iter()
+            .filter_map(|(id, info)| {
+                if info.optional.is_none() {
+                    Some((id.clone(), CurrentDependencyInfo::default()))
+                } else {
+                    None
+                }
+            })
+            .collect();
         for ptr in spec.pointers(&config)? {
             match ptr {
                 ValueSpecPointer::Package(PackagePointerSpec { package_id, target }) => {
-                    if let Some(dep_ptrs) = dep_ptrs.get_mut(&package_id) {
-                        dep_ptrs.push(target);
+                    if let Some(current_dependency) = current_dependencies.get_mut(&package_id) {
+                        current_dependency.pointers.push(target);
                     } else {
-                        dep_ptrs.insert(package_id, vec![target]);
+                        current_dependencies.insert(
+                            package_id,
+                            CurrentDependencyInfo {
+                                pointers: vec![target],
+                                health_checks: IndexSet::new(),
+                            },
+                        );
                     }
                 }
                 ValueSpecPointer::System(s) => sys.push(s),
@@ -372,19 +383,23 @@ fn configure<'a, Db: DbHandle>(
                 .await?;
 
             // track dependencies with no pointers
-            for pkg in res.depends_on.keys() {
-                if !dep_ptrs.contains_key(pkg) {
-                    dep_ptrs.insert(pkg.clone(), Vec::new());
+            for (package_id, health_checks) in res.depends_on.into_iter() {
+                if let Some(current_dependency) = current_dependencies.get_mut(&package_id) {
+                    current_dependency.health_checks.extend(health_checks);
+                } else {
+                    current_dependencies.insert(
+                        package_id,
+                        CurrentDependencyInfo {
+                            pointers: Vec::new(),
+                            health_checks,
+                        },
+                    );
                 }
             }
 
             // track dependency health checks
-            let mut deps = pkg_model
-                .clone()
-                .required_dependencies()
-                .get_mut(db)
-                .await?;
-            *deps = res.depends_on;
+            let mut deps = pkg_model.clone().current_dependencies().get_mut(db).await?;
+            *deps = current_dependencies.clone();
             deps.save(db).await?;
             res.signal
         } else {
@@ -392,7 +407,7 @@ fn configure<'a, Db: DbHandle>(
         };
 
         // update dependencies
-        for (dependency, pointers) in dep_ptrs {
+        for (dependency, dep_info) in current_dependencies {
             if let Some(dependency_model) = crate::db::DatabaseModel::new()
                 .package_data()
                 .idx_model(&dependency)
@@ -401,9 +416,9 @@ fn configure<'a, Db: DbHandle>(
                 .await?
             {
                 dependency_model
-                    .dependents()
+                    .current_dependents()
                     .idx_model(id)
-                    .put(db, &pointers)
+                    .put(db, &dep_info)
                     .await?;
             }
         }
@@ -412,10 +427,10 @@ fn configure<'a, Db: DbHandle>(
         overrides.insert(id.clone(), config.clone());
 
         // handle dependents
-        let dependents = pkg_model.clone().dependents().get(db).await?;
+        let dependents = pkg_model.clone().current_dependents().get(db).await?;
         let prev = old_config.map(Value::Object).unwrap_or_default();
         let next = Value::Object(config.clone());
-        for (dependent, ptrs) in &*dependents {
+        for (dependent, dep_info) in &*dependents {
             fn handle_broken_dependents<'a, Db: DbHandle>(
                 db: &'a mut Db,
                 id: &'a PackageId,
@@ -458,7 +473,7 @@ fn configure<'a, Db: DbHandle>(
                                 .critical
                             {
                                 status.main.stop();
-                                let dependents = model.dependents().get(db).await?;
+                                let dependents = model.current_dependents().get(db).await?;
                                 for (dependent, _) in &*dependents {
                                     let dependent_model = crate::db::DatabaseModel::new()
                                         .package_data()
@@ -520,7 +535,7 @@ fn configure<'a, Db: DbHandle>(
                 }
 
                 // handle backreferences
-                for ptr in ptrs {
+                for ptr in &dep_info.pointers {
                     if let PackagePointerSpecVariant::Config { selector, multi } = ptr {
                         if selector.select(*multi, &next) != selector.select(*multi, &prev) {
                             if let Err(e) = configure(
