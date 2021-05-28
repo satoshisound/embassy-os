@@ -41,7 +41,7 @@ export class RecommendationButtonComponent {
       componentProps: {
         information: `
           <div style="font-size: medium; font-style: italic; margin: 5px 0px;">
-            ${capitalizeFirstLetter(this.rec.title)} Installation Recommendations
+            ${capitalizeFirstLetter(this.rec.dependentTitle)} Installation Recommendations
           </div>
           <div>
             ${this.rec.description}
@@ -57,10 +57,9 @@ export class RecommendationButtonComponent {
 }
 
 export type Recommendation = {
-  title: string
-  appId: string
-  iconURL: string,
-  description: string,
-  versionSpec?: string
-  whyDependency?: string
+  dependentId: string
+  dependentTitle: string
+  dependentIcon: string,
+  description: string
+  version?: string
 }

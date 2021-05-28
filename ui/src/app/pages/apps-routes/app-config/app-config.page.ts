@@ -33,9 +33,9 @@ export class AppConfigPage {
 
   backButtonDefense = false
 
-  recommendation: Recommendation | null = null
-  showRecommendation = true
-  openRecommendation = false
+  rec: Recommendation | null = null
+  showRec = true
+  openRec = false
 
   invalid: string
   edited: boolean
@@ -93,18 +93,18 @@ export class AppConfigPage {
       concatMap(({ spec, config }) => {
         const rec = history.state && history.state.configRecommendation as Recommendation
         if (rec) {
-          this.loadingText$.next(`Setting properties to accommodate ${rec.title}...`)
-          return from(this.apiService.dryConfigureDependency({ 'dependency-id': pkgId, 'dependent-id': rec.appId }))
+          this.loadingText$.next(`Setting properties to accommodate ${rec.dependentTitle}...`)
+          return from(this.apiService.dryConfigureDependency({ 'dependency-id': pkgId, 'dependent-id': rec.dependentId }))
           .pipe(
             map(res => ({
               spec,
               config,
               dependencyConfig: res,
             })),
-            tap(() => this.recommendation = rec),
+            tap(() => this.rec = rec),
             catchError(e => {
-              this.error = { text: `Could not set properties to accommodate ${rec.title}: ${e.message}`, moreInfo: {
-                title: `${rec.title} requires the following:`,
+              this.error = { text: `Could not set properties to accommodate ${rec.dependentTitle}: ${e.message}`, moreInfo: {
+                title: `${rec.dependentTitle} requires the following:`,
                 description: rec.description,
                 buttonText: 'Configure Manually',
               } }
@@ -160,8 +160,8 @@ export class AppConfigPage {
     this.hasConfig = !isEmptyObject(this.spec)
   }
 
-  dismissRecommendation () {
-    this.showRecommendation = false
+  dismissRec () {
+    this.showRec = false
   }
 
   dismissError () {

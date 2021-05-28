@@ -19,7 +19,7 @@ function handleInstalledState (status: Status): PkgStatusRendering {
     return { display: 'Needs Config', color: 'warning', showDots: false, feStatus: FEStatus.NeedsConfig }
   }
 
-  if (Object.values(status.dependencies).length) {
+  if (Object.values(status['dependency-errors']).length) {
     return { display: 'Dependency Issue', color: 'warning', showDots: false, feStatus: FEStatus.DependencyIssue }
   }
 

@@ -190,6 +190,12 @@ export interface AvailableShow {
   manifest: Manifest
   categories: string[]
   versions: string[]
+  'dependency-metadata': {
+    [id: string]: {
+      title: string
+      icon: URL
+    }
+  }
 }
 
 export interface BreakageRes {

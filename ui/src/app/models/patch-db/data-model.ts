@@ -1,5 +1,4 @@
 import { ConfigSpec } from 'src/app/pkg-config/config-types'
-import { Breakages } from 'src/app/services/api/api-types'
 
 export interface DataModel {
   'server-info': ServerInfo
@@ -46,7 +45,7 @@ export interface PackageDataEntry {
     instructions: URL
     icon: URL
   }
-  'unverified-manifest'?: Manifest // exists when: installing, updating
+  'temp-manifest'?: Manifest // exists when: installing, updating, removing
   installed?: InstalledPackageDataEntry, // exists when: installed, updating, removing
   'install-progress'?: InstallProgress, // exists when: installing, updating
 }
@@ -65,6 +64,14 @@ export interface InstalledPackageDataEntry {
   manifest: Manifest
   status: Status
   'interface-info': InterfaceInfo
+  'system-pointers': any[]
+  'current-dependents': { [id: string]: CurrentDependencyInfo }
+  'current-dependencies': { [id: string]: CurrentDependencyInfo }
+}
+
+export interface CurrentDependencyInfo {
+  pointers: any[]
+  'health-checks': string[] // array of health check IDs
 }
 
 export enum PackageState {
@@ -210,7 +217,7 @@ export interface Action {
 export interface Status {
   configured: boolean
   main: MainStatus
-  dependencies: Breakages
+  'dependency-errors': { [id: string]: DependencyError }
 }
 
 export type MainStatus = MainStatusStopped | MainStatusStopping | MainStatusRunning | MainStatusBackingUp | MainStatusRestoring
@@ -272,32 +279,43 @@ export interface HealthCheckResultFailure {
 
 export type DependencyError = DependencyErrorNotInstalled | DependencyErrorNotRunning | DependencyErrorIncorrectVersion | DependencyErrorConfigUnsatisfied | DependencyErrorHealthCheckFailed | DependencyErrorInterfaceHealthChecksFailed
 
+export enum DependencyErrorType {
+  NotInstalled = 'not-installed',
+  NotRunning = 'not-running',
+  IncorrectVersion = 'incorrect-version',
+  ConfigUnsatisfied = 'config-unsatisfied',
+  HealthCheckFailed = 'health-check-failed',
+  InterfaceHealthChecksFailed = 'interface-health-checks-failed',
+}
+
 export interface DependencyErrorNotInstalled {
-  type: 'not-installed'
+  type: DependencyErrorType.NotInstalled
+  title: string
+  icon: URL
 }
 
 export interface DependencyErrorNotRunning {
-  type: 'not-running'
+  type: DependencyErrorType.NotRunning
 }
 
 export interface DependencyErrorIncorrectVersion {
-  type: 'incorrect-version'
+  type: DependencyErrorType.IncorrectVersion
   expected: string // version range
   received: string // version
 }
 
 export interface DependencyErrorConfigUnsatisfied {
-  type: 'config-unsatisfied'
+  type: DependencyErrorType.ConfigUnsatisfied
   errors: string[]
 }
 
 export interface DependencyErrorHealthCheckFailed {
-  type: 'health-check-failed'
+  type: DependencyErrorType.HealthCheckFailed
   check: HealthCheckResult
 }
 
 export interface DependencyErrorInterfaceHealthChecksFailed {
-  type: 'interface-health-checks-failed'
+  type: DependencyErrorType.InterfaceHealthChecksFailed
   failures: { [id: string]: HealthCheckResult }
 }
 
@@ -308,7 +326,7 @@ export interface DependencyInfo {
 export interface DependencyEntry {
   version: string
   optional: string | null
-  default: boolean
+  recommended: boolean
   description: string | null
   config: ConfigRuleEntryWithSuggestions[]
   interfaces: any[] // @TODO placeholder

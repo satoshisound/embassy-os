@@ -2,7 +2,6 @@ import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { Routes, RouterModule } from '@angular/router'
 import { IonicModule } from '@ionic/angular'
-import { DependencyListComponentModule } from 'src/app/components/dependency-list/dependency-list.component.module'
 import { AppInstalledShowPage } from './app-installed-show.page'
 import { StatusComponentModule } from 'src/app/components/status/status.component.module'
 import { SharingModule } from 'src/app/modules/sharing.module'
@@ -22,7 +21,6 @@ const routes: Routes = [
   imports: [
     CommonModule,
     StatusComponentModule,
-    DependencyListComponentModule,
     SharingModule,
     IonicModule,
     RouterModule.forChild(routes),

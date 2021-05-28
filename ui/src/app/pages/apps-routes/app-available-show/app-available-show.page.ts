@@ -2,7 +2,6 @@ import { Component } from '@angular/core'
 import { ActivatedRoute } from '@angular/router'
 import { ApiService } from 'src/app/services/api/api.service'
 import { AlertController, ModalController, NavController, PopoverController } from '@ionic/angular'
-import { BehaviorSubject } from 'rxjs'
 import { Recommendation } from 'src/app/components/recommendation-button/recommendation-button.component'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
 import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
@@ -21,22 +20,16 @@ import { PackageState } from 'src/app/models/patch-db/data-model'
 })
 export class AppAvailableShowPage {
   loading = true
-
-  // When a new version is selected
-  // newVersionLoading$ = new BehaviorSubject(false)
-  // When dependencies are refreshing
-  // dependenciesLoading$ = new BehaviorSubject(false)
-
   error = ''
   pkg: AvailableShow
   pkgId: string
 
   PackageState = PackageState
 
-  // openRecommendation = false
-  // recommendation: Recommendation | null = null
+  openRecommendation = false
+  recommendation: Recommendation | null = null
 
-  serviceDependencyDefintion = '<span style="font-style: italic">Service Dependencies</span> are other services that this service recommends or requires in order to run.'
+  depDefinition = '<span style="font-style: italic">Service Dependencies</span> are other services that this service recommends or requires in order to run.'
 
   constructor (
     private readonly route: ActivatedRoute,

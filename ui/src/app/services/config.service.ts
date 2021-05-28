@@ -98,10 +98,10 @@ export function hasUi (interfaces: { [id: string]: InterfaceDef }): boolean {
 }
 
 export function getManifest (pkg: PackageDataEntry): Manifest {
-  if ([PackageState.Installing, PackageState.Updating].includes(pkg.state)) {
-    return pkg['unverified-manifest']
+  if (pkg.state === PackageState.Installed) {
+    return pkg.installed.manifest
   }
-  return pkg.installed.manifest
+  return pkg['temp-manifest']
 }
 
 function removeProtocol (str: string): string {

@@ -1,19 +1,19 @@
 import { Component, ViewChild } from '@angular/core'
-import { AlertController, NavController, ToastController, ModalController, IonContent, PopoverController } from '@ionic/angular'
+import { AlertController, NavController, ModalController, IonContent, PopoverController } from '@ionic/angular'
 import { ApiService } from 'src/app/services/api/api.service'
-import { ActivatedRoute } from '@angular/router'
-import { copyToClipboard } from 'src/app/util/web.util'
+import { ActivatedRoute, NavigationExtras } from '@angular/router'
 import { chill } from 'src/app/util/misc.util'
 import { LoaderService } from 'src/app/services/loader.service'
 import { Observable, of, Subscription } from 'rxjs'
 import { wizardModal } from 'src/app/components/install-wizard/install-wizard.component'
 import { WizardBaker } from 'src/app/components/install-wizard/prebaked-wizards'
 import { InformationPopoverComponent } from 'src/app/components/information-popover/information-popover.component'
-import { ConfigService, lanUiAddress, torUiAddress } from 'src/app/services/config.service'
+import { ConfigService } from 'src/app/services/config.service'
 import { PatchDbModel } from 'src/app/models/patch-db/patch-db-model'
-import { PackageDataEntry } from 'src/app/models/patch-db/data-model'
+import { DependencyErrorConfigUnsatisfied, DependencyErrorNotInstalled, DependencyErrorType, PackageDataEntry, PackageState } from 'src/app/models/patch-db/data-model'
 import { FEStatus } from 'src/app/services/pkg-status-rendering.service'
 import { ConnectionService } from 'src/app/services/connection.service'
+import { Recommendation } from 'src/app/components/recommendation-button/recommendation-button.component'
 
 @Component({
   selector: 'app-installed-show',
@@ -28,8 +28,10 @@ export class AppInstalledShowPage {
   hideLAN: boolean
 
   FeStatus = FEStatus
+  PackageState = PackageState
+  DependencyErrorType = DependencyErrorType
 
-  dependencyDefintion = () => `<span style="font-style: italic">Dependencies</span> are other services which must be installed, configured appropriately, and started in order to start ${this.pkg.installed.manifest.title}`
+  depDefinition = '<span style="font-style: italic">Service Dependencies</span> are other services that this service recommends or requires in order to run.'
 
   @ViewChild(IonContent) content: IonContent
 
@@ -38,13 +40,12 @@ export class AppInstalledShowPage {
     private readonly route: ActivatedRoute,
     private readonly navCtrl: NavController,
     private readonly loader: LoaderService,
-    private readonly toastCtrl: ToastController,
     private readonly modalCtrl: ModalController,
     private readonly apiService: ApiService,
     private readonly wizardBaker: WizardBaker,
     private readonly popoverController: PopoverController,
     private readonly config: ConfigService,
-    private readonly patch: PatchDbModel,
+    public readonly patch: PatchDbModel,
     public readonly connectionService: ConnectionService,
   ) { }
 
@@ -59,32 +60,6 @@ export class AppInstalledShowPage {
 
   launchUiTab (): void {
     window.open(this.config.launchableURL(this.pkg.installed), '_blank')
-  }
-
-  async copyTor (): Promise<void> {
-    let message = ''
-    await copyToClipboard(torUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
-
-    const toast = await this.toastCtrl.create({
-      header: message,
-      position: 'bottom',
-      duration: 1000,
-      cssClass: 'notification-toast',
-    })
-    await toast.present()
-  }
-
-  async copyLAN (): Promise<void> {
-    let message = ''
-    await copyToClipboard(lanUiAddress(this.pkg.installed) || '').then(success => { message = success ? 'copied to clipboard!' :  'failed to copy' })
-
-    const toast = await this.toastCtrl.create({
-      header: message,
-      position: 'bottom',
-      duration: 1000,
-      cssClass: 'notification-toast',
-    })
-    await toast.present()
   }
 
   async stop (): Promise<void> {
@@ -158,6 +133,53 @@ export class AppInstalledShowPage {
     if (!el) return
     let y = el.offsetTop
     return this.content.scrollToPoint(0, y, 1000)
+  }
+
+  async fixDep (action: 'install' | 'update' | 'configure', id: string): Promise<void> {
+    switch (action) {
+      case 'install':
+      case 'update':
+        return this.installDep(id)
+      case 'configure':
+        return this.configureDep(id)
+    }
+  }
+
+  private async installDep (depId: string): Promise<void> {
+    const version = this.pkg.installed.manifest.dependencies[depId].version
+    const dependentTitle = this.pkg.installed.manifest.title
+
+    const installationRecommendation: Recommendation = {
+      dependentId: this.pkgId,
+      dependentTitle,
+      dependentIcon: this.pkg['static-files'].icon,
+      version,
+      description: `${dependentTitle} requires an install of ${(this.pkg.installed.status['dependency-errors'][depId] as DependencyErrorNotInstalled)?.title} satisfying ${version}.`,
+    }
+    const navigationExtras: NavigationExtras = {
+      state: { installationRecommendation },
+    }
+
+    await this.navCtrl.navigateForward(`/services/marketplace/${depId}`, navigationExtras)
+  }
+
+  private async configureDep (depId: string): Promise<void> {
+    const configErrors = (this.pkg.installed.status['dependency-errors'][depId] as DependencyErrorConfigUnsatisfied).errors
+
+    const description = `<ul>${configErrors.map(d => `<li>${d}</li>`).join('\n')}</ul>`
+    const dependentTitle = this.pkg.installed.manifest.title
+
+    const configRecommendation: Recommendation = {
+      dependentId: this.pkgId,
+      dependentTitle,
+      dependentIcon: this.pkg['static-files'].icon,
+      description,
+    }
+    const navigationExtras: NavigationExtras = {
+      state: { configRecommendation },
+    }
+
+    await this.navCtrl.navigateForward(`/services/installed/${depId}/config`, navigationExtras)
   }
 
   private async presentAlertStart (message: string): Promise<void> {

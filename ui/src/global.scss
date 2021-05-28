@@ -286,7 +286,7 @@ ion-avatar {
   --inner-border-width: 0;
 }
 
-.recommendation-item {
+.rec-item {
   margin: 10px;
   border-style: solid;
   border-width: 1px;
@@ -317,4 +317,9 @@ ion-item-divider {
 .dots-medium {
   width: 16px !important;
   height: 16px !important;
+}
+
+.dependency-item {
+  --padding-start: 20px;
+  --padding-end: 2px;
 }

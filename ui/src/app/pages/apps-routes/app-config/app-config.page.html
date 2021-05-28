@@ -54,26 +54,26 @@
         </ion-item>
       </ng-container>
 
-      <ng-container *ngIf="recommendation && showRecommendation">
-        <ion-item class="recommendation-item">
+      <ng-container *ngIf="rec && showRec">
+        <ion-item class="rec-item">
           <ion-label class="ion-text-wrap">
             <h2 style="display: flex; align-items: center;">
               <ion-icon size="small" style="margin: 4px" slot="start" color="primary" slot="start" name="ellipse"></ion-icon>
               <ion-avatar style="width: 3vh; height: 3vh; margin: 0px 2px 0px 5px;" slot="start">
-                <img [src]="recommendation.iconURL" [alt]="recommendation.title"/>
+                <img [src]="rec.dependentIcon" [alt]="rec.dependentTitle"/>
               </ion-avatar>
-              <ion-text style="margin: 5px; font-family: 'Montserrat'; font-size: smaller;">{{recommendation.title}}</ion-text>
+              <ion-text style="margin: 5px; font-family: 'Montserrat'; font-size: smaller;">{{ rec.dependentTitle }}</ion-text>
             </h2>
             <div style="margin: 7px 5px;">
-              <p style="font-size: small; color: var(--ion-color-medium)"> {{app.title | ngrxPush}} config has been modified to satisfy {{recommendation.title}}.
+              <p style="font-size: small; color: var(--ion-color-medium)"> {{app.title | ngrxPush}} config has been modified to satisfy {{ rec.dependentTitle }}.
                 <ion-text color="dark">To accept the changes, click “Save” below.</ion-text>
               </p>
-              <a style="font-size: small" *ngIf="!openRecommendation" (click)="openRecommendation = true">More Info</a>
-              <ng-container *ngIf="openRecommendation">
-                <p style="margin-top: 10px; color: var(--ion-color-medium); font-size: small" [innerHTML]="recommendation.description"></p>
-                <a style="font-size: x-small; font-style: italic;" (click)="openRecommendation = false">hide</a>
+              <a style="font-size: small" *ngIf="!openRec" (click)="openRec = true">More Info</a>
+              <ng-container *ngIf="openRec">
+                <p style="margin-top: 10px; color: var(--ion-color-medium); font-size: small" [innerHTML]="rec.description"></p>
+                <a style="font-size: x-small; font-style: italic;" (click)="openRec = false">hide</a>
               </ng-container>
-              <ion-button style="position: absolute; right: 0; top: 0" color="primary" fill="clear" (click)="dismissRecommendation()">
+              <ion-button style="position: absolute; right: 0; top: 0" color="primary" fill="clear" (click)="dismissRec()">
                 <ion-icon name="close-outline"></ion-icon>
               </ion-button>
             </div>

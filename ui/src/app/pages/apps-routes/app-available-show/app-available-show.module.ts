@@ -2,7 +2,6 @@ import { NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { Routes, RouterModule } from '@angular/router'
 import { IonicModule } from '@ionic/angular'
-import { DependencyListComponentModule } from '../../../components/dependency-list/dependency-list.component.module'
 import { AppAvailableShowPage } from './app-available-show.page'
 import { SharingModule } from 'src/app/modules/sharing.module'
 import { PwaBackComponentModule } from 'src/app/components/pwa-back-button/pwa-back.component.module'
@@ -24,7 +23,6 @@ const routes: Routes = [
     CommonModule,
     IonicModule,
     StatusComponentModule,
-    DependencyListComponentModule,
     RouterModule.forChild(routes),
     SharingModule,
     PwaBackComponentModule,

@@ -292,11 +292,19 @@ export module Mock {
     },
     permissions: { },
     dependencies: {
-      bitcoind: {
+      'bitcoind': {
         version: '0.21.0',
         description: 'LND needs bitcoin to live.',
         optional: null,
-        default: true,
+        recommended: true,
+        config: [],
+        interfaces: [],
+      },
+      'bitcoin-proxy': {
+        version: '0.2.2',
+        description: 'As long as Bitcoin is pruned, LND needs Bitcoin Proxy to fetch block over the P2P network.',
+        optional: null,
+        recommended: true,
         config: [],
         interfaces: [],
       },
@@ -318,6 +326,7 @@ export module Mock {
         },
         categories: ['bitcoin', 'cryptocurrency'],
         versions: ['0.19.0', '0.20.0', '0.21.0'],
+        'dependency-metadata': { },
       },
       '0.20.0': {
         icon: 'assets/img/service-icons/bitcoind.png',
@@ -328,6 +337,7 @@ export module Mock {
         },
         categories: ['bitcoin', 'cryptocurrency'],
         versions: ['0.19.0', '0.20.0', '0.21.0'],
+        'dependency-metadata': { },
       },
       '0.21.0': {
         icon: 'assets/img/service-icons/bitcoind.png',
@@ -338,12 +348,14 @@ export module Mock {
         },
         categories: ['bitcoin', 'cryptocurrency'],
         versions: ['0.19.0', '0.20.0', '0.21.0'],
+        'dependency-metadata': { },
       },
       'latest': {
         icon: 'assets/img/service-icons/bitcoind.png',
         manifest: Mock.MockManifestBitcoind,
         categories: ['bitcoin', 'cryptocurrency'],
         versions: ['0.19.0', '0.20.0', '0.21.0'],
+        'dependency-metadata': { },
       },
     },
     'lnd': {
@@ -356,6 +368,16 @@ export module Mock {
         },
         categories: ['bitcoin', 'lightning', 'cryptocurrency'],
         versions: ['0.11.0', '0.11.1'],
+        'dependency-metadata': {
+          'bitcoind': {
+            title: 'Bitcoin Core',
+            icon: 'assets/img/service-icons/bitcoind.png',
+          },
+          'bitcoin-proxy': {
+            title: 'Bitcoin Proxy',
+            icon: 'assets/img/service-icons/bitcoin-proxy.png',
+          },
+        },
       },
       '0.11.1': {
         icon: 'assets/img/service-icons/lnd.png',
@@ -366,12 +388,32 @@ export module Mock {
         },
         categories: ['bitcoin', 'lightning', 'cryptocurrency'],
         versions: ['0.11.0', '0.11.1'],
+        'dependency-metadata': {
+          'bitcoind': {
+            title: 'Bitcoin Core',
+            icon: 'assets/img/service-icons/bitcoind.png',
+          },
+          'bitcoin-proxy': {
+            title: 'Bitcoin Proxy',
+            icon: 'assets/img/service-icons/bitcoin-proxy.png',
+          },
+        },
       },
       'latest': {
         icon: 'assets/img/service-icons/lnd.png',
         manifest: Mock.MockManifestLnd,
         categories: ['bitcoin', 'lightning', 'cryptocurrency'],
         versions: ['0.11.0', '0.11.1'],
+        'dependency-metadata': {
+          'bitcoind': {
+            title: 'Bitcoin Core',
+            icon: 'assets/img/service-icons/bitcoind.png',
+          },
+          'bitcoin-proxy': {
+            title: 'Bitcoin Proxy',
+            icon: 'assets/img/service-icons/bitcoin-proxy.png',
+          },
+        },
       },
     },
   }
@@ -383,6 +425,7 @@ export module Mock {
       icon: 'assets/img/service-icons/bitcoind.png',
       instructions: markdown, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
+    'temp-manifest': MockManifestBitcoind,
     installed: {
       manifest: {
         ...MockManifestBitcoind,
@@ -395,7 +438,7 @@ export module Mock {
           started: new Date().toISOString(),
           health: { },
         },
-        dependencies: { },
+        'dependency-errors': { },
       },
       'interface-info': {
         ip: '10.0.0.1',
@@ -414,8 +457,15 @@ export module Mock {
           },
         },
       },
+      'system-pointers': [],
+      'current-dependents': {
+        'lnd': {
+          pointers: [],
+          'health-checks': [],
+        },
+      },
+      'current-dependencies': { },
     },
-    'unverified-manifest': MockManifestBitcoind,
   }
 
   export const lnd: PackageDataEntry = {
@@ -425,6 +475,7 @@ export module Mock {
       icon: 'assets/img/service-icons/lnd.png',
       instructions: markdown, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
+    'temp-manifest': MockManifestLnd,
     installed: {
       manifest: MockManifestLnd,
       status: {
@@ -432,7 +483,7 @@ export module Mock {
         main: {
           status: PackageMainStatus.Stopped,
         },
-        dependencies: { },
+        'dependency-errors': { },
       },
       'interface-info': {
         ip: '10.0.0.1',
@@ -447,8 +498,19 @@ export module Mock {
           },
         },
       },
+      'system-pointers': [],
+      'current-dependents': { },
+      'current-dependencies': {
+        'bitcoind': {
+          pointers: [],
+          'health-checks': [],
+        },
+        'bitcoin-proxy': {
+          pointers: [],
+          'health-checks': [],
+        },
+      },
     },
-    'unverified-manifest': MockManifestLnd,
   }
 
   export const DbDump: RR.GetDumpRes = {
