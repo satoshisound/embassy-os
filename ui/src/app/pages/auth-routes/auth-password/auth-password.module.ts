@@ -3,13 +3,13 @@ import { RouterModule, Routes } from '@angular/router'
 import { CommonModule } from '@angular/common'
 import { FormsModule } from '@angular/forms'
 import { IonicModule } from '@ionic/angular'
-import { AuthenticatePage } from './authenticate.page'
+import { AuthPasswordPage } from './auth-password.page'
 import { SharingModule } from 'src/app/modules/sharing.module'
 
 const routes: Routes = [
   {
     path: '',
-    component: AuthenticatePage,
+    component: AuthPasswordPage,
   },
 ]
 
@@ -21,6 +21,6 @@ const routes: Routes = [
     RouterModule.forChild(routes),
     SharingModule,
   ],
-  declarations: [AuthenticatePage],
+  declarations: [AuthPasswordPage],
 })
-export class AuthenticatePageModule { }
+export class AuthPasswordPageModule { }

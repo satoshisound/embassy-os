@@ -34,7 +34,7 @@ export class AuthGuard implements CanActivate, CanActivateChild {
       case AuthState.UNVERIFIED:
       // @TODO could initializing cause a loop?
       case AuthState.INITIALIZING:
-        this.router.navigate(['/authenticate'], { replaceUrl: true })
+        this.router.navigate(['/auth'], { replaceUrl: true })
         return false
     }
   }

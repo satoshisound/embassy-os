@@ -98,7 +98,7 @@ export class AppComponent {
         this.showMenu = false
         this.patch.stop()
         this.storage.clear()
-        this.router.navigate(['/authenticate'], { replaceUrl: true })
+        this.router.navigate(['/auth'], { replaceUrl: true })
       }
     })
 

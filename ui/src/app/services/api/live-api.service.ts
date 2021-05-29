@@ -36,8 +36,12 @@ export class LiveApiService extends ApiService {
 
   // auth
 
-  async login (params: RR.LoginReq): Promise<RR.LoginRes> {
-    return this.http.rpcRequest({ method: 'auth.login', params })
+  async submitPin (params: RR.SubmitPinReq): Promise<RR.SubmitPinRes> {
+    return this.http.rpcRequest({ method: 'auth.pin', params })
+  }
+
+  async submitPassword (params: RR.SubmitPasswordReq): Promise<RR.SubmitPasswordRes> {
+    return this.http.rpcRequest({ method: 'auth.password', params })
   }
 
   async logout (params: RR.LogoutReq): Promise<RR.LogoutRes> {

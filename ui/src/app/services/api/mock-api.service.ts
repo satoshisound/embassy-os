@@ -71,7 +71,12 @@ export class MockApiService extends ApiService {
 
   // auth
 
-  async login (params: RR.LoginReq): Promise<RR.LoginRes> {
+  async submitPin (params: RR.SubmitPinReq): Promise<RR.SubmitPinRes> {
+    await pauseFor(2000)
+    return null
+  }
+
+  async submitPassword (params: RR.SubmitPasswordReq): Promise<RR.SubmitPasswordRes> {
     await pauseFor(2000)
     return null
   }

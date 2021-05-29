@@ -34,7 +34,9 @@ export abstract class ApiService implements Source<DataModel>, Http<DataModel> {
 
   // auth
 
-  abstract login (params: RR.LoginReq): Promise<RR.LoginRes>
+  abstract submitPin (params: RR.SubmitPinReq): Promise<RR.SubmitPinRes>
+
+  abstract submitPassword (params: RR.SubmitPasswordReq): Promise<RR.SubmitPasswordReq>
 
   abstract logout (params: RR.LogoutReq): Promise<RR.LogoutRes>
 
