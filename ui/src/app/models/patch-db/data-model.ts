@@ -46,7 +46,7 @@ export interface PackageDataEntry {
     icon: URL
   }
   'temp-manifest'?: Manifest // exists when: installing, updating, removing
-  installed?: InstalledPackageDataEntry, // exists when: installed, updating, removing
+  installed?: InstalledPackageDataEntry, // exists when: installed, updating
   'install-progress'?: InstallProgress, // exists when: installing, updating
 }
 

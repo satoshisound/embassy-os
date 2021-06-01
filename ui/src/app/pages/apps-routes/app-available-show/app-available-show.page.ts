@@ -26,8 +26,8 @@ export class AppAvailableShowPage {
 
   PackageState = PackageState
 
-  openRecommendation = false
-  recommendation: Recommendation | null = null
+  rec: Recommendation | null = null
+  showRec = true
 
   depDefinition = '<span style="font-style: italic">Service Dependencies</span> are other services that this service recommends or requires in order to run.'
 
@@ -45,6 +45,7 @@ export class AppAvailableShowPage {
 
   async ngOnInit () {
     this.pkgId = this.route.snapshot.paramMap.get('pkgId') as string
+    this.rec = history.state && history.state.installRec as Recommendation
     this.getPkg()
   }
 
@@ -111,7 +112,6 @@ export class AppAvailableShowPage {
         id,
         title,
         version,
-        serviceRequirements: dependencies, // @TODO what type is service requirements?
         installAlert: alerts.install,
       }),
     )
@@ -140,5 +140,9 @@ export class AppAvailableShowPage {
     if (cancelled) return
     await pauseFor(250)
     this.navCtrl.back()
+  }
+
+  dismissRec () {
+    this.showRec = false
   }
 }

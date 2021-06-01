@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core'
-import { DependencyInfo, InstalledPackageDataEntry, PackageDataEntry } from 'src/app/models/patch-db/data-model'
+import { InstalledPackageDataEntry } from 'src/app/models/patch-db/data-model'
 import { Breakages } from 'src/app/services/api/api-types'
 import { exists } from 'src/app/util/misc.util'
 import { ApiService } from '../../services/api/api.service'
@@ -13,17 +13,16 @@ export class WizardBaker {
   ) { }
 
   install (values: {
-    id: string, title: string, version: string, serviceRequirements: DependencyInfo, installAlert?: string
+    id: string, title: string, version: string, installAlert?: string
   }): InstallWizardComponent['params'] {
-    const { id, title, version, serviceRequirements, installAlert } = values
+    const { id, title, version, installAlert } = values
 
     validate(id, exists, 'missing id')
     validate(title, exists, 'missing title')
     validate(version, exists, 'missing version')
-    validate(serviceRequirements, t => !!t && Array.isArray(t), 'missing serviceRequirements')
 
     const action = 'install'
-    const toolbar: TopbarParams  = { action, title, version }
+    const toolbar: TopbarParams = { action, title, version }
 
     const slideDefinitions: SlideDefinition[] = [
       installAlert ? {
@@ -39,21 +38,6 @@ export class WizardBaker {
           cancel: { afterLoading: { text: 'Cancel' } }, next: 'Next',
         },
       } : undefined,
-      // {
-      //   slide: {
-      //     selector: 'dependencies',
-      //     params: {
-      //       action,
-      //       title,
-      //       version,
-      //       serviceRequirements,
-      //     },
-      //   },
-      //   bottomBar: {
-      //     cancel: { afterLoading: { text: 'Cancel' } },
-      //     next: 'Install',
-      //   },
-      // },
       {
         slide: {
           selector: 'complete',
@@ -74,14 +58,13 @@ export class WizardBaker {
   }
 
   update (values: {
-    id: string, title: string, version: string, serviceRequirements: DependencyInfo, installAlert?: string
+    id: string, title: string, version: string, installAlert?: string
   }): InstallWizardComponent['params'] {
-    const { id, title, version, serviceRequirements, installAlert } = values
+    const { id, title, version, installAlert } = values
 
     validate(id, exists, 'missing id')
     validate(title, exists, 'missing title')
     validate(version, exists, 'missing version')
-    validate(serviceRequirements, t => !!t && Array.isArray(t), 'missing serviceRequirements')
 
     const action = 'update'
     const toolbar: TopbarParams  = { action, title, version }
@@ -101,36 +84,24 @@ export class WizardBaker {
           next: 'Next',
         },
       } : undefined,
-      // { slide: {
-      //     selector: 'dependencies',
-      //     params: {
-      //       action,
-      //       title,
-      //       version,
-      //       serviceRequirements,
-      //     },
-      //   },
-      //   bottomBar: {
-      //     cancel: { afterLoading: { text: 'Cancel' } },
-      //     next: 'Update',
-      //   },
-      // },
-      // { slide: {
-      //     selector: 'dependents',
-      //     params: {
-      //       skipConfirmationDialogue: true,
-      //       action,
-      //       verb: 'updating',
-      //       title,
-      //       fetchBreakages: () => this.apiService.dryUpdatePackage({ id, version }).then( ({ breakages }) => breakages ),
-      //     },
-      //   },
-      //   bottomBar: {
-      //     cancel: { afterLoading: { text: 'Cancel' } },
-      //     next: 'Update Anyways',
-      //   },
-      // },
-      { slide: {
+      {
+        slide: {
+          selector: 'dependents',
+          params: {
+            skipConfirmationDialogue: true,
+            action,
+            verb: 'updating',
+            title,
+            fetchBreakages: () => this.apiService.dryUpdatePackage({ id, version }).then( ({ breakages }) => breakages ),
+          },
+        },
+        bottomBar: {
+          cancel: { afterLoading: { text: 'Cancel' } },
+          next: 'Update Anyways',
+        },
+      },
+      {
+        slide: {
           selector: 'complete',
           params: {
             action,
@@ -158,7 +129,8 @@ export class WizardBaker {
     const toolbar: TopbarParams  = { action, title, version }
 
     const slideDefinitions: SlideDefinition[] = [
-      { slide : {
+      {
+        slide : {
           selector: 'notes',
           params: {
             notes: releaseNotes,
@@ -170,7 +142,8 @@ export class WizardBaker {
           cancel: { afterLoading: { text: 'Cancel' } }, next: 'Update OS',
         },
       },
-      { slide: {
+      {
+        slide: {
           selector: 'complete',
           params: {
             action,
@@ -189,14 +162,13 @@ export class WizardBaker {
   }
 
   downgrade (values: {
-    id: string, title: string, version: string, serviceRequirements: DependencyInfo, installAlert?: string
+    id: string, title: string, version: string, installAlert?: string
   }): InstallWizardComponent['params'] {
-    const { id, title, version, serviceRequirements, installAlert } = values
+    const { id, title, version, installAlert } = values
 
     validate(id, exists, 'missing id')
     validate(title, exists, 'missing title')
     validate(version, exists, 'missing version')
-    validate(serviceRequirements, t => !!t && Array.isArray(t), 'missing serviceRequirements')
 
     const action = 'downgrade'
     const toolbar: TopbarParams  = { action, title, version }
@@ -213,34 +185,20 @@ export class WizardBaker {
         },
         bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Next' },
       } : undefined,
-      // { slide: {
-      //     selector: 'dependencies',
-      //     params: {
-      //       action,
-      //       title,
-      //       version,
-      //       serviceRequirements,
-      //     },
-      //   },
-      //   bottomBar: {
-      //     cancel: { afterLoading: { text: 'Cancel' } },
-      //     next: 'Downgrade',
-      //   },
-      // },
-      // { slide: {
-      //     selector: 'dependents',
-      //     params: {
-      //       skipConfirmationDialogue: true,
-      //       action,
-      //       verb: 'downgrading',
-      //       title,
-      //       fetchBreakages: () => this.apiService.dryUpdatePackage({ id, version }).then( ({ breakages }) => breakages ),
-      //     },
-      //   },
-      //   bottomBar: {
-      //     cancel: { whileLoading: { }, afterLoading: { text: 'Cancel' } }, next: 'Downgrade Anyways',
-      //   },
-      // },
+      { slide: {
+          selector: 'dependents',
+          params: {
+            skipConfirmationDialogue: true,
+            action,
+            verb: 'downgrading',
+            title,
+            fetchBreakages: () => this.apiService.dryUpdatePackage({ id, version }).then( ({ breakages }) => breakages ),
+          },
+        },
+        bottomBar: {
+          cancel: { whileLoading: { }, afterLoading: { text: 'Cancel' } }, next: 'Downgrade Anyways',
+        },
+      },
       { slide: {
           selector: 'complete',
           params: {
@@ -272,7 +230,8 @@ export class WizardBaker {
     const toolbar: TopbarParams  = { action, title, version }
 
     const slideDefinitions: SlideDefinition[] = [
-      { slide: {
+      {
+        slide: {
           selector: 'notes',
           params: {
             notes: uninstallAlert || defaultUninstallationWarning(title),
@@ -282,18 +241,20 @@ export class WizardBaker {
         },
         bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Continue' },
       },
-      // { slide: {
-      //     selector: 'dependents',
-      //     params: {
-      //       action,
-      //       verb: 'uninstalling',
-      //       title,
-      //       fetchBreakages: () => this.apiService.dryRemovePackage({ id }).then( ({ breakages }) => breakages ),
-      //     },
-      //   },
-      //   bottomBar: { cancel: { whileLoading: { }, afterLoading: { text: 'Cancel' } }, next: 'Uninstall' },
-      // },
-      { slide: {
+      {
+        slide: {
+          selector: 'dependents',
+          params: {
+            action,
+            verb: 'uninstalling',
+            title,
+            fetchBreakages: () => this.apiService.dryRemovePackage({ id }).then( ({ breakages }) => breakages ),
+          },
+        },
+        bottomBar: { cancel: { whileLoading: { }, afterLoading: { text: 'Cancel' } }, next: 'Uninstall' },
+      },
+      {
+        slide: {
           selector: 'complete',
           params: {
             action,
@@ -321,17 +282,18 @@ export class WizardBaker {
     const toolbar: TopbarParams  = { action, title, version }
 
     const slideDefinitions: SlideDefinition[] = [
-      // { slide: {
-      //     selector: 'dependents',
-      //     params: {
-      //       action,
-      //       verb: 'stopping',
-      //       title,
-      //       fetchBreakages: () => Promise.resolve(breakages),
-      //     },
-      //   },
-      //   bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Stop Anyways' },
-      // },
+      {
+        slide: {
+          selector: 'dependents',
+          params: {
+            action,
+            verb: 'stopping',
+            title,
+            fetchBreakages: () => Promise.resolve(breakages),
+          },
+        },
+        bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Stop Anyways' },
+      },
     ]
     return { toolbar, slideDefinitions }
   }
@@ -343,16 +305,17 @@ export class WizardBaker {
     const toolbar: TopbarParams  = { action, title, version }
 
     const slideDefinitions: SlideDefinition[] = [
-      // { slide: {
-      //     selector: 'dependents',
-      //     params: {
-      //       action,
-      //       verb: 'saving config for',
-      //       title, fetchBreakages: () => Promise.resolve(breakages),
-      //     },
-      //   },
-      //   bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Save Config Anyways' },
-      // },
+      {
+        slide: {
+          selector: 'dependents',
+          params: {
+            action,
+            verb: 'saving config for',
+            title, fetchBreakages: () => Promise.resolve(breakages),
+          },
+        },
+        bottomBar: { cancel: { afterLoading: { text: 'Cancel' } }, next: 'Save Config Anyways' },
+      },
     ]
     return { toolbar, slideDefinitions }
   }

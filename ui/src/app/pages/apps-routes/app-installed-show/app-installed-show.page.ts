@@ -149,7 +149,7 @@ export class AppInstalledShowPage {
     const version = this.pkg.installed.manifest.dependencies[depId].version
     const dependentTitle = this.pkg.installed.manifest.title
 
-    const installationRecommendation: Recommendation = {
+    const installRec: Recommendation = {
       dependentId: this.pkgId,
       dependentTitle,
       dependentIcon: this.pkg['static-files'].icon,
@@ -157,7 +157,7 @@ export class AppInstalledShowPage {
       description: `${dependentTitle} requires an install of ${(this.pkg.installed.status['dependency-errors'][depId] as DependencyErrorNotInstalled)?.title} satisfying ${version}.`,
     }
     const navigationExtras: NavigationExtras = {
-      state: { installationRecommendation },
+      state: { installRec },
     }
 
     await this.navCtrl.navigateForward(`/services/marketplace/${depId}`, navigationExtras)

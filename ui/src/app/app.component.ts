@@ -3,7 +3,7 @@ import { Storage } from '@ionic/storage'
 import { AuthService, AuthState } from './services/auth.service'
 import { ApiService } from './services/api/api.service'
 import { Router, RoutesRecognized } from '@angular/router'
-import { filter, finalize, takeWhile } from 'rxjs/operators'
+import { distinctUntilChanged, filter, finalize, takeWhile } from 'rxjs/operators'
 import { AlertController, ToastController } from '@ionic/angular'
 import { LoaderService } from './services/loader.service'
 import { Emver } from './services/emver.service'
@@ -12,6 +12,7 @@ import { LoadingOptions } from '@ionic/core'
 import { PatchDbModel } from './models/patch-db/patch-db-model'
 import { HttpService } from './services/http.service'
 import { ServerStatus } from './models/patch-db/data-model'
+import { ConnectionService } from './services/connection.service'
 
 @Component({
   selector: 'app-root',
@@ -55,6 +56,7 @@ export class AppComponent {
     private readonly alertCtrl: AlertController,
     private readonly loader: LoaderService,
     private readonly emver: Emver,
+    private readonly connectionService: ConnectionService,
     private readonly toastCtrl: ToastController,
     readonly splitPane: SplitPaneTracker,
     readonly patch: PatchDbModel,
@@ -72,12 +74,6 @@ export class AppComponent {
 
     this.router.initialNavigation()
 
-    // let fromFresh = true
-    // if (fromFresh) {
-    //   this.router.initialNavigation()
-    //   fromFresh = false
-    // }
-
     // watch auth
     this.authService.watch$()
     .subscribe(auth => {
@@ -86,6 +82,8 @@ export class AppComponent {
         this.http.authReqEnabled = true
         this.showMenu = true
         this.patch.start()
+        // watch network
+        this.watchNetwork(auth)
         // watch router to highlight selected menu item
         this.watchRouter(auth)
         // watch status to display/hide maintenance page
@@ -104,6 +102,17 @@ export class AppComponent {
 
     this.http.watch401$().subscribe(() => {
       this.authService.setUnverified()
+    })
+  }
+
+  private watchNetwork (auth: AuthState): void {
+    this.connectionService.monitor$()
+    .pipe(
+      distinctUntilChanged(),
+      takeWhile(() => auth === AuthState.VERIFIED),
+    )
+    .subscribe(c => {
+      console.log('CONNECTION CHANGED', c)
     })
   }
 

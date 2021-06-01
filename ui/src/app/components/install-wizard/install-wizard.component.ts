@@ -3,8 +3,7 @@ import { IonContent, IonSlides, ModalController } from '@ionic/angular'
 import { BehaviorSubject } from 'rxjs'
 import { capitalizeFirstLetter, pauseFor } from 'src/app/util/misc.util'
 import { CompleteComponent } from './complete/complete.component'
-// import { DependenciesComponent } from './dependencies/dependencies.component'
-// import { DependentsComponent } from './dependents/dependents.component'
+import { DependentsComponent } from './dependents/dependents.component'
 import { NotesComponent } from './notes/notes.component'
 import { Loadable } from './loadable'
 import { WizardAction } from './wizard-types'
@@ -39,8 +38,8 @@ export class InstallWizardComponent {
     return this.params.slideDefinitions[this.slideIndex].bottomBar
   }
 
-  $initializing$ = new BehaviorSubject(true)
-  $error$ = new BehaviorSubject(undefined)
+  initializing$ = new BehaviorSubject(true)
+  error$ = new BehaviorSubject(undefined)
 
   constructor (
     private readonly modalController: ModalController,
@@ -54,15 +53,15 @@ export class InstallWizardComponent {
   }
 
   ionViewDidEnter () {
-    this.$initializing$.next(false)
+    this.initializing$.next(false)
   }
 
   // process bottom bar buttons
   private transition = (info: { next: any } | { error: Error } | { cancelled: true } | { final: true }) => {
     const i = info as { next?: any, error?: Error, cancelled?: true, final?: true }
-    if (i.cancelled) this.currentSlide.$cancel$.next()
+    if (i.cancelled) this.currentSlide.cancel$.next()
     if (i.final || i.cancelled) return this.modalController.dismiss(i)
-    if (i.error) return this.$error$.next(capitalizeFirstLetter(i.error.message))
+    if (i.error) return this.error$.next(capitalizeFirstLetter(i.error.message))
 
     this.moveToNextSlide(i.next)
   }
@@ -91,8 +90,7 @@ export class InstallWizardComponent {
 
 export interface SlideDefinition {
   slide:
-    // { selector: 'dependencies', params: DependenciesComponent['params'] } |
-    // { selector: 'dependents', params: DependentsComponent['params'] } |
+    { selector: 'dependents', params: DependentsComponent['params'] } |
     { selector: 'complete', params: CompleteComponent['params'] } |
     { selector: 'notes', params: NotesComponent['params'] }
   bottomBar: {

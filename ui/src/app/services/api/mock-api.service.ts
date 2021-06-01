@@ -3,7 +3,7 @@ import { pauseFor } from '../../util/misc.util'
 import { ApiService } from './api.service'
 import { Observable } from 'rxjs'
 import { PatchOp, Update } from 'patch-db-client'
-import { DataModel, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
+import { DataModel, PackageDataEntry, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
 import { ConfigService } from '../config.service'
 import { RR } from './api-types'
 import { parsePropertiesPermissive } from 'src/app/util/properties.util'
@@ -299,28 +299,30 @@ export class MockApiService extends ApiService {
 
   async installPackageRaw (params: RR.InstallPackageReq): Promise<RR.InstallPackageRes> {
     await pauseFor(2000)
+    const pkg: PackageDataEntry = {
+      ...Mock.bitcoinproxy,
+      state: PackageState.Installing,
+      'temp-manifest': Mock.MockManifestBitcoinProxy,
+      // installed: undefined,
+      'install-progress': {
+        size: 100,
+        downloaded: 10,
+        'download-complete': false,
+        validated: 1,
+        'validation-complete': true,
+        read: 50,
+        'read-complete': false,
+      },
+    }
     return {
       response: null,
       revision: {
         id: this.nextSequence(),
         patch: [
           {
-            op: PatchOp.REPLACE,
-            path: `/package-data/${params.id}/state`,
-            value: PackageState.Installing,
-          },
-          {
             op: PatchOp.ADD,
-            path: `/package-data/${params.id}/install-progress`,
-            value: {
-              size: 100,
-              downloaded: 10,
-              'download-complete': false,
-              validated: 1,
-              'validation-complete': true,
-              read: 50,
-              'read-complete': false,
-            },
+            path: `/package-data/${params.id}`,
+            value: pkg,
           },
         ],
         expireId: null,

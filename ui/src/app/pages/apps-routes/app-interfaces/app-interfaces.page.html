@@ -13,7 +13,10 @@
     <ion-card style="margin-bottom: 16px;" *ngFor="let interface of pkg.installed.manifest.interfaces | keyvalue: asIsOrder">
       <ion-card-header>
         <ion-card-title>
-          {{ interface.value.name }} <ion-icon *ngIf="interface.value.ui" [disabled]="!(pkg | isLaunchable)" name="rocket-outline" color="primary" (click)="launch()"></ion-icon>
+          {{ interface.value.name }}
+          <ion-button class="vertical-align" *ngIf="interface.value.ui" [disabled]="!(pkg | isLaunchable)" fill="clear" (click)="launch(pkg.installed)">
+            <ion-icon slot="icon-only" name="rocket-outline" size="small"></ion-icon>
+          </ion-button>
         </ion-card-title>
         <ion-card-subtitle>{{ interface.value.description }}</ion-card-subtitle>
       </ion-card-header>

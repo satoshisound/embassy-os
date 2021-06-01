@@ -1,4 +1,4 @@
-import { DockerIoFormat, Manifest, PackageDataEntry, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
+import { DependencyErrorType, DockerIoFormat, Manifest, PackageDataEntry, PackageMainStatus, PackageState, ServerStatus } from 'src/app/models/patch-db/data-model'
 import { NotificationLevel, RR, ServerNotification, ServerNotifications } from './api-types'
 import markdown from 'raw-loader!./md-sample.md'
 
@@ -24,6 +24,13 @@ export module Mock {
       version: '0.11.1',
       descriptionShort: 'A BOLT-compliant, lightning network node.',
       icon: 'assets/img/service-icons/lnd.png',
+    },
+    {
+      id: 'bitcoin-proxy',
+      title: 'Bitcoin Proxy',
+      version: '0.2.2',
+      descriptionShort: 'A super charger for your Bitcoin node.',
+      icon: 'assets/img/service-icons/bitcoin-proxy.png',
     },
   ]
 
@@ -293,7 +300,7 @@ export module Mock {
     permissions: { },
     dependencies: {
       'bitcoind': {
-        version: '0.21.0',
+        version: '=0.21.0',
         description: 'LND needs bitcoin to live.',
         optional: null,
         recommended: true,
@@ -301,8 +308,111 @@ export module Mock {
         interfaces: [],
       },
       'bitcoin-proxy': {
-        version: '0.2.2',
+        version: '>=0.2.2',
         description: 'As long as Bitcoin is pruned, LND needs Bitcoin Proxy to fetch block over the P2P network.',
+        optional: null,
+        recommended: true,
+        config: [],
+        interfaces: [],
+      },
+    },
+  }
+
+  export const MockManifestBitcoinProxy: Manifest = {
+    id: 'bitcoin-proxy',
+    title: 'Bitcoin Proxy',
+    version: '0.2.2',
+    description: {
+      short: 'A super charger for your Bitcoin node.',
+      long: 'More info about Bitcoin Proxy. More info about Bitcoin Proxy. More info about Bitcoin Proxy.',
+    },
+    'release-notes': 'Even better support for Bitcoin and wallets!',
+    license: 'MIT',
+    'wrapper-repo': 'https://github.com/start9labs/btc-rpc-proxy-wrapper',
+    'upstream-repo': 'https://github.com/Kixunil/btc-rpc-proxy',
+    'support-site': '',
+    'marketing-site': '',
+    alerts: {
+      install: null,
+      uninstall: null,
+      restore: null,
+      start: null,
+      stop: null,
+    },
+    main: {
+      type: 'docker',
+      image: '',
+      system: true,
+      entrypoint: '',
+      args: [''],
+      mounts: { },
+      'io-format': DockerIoFormat.Yaml,
+      inject: false,
+      'shm-size': '',
+    },
+    'health-check': {
+      type: 'docker',
+      image: '',
+      system: true,
+      entrypoint: '',
+      args: [''],
+      mounts: { },
+      'io-format': DockerIoFormat.Yaml,
+      inject: false,
+      'shm-size': '',
+    },
+    config: null,
+    volumes: { },
+    'min-os-version': '0.2.12',
+    interfaces: {
+      rpc: {
+        name: 'RPC interface',
+        description: 'Good for connecting to your node at a distance.',
+        ui: true,
+        'tor-config': {
+          'hidden-service-version': 'v3',
+          'port-mapping': { },
+        },
+        'lan-config': {
+          44: {
+            ssl: true,
+            mapping: 33,
+          },
+        },
+        protocols: [],
+      },
+    },
+    backup: {
+      create: {
+        type: 'docker',
+        image: '',
+        system: true,
+        entrypoint: '',
+        args: [''],
+        mounts: { },
+        'io-format': DockerIoFormat.Yaml,
+        inject: false,
+        'shm-size': '',
+      },
+      restore: {
+        type: 'docker',
+        image: '',
+        system: true,
+        entrypoint: '',
+        args: [''],
+        mounts: { },
+        'io-format': DockerIoFormat.Yaml,
+        inject: false,
+        'shm-size': '',
+      },
+    },
+    migrations: null,
+    actions: { },
+    permissions: { },
+    dependencies: {
+      'bitcoind': {
+        version: '>=0.20.0',
+        description: 'Bitcoin Proxy requires a Bitcoin node.',
         optional: null,
         recommended: true,
         config: [],
@@ -416,6 +526,20 @@ export module Mock {
         },
       },
     },
+    'bitcoin-proxy': {
+      'latest': {
+        icon: 'assets/img/service-icons/bitcoin-proxy.png',
+        manifest: Mock.MockManifestBitcoinProxy,
+        categories: ['bitcoin'],
+        versions: ['0.2.2'],
+        'dependency-metadata': {
+          'bitcoind': {
+            title: 'Bitcoin Core',
+            icon: 'assets/img/service-icons/bitcoind.png',
+          },
+        },
+      },
+    },
   }
 
   export const bitcoind: PackageDataEntry = {
@@ -425,7 +549,7 @@ export module Mock {
       icon: 'assets/img/service-icons/bitcoind.png',
       instructions: markdown, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
-    'temp-manifest': MockManifestBitcoind,
+    'temp-manifest': undefined,
     installed: {
       manifest: {
         ...MockManifestBitcoind,
@@ -466,6 +590,7 @@ export module Mock {
       },
       'current-dependencies': { },
     },
+    'install-progress': undefined,
   }
 
   export const lnd: PackageDataEntry = {
@@ -475,7 +600,7 @@ export module Mock {
       icon: 'assets/img/service-icons/lnd.png',
       instructions: markdown, // /public/package-data/bitcoind/0.21.1/INSTRUCTIONS.md
     },
-    'temp-manifest': MockManifestLnd,
+    'temp-manifest': undefined,
     installed: {
       manifest: MockManifestLnd,
       status: {
@@ -483,7 +608,13 @@ export module Mock {
         main: {
           status: PackageMainStatus.Stopped,
         },
-        'dependency-errors': { },
+        'dependency-errors': {
+          'bitcoin-proxy': {
+            type: DependencyErrorType.NotInstalled,
+            title: Mock.MockManifestBitcoinProxy.title,
+            icon: 'assets/img/service-icons/bitcoin-proxy.png',
+          },
+        },
       },
       'interface-info': {
         ip: '10.0.0.1',
@@ -511,6 +642,52 @@ export module Mock {
         },
       },
     },
+    'install-progress': undefined,
+  }
+
+  export const bitcoinproxy: PackageDataEntry = {
+    state: PackageState.Installed,
+    'static-files': {
+      license: 'licenseURL',
+      icon: 'assets/img/service-icons/bitcoin-proxy.png',
+      instructions: '*These are some instructions.*', // /public/package-data/bitcoinproxy/0.2.2/INSTRUCTIONS.md
+    },
+    'temp-manifest': undefined,
+    installed: {
+      manifest: MockManifestBitcoinProxy,
+      status: {
+        configured: true,
+        main: {
+          status: PackageMainStatus.Running,
+          started: new Date().toISOString(),
+          health: { },
+        },
+        'dependency-errors': { },
+      },
+      'interface-info': {
+        ip: '10.0.0.1',
+        addresses: {
+          rpc: {
+            'tor-address': 'bitcoinproxy-rpc-address.onion',
+            'lan-address': 'bitcoinproxy-rpc-address.local',
+          },
+        },
+      },
+      'system-pointers': [],
+      'current-dependents': {
+        'lnd': {
+          pointers: [],
+          'health-checks': [],
+        },
+      },
+      'current-dependencies': {
+        'bitcoind': {
+          pointers: [],
+          'health-checks': [],
+        },
+      },
+    },
+    'install-progress': undefined,
   }
 
   export const DbDump: RR.GetDumpRes = {
